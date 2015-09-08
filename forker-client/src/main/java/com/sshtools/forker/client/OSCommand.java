@@ -82,7 +82,7 @@ public class OSCommand {
         try {
             List<String> args = new ArrayList<String>(Arrays.asList(sargs));
             askPass = getAskPass(args);
-            LOG.info("Running command: " + StringUtils.join(args, " "));
+            LOG.fine("Running command: " + StringUtils.join(args, " "));
             ForkerBuilder pb = new ForkerBuilder(args);
             pb.io(IO.INPUT);
             if (askPass != null) {
