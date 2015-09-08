@@ -47,6 +47,16 @@ When both input and output to a process is required, and you want low fork costs
 			<email>brett@nervepoint.com</email>
 		</developer>
 	</developers>
+	
+	<distributionManagement>
+		<snapshotRepository>
+			<uniqueVersion>true</uniqueVersion>
+			<id>opensource-snapshots</id>
+			<name>Nervepoint Host Opensource Snapshots</name>
+			<url>http://artifactory.javassh.com/opensource-snapshots</url>
+			<layout>default</layout>
+		</snapshotRepository>
+	</distributionManagement>
 
 	<modules>
 		<module>forker-common</module>
