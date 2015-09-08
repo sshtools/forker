@@ -1,0 +1,134 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	
+	
+	<properties>
+		<maven.compiler.target>1.6</maven.compiler.target>
+		<maven.compiler.source>1.6</maven.compiler.source>
+	</properties>
+	
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>com.sshtools</groupId>
+	<artifactId>forker</artifactId>
+	<version>1.1-SNAPSHOT</version>
+	<name>Forker</name>
+	<description>Forker is a set of utilities and helpers for launching processes in the most efficient way
+
+Used as a replacement to ProcessBuilder and Runtime.exec(), it uses a number of different techniques to reduce the memory impact of these operations, as well as a number of utilities for common process execution requirements, and facilities  to run processes in the background and with elevated privileges.
+
+Depending on whether input, output, or I/O is needed (which should be provided as hint to the API), popen, system or a standard process will be used.
+
+When both input and output to a process is required, and you want low fork costs, a separate optional daemon process may be used. The daemon waits for a command and set of arguments , and executes them. Because the virtual machine for the daemon is MUCH smaller, the impact of the fork is greatly lessened.  
+</description>
+	<url>http://www.nervepoint.com</url>
+	<packaging>pom</packaging>
+
+	<parent>
+		<groupId>org.sonatype.oss</groupId>
+		<artifactId>oss-parent</artifactId>
+		<version>7</version>
+	</parent>
+
+	<licenses>
+		<license>
+			<name>Apache License Version 2.0</name>
+			<url>http://www.apache.org/licenses/LICENSE-2.0</url>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
+	<scm>
+		<url>https://github.com/sshtools/forker</url>
+		<connection>https://github.com/sshtools/forker.git</connection>
+	</scm>
+	<developers>
+		<developer>
+			<id>brett</id>
+			<name>Brett Smith</name>
+			<email>brett@nervepoint.com</email>
+		</developer>
+	</developers>
+
+	<modules>
+		<module>forker-common</module>
+		<module>forker-daemon</module>
+		<module>forker-client</module>
+		<module>forker-examples</module>
+	</modules>
+
+	<dependencies>
+		<!-- Tests -->
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<version>4.7</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>log4j</groupId>
+			<artifactId>log4j</artifactId>
+			<version>1.2.16</version>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<profiles>
+		<profile>
+			<id>release-sign-artifacts</id>
+			<activation>
+				<property>
+					<name>performRelease</name>
+					<value>true</value>
+				</property>
+			</activation>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-gpg-plugin</artifactId>
+						<version>1.1</version>
+						<executions>
+							<execution>
+								<id>sign-artifacts</id>
+								<phase>verify</phase>
+								<goals>
+									<goal>sign</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+
+	<build>
+		<pluginManagement>
+			<plugins>
+				<plugin>
+					<groupId>org.eclipse.m2e</groupId>
+					<artifactId>lifecycle-mapping</artifactId>
+					<version>1.0.0</version>
+					<configuration>
+						<lifecycleMappingMetadata>
+							<pluginExecutions>
+								<pluginExecution>
+									<pluginExecutionFilter>
+										<groupId>org.apache.maven.plugins</groupId>
+										<artifactId>maven-enforcer-plugin</artifactId>
+										<versionRange>[1.0.0,)</versionRange>
+										<goals>
+											<goal>enforce</goal>
+										</goals>
+									</pluginExecutionFilter>
+									<action>
+										<ignore />
+									</action>
+								</pluginExecution>
+							</pluginExecutions>
+						</lifecycleMappingMetadata>
+					</configuration>
+				</plugin>
+			</plugins>
+		</pluginManagement>
+	</build>
+</project>
