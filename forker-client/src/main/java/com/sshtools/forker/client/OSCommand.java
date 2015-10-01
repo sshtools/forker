@@ -150,8 +150,8 @@ public class OSCommand {
         }
     }
 
-    public static void runCommand(OutputStream out, List<String> args) throws IOException {
-        runCommand((File) null, out, (String[]) args.toArray(new String[0]));
+    public static int runCommand(OutputStream out, List<String> args) throws IOException {
+        return runCommand((File) null, out, (String[]) args.toArray(new String[0]));
     }
 
     public static int runCommand(List<String> args) throws IOException {
