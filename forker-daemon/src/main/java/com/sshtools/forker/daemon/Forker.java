@@ -31,7 +31,6 @@ public class Forker {
 	public void start() throws IOException {
 		executor = Executors.newFixedThreadPool(threads);
 
-		@SuppressWarnings("resource")
 		ServerSocket s = new ServerSocket(port, backlog,
 				InetAddress.getLocalHost());
 		s.setReuseAddress(true);
@@ -226,10 +225,11 @@ public class Forker {
 						s.getOutputStream());
 				Command cmd = new Command(din);
 				System.out.println(cmd);
-				if (cmd.getIO() == IO.PTY)
+				if (cmd.getIO() == IO.PTY) {
 					handlePTYCommand(din, dout, cmd);
-				else
+				} else {
 					handleStandardCommand(din, dout, cmd);
+				}
 			} catch (IOException ioe) {
 				System.err.println("Forker client I/O failed.");
 				ioe.printStackTrace();
