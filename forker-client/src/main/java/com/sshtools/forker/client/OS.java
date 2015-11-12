@@ -6,7 +6,7 @@ import java.io.IOException;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.SystemUtils;
 
-import com.sshtools.forker.client.ForkerBuilder.IO;
+import com.sshtools.forker.common.IO;
 
 public class OS {
 

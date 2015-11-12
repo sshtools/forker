@@ -13,4 +13,5 @@ public class States {
     public final static int CLOSE_ERR = 8;
     public final static int CLOSE_IN = 9;
     public final static int FLUSH_OUT = 10;
+    public final static int WINDOW_SIZE = 11;
 }

@@ -53,6 +53,21 @@
 			<version>4.7</version>
 			<scope>test</scope>
 		</dependency>
+		
+		<dependency>
+			<groupId>pty4j</groupId>
+			<artifactId>pty4j</artifactId>
+			<version>0.4-SNAPSHOT</version>
+			<type>jar</type>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>pty4j</groupId>
+			<artifactId>pty4j-natives</artifactId>
+			<version>0.4-SNAPSHOT</version>
+			<type>jar</type>
+			<scope>compile</scope>
+		</dependency>
 
 		<!-- Use log4j in tests -->
 		<dependency>
