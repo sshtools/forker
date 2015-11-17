@@ -5,6 +5,7 @@ import java.io.OutputStream;
 
 import com.sshtools.forker.client.AbstractOSProcess;
 import com.sshtools.forker.client.ForkerBuilder;
+import com.sshtools.forker.common.CSystem;
 
 public class SystemProcess extends AbstractOSProcess {
 

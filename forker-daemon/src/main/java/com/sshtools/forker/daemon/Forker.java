@@ -11,7 +11,12 @@ import java.net.Socket;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.SystemUtils;
+
 import com.pty4j.PtyProcess;
+import com.pty4j.util.PtyUtil;
+import com.sshtools.forker.common.CSystem;
 import com.sshtools.forker.common.Command;
 import com.sshtools.forker.common.Defaults;
 import com.sshtools.forker.common.IO;
@@ -23,6 +28,7 @@ public class Forker {
 	private int backlog = 10;
 	private int threads = 5;
 	private ExecutorService executor;
+	private ServerSocket socket;
 
 	public Forker() {
 
@@ -31,13 +37,11 @@ public class Forker {
 	public void start() throws IOException {
 		executor = Executors.newFixedThreadPool(threads);
 
-		@SuppressWarnings("resource")
-		ServerSocket s = new ServerSocket(port, backlog,
-				InetAddress.getLocalHost());
-		s.setReuseAddress(true);
+		socket = new ServerSocket(port, backlog, InetAddress.getLocalHost());
+		socket.setReuseAddress(true);
 		while (true) {
-			Socket c = s.accept();
-			executor.execute(new Client(c));
+			Socket c = socket.accept();
+			executor.execute(new Client(this, c));
 		}
 	}
 
@@ -46,14 +50,60 @@ public class Forker {
 		f.start();
 	}
 
-	private static void handlePTYCommand(final DataInputStream din,
-			final DataOutputStream dout, final Command cmd) throws IOException {
+	private static void handlePTYCommand(Forker forker,
+			final DataInputStream din, final DataOutputStream dout,
+			final Command cmd) throws IOException {
 
 		try {
+			/*
+			 * HACK! Make sure the classes are loaded now so that there are not
+			 * problems when it's forked
+			 * 
+			 * These don't actually get used
+			 */
+			OutputThread outThread = new OutputThread(null, null, null);
+			InputThread inThread = new InputThread(null, null) {
+				@Override
+				void kill() {
+				}
+			};
+			
+			PtyUtil.resolveNativeLibrary();
 
-			final PtyProcess pty = PtyProcess.exec((String[]) cmd
-					.getArguments().toArray(new String[0]), cmd
-					.getEnvironment(), cmd.getDirectory().getAbsolutePath());
+			// Change the EUID before we fork
+			int euidWas = -1;
+			if (!StringUtils.isBlank(cmd.getRunAs())) {
+				if (SystemUtils.IS_OS_LINUX || SystemUtils.IS_OS_MAC_OSX) {
+					euidWas = CSystem.INSTANCE.geteuid();
+					int euid = Integer.parseInt(cmd.getRunAs());
+					if (CSystem.INSTANCE.seteuid(euid) == -1) {
+						// TODO get errono
+						throw new RuntimeException("Failed to set EUID.");
+					}
+					System.out.println("RUN AS " + euid);
+				}
+			}
+
+			PtyProcess ptyorig = null;
+			try {
+				ptyorig = PtyProcess.exec((String[]) cmd.getArguments()
+						.toArray(new String[0]), cmd.getEnvironment(), cmd
+						.getDirectory().getAbsolutePath());
+			} finally {
+				// And return to previous ID
+				if (euidWas != -1) {
+					if (CSystem.INSTANCE.seteuid(euidWas) == -1) {
+						// TODO get errono
+						throw new RuntimeException("Failed to set EUID.");
+					}
+					System.out.println("NOW RUNNING AS " + euidWas);
+				}
+			}
+			final PtyProcess pty = ptyorig;
+
+			// The JVM is now forked, so free up some resources we won't
+			// actually use
+			forker.socket.close();
 
 			InputStream in = pty.getInputStream();
 			OutputStream out = pty.getOutputStream();
@@ -65,22 +115,18 @@ public class Forker {
 			dout.writeInt(States.WINDOW_SIZE);
 			dout.writeInt(width);
 			dout.writeInt(height);
-			new Thread() {
-				public void run() {
-					readStreamToOutput(dout, err,
-							cmd.isRedirectError() ? States.OUT : States.ERR);
-				}
-			}.start();
+			outThread = new OutputThread(dout, cmd, err);
+			outThread.start();
 
 			// Take any input coming the other way
-			final Thread input = new InputThread(out, din) {
+			inThread = new InputThread(out, din) {
 
 				@Override
 				void kill() {
 					pty.destroy();
 				}
 			};
-			input.start();
+			inThread.start();
 			readStreamToOutput(dout, in, States.IN);
 			synchronized (dout) {
 				dout.writeInt(States.END);
@@ -89,7 +135,7 @@ public class Forker {
 			}
 
 			// Wait for stream other end to close
-			input.join();
+			inThread.join();
 		} catch (Throwable t) {
 			t.printStackTrace();
 			synchronized (dout) {
@@ -147,7 +193,7 @@ public class Forker {
 		}
 	}
 
-	private static void readStreamToOutput(final DataOutputStream dout,
+	static void readStreamToOutput(final DataOutputStream dout,
 			final InputStream stream, final int outStream) {
 		// Capture stdout if not already doing so via
 		// ProcessBuilder
@@ -166,54 +212,14 @@ public class Forker {
 		}
 	}
 
-	private abstract static class InputThread extends Thread {
-		private final DataInputStream din;
-		private final OutputStream out;
-
-		private InputThread(OutputStream out, DataInputStream din) {
-			this.out = out;
-			this.din = din;
-		}
-
-		abstract void kill();
-
-		public void run() {
-			try {
-				boolean run = true;
-				while (run) {
-					int cmd = din.readInt();
-					if (cmd == States.OUT) {
-						int len = din.readInt();
-						byte[] buf = new byte[len];
-						din.readFully(buf);
-						out.write(buf);
-					} else if (cmd == States.KILL) {
-						kill();
-					} else if (cmd == States.CLOSE_OUT) {
-						out.close();
-						break;
-					} else if (cmd == States.FLUSH_OUT) {
-						out.flush();
-						break;
-					} else if (cmd == States.END) {
-						run = false;
-						break;
-					} else {
-						throw new IllegalStateException(
-								"Unknown state code from client '" + cmd + "'");
-					}
-				}
-			} catch (IOException ioe) {
-			}
-		}
-	}
-
 	private final static class Client implements Runnable {
 
 		private Socket s;
+		private Forker forker;
 
-		public Client(Socket s) {
+		public Client(Forker forker, Socket s) {
 			this.s = s;
+			this.forker = forker;
 		}
 
 		@Override
@@ -227,7 +233,7 @@ public class Forker {
 				Command cmd = new Command(din);
 				System.out.println(cmd);
 				if (cmd.getIO() == IO.PTY)
-					handlePTYCommand(din, dout, cmd);
+					handlePTYCommand(forker, din, dout, cmd);
 				else
 					handleStandardCommand(din, dout, cmd);
 			} catch (IOException ioe) {

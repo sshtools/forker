@@ -6,6 +6,7 @@ import java.io.OutputStream;
 
 import com.sshtools.forker.client.AbstractOSProcess;
 import com.sshtools.forker.client.ForkerBuilder;
+import com.sshtools.forker.common.CSystem;
 import com.sshtools.forker.common.IO;
 import com.sun.jna.Memory;
 
@@ -22,7 +23,7 @@ public class POpenProcess extends AbstractOSProcess {
 		if(builder.effectiveUser() == null)
 			doBuildCommand(builder);
 		else {
-			builder.effectiveUser().elevate(builder, this);
+			builder.effectiveUser().elevate(builder, this, null);
 			try {
 				doBuildCommand(builder);
 			}

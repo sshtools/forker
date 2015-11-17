@@ -6,6 +6,8 @@ import java.util.Map;
 
 import org.apache.commons.lang.SystemUtils;
 
+import com.sshtools.forker.common.Util;
+
 public abstract class AbstractOSProcess extends Process {
 
 	protected String buildCommand(final ForkerBuilder builder) {

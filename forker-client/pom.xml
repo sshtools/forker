@@ -9,7 +9,7 @@ It provides the ProcessBuilder replacement, ForkerBuilder, as well the helpers i
 	<parent>
 		<groupId>com.sshtools</groupId>
 		<artifactId>forker</artifactId>
-		<version>1.1-SNAPSHOT</version>
+		<version>1.2-SNAPSHOT</version>
 		<relativePath>..</relativePath>
 	</parent>
 
@@ -44,11 +44,6 @@ It provides the ProcessBuilder replacement, ForkerBuilder, as well the helpers i
 			<artifactId>junit</artifactId>
 			<version>4.7</version>
 			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>net.java.dev.jna</groupId>
-			<artifactId>jna</artifactId>
-			<version>4.1.0</version>
 		</dependency>
 
 

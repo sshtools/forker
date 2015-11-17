@@ -1,4 +1,4 @@
-package com.sshtools.forker.client;
+package com.sshtools.forker.common;
 
 public class Util {
 

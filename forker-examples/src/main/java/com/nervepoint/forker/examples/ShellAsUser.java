@@ -4,29 +4,17 @@ import java.io.IOException;
 
 import org.apache.commons.io.IOUtils;
 
+import com.sshtools.forker.client.EffectiveUserFactory;
 import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.client.ShellBuilder;
-import com.sshtools.forker.client.impl.ForkerProcess;
-import com.sshtools.forker.client.impl.ForkerProcess.Listener;
 import com.sshtools.forker.common.IO;
 
-public class Shell {
+public class ShellAsUser {
 
 	public static void main(String[] args) throws Exception {
 		ForkerBuilder shell = new ShellBuilder().loginShell(true).io(IO.PTY).redirectErrorStream(true);
+		shell.effectiveUser(new EffectiveUserFactory.POSIXEffectiveUser(65534));
 		final Process p = shell.start();
-		
-		/* NOTE: The process will actually be an instance of ForkerProcess in the case of PTY.
-		 * You can cast this to add listeners for window size
-		 */
-		ForkerProcess fp = (ForkerProcess)p;
-		fp.addListener(new Listener() {
-			@Override
-			public void windowSizeChanged(int ptyWidth, int ptyHeight) {
-				System.out.println("Window size changed to " + ptyWidth + " x " + ptyHeight);
-			}
-		});
-		
 		new Thread() {
 			public void run() {
 				try {

@@ -1,4 +1,4 @@
-package com.sshtools.forker.client.impl;
+package com.sshtools.forker.common;
 
 import com.sun.jna.Library;
 import com.sun.jna.Memory;

@@ -128,10 +128,11 @@ public class ForkerBuilder {
 	}
 
 	public ForkerBuilder redirectErrorStream(boolean redirectErrorStream) {
-		if (redirectErrorStream && command.getIO() != IO.IO && command.getIO() != IO.PTY && command.getIO() != IO.INPUT) {
+		if (redirectErrorStream && command.getIO() != IO.IO
+				&& command.getIO() != IO.PTY && command.getIO() != IO.INPUT) {
 			throw new IllegalStateException(
-					"Cannot redirect error stream if using IO mode '" + command.getIO()
-							+ "'");
+					"Cannot redirect error stream if using IO mode '"
+							+ command.getIO() + "'");
 		}
 		this.command.setRedirectError(redirectErrorStream);
 		return this;
@@ -139,8 +140,9 @@ public class ForkerBuilder {
 
 	public Process start() throws IOException {
 		// As far as I know none of this is required on Windows (except for Pty)
-		if (command.getIO() != IO.PTY && ( SystemUtils.IS_OS_WINDOWS
-				|| "true".equals(System.getProperty("forker.forceJavaFork")))) {
+		if (command.getIO() != IO.PTY
+				&& (SystemUtils.IS_OS_WINDOWS || "true".equals(System
+						.getProperty("forker.forceJavaFork")))) {
 			return startProcessBuilder();
 		}
 
@@ -193,12 +195,22 @@ public class ForkerBuilder {
 			// We need input and output, first try and connect to the forker
 			// daemon
 			try {
-				return new ForkerProcess(command);
+				ForkerProcess forkerProcess = new ForkerProcess(command);
+				if (effectiveUser != null)
+					effectiveUser.elevate(this, forkerProcess, command);
+				try {
+					forkerProcess.start();
+					return forkerProcess;
+				} finally {
+					if (effectiveUser != null)
+						effectiveUser.descend();
+				}
 			} catch (ConnectException ce) {
 				// No forker, we will have to resort to using standard
 				// ProcessBuilder
-				if(command.getIO() == IO.PTY)
-					throw new IOException("PTY IO mode currently requires the daemon.");
+				if (command.getIO() == IO.PTY)
+					throw new IOException(
+							"PTY IO mode currently requires the daemon.");
 				return startProcessBuilder();
 			} catch (IOException e) {
 				throw handleIOException(prog, security, dir, e);
@@ -240,7 +252,7 @@ public class ForkerBuilder {
 		// Fallback to standard ProcessBuilder
 
 		if (effectiveUser != null)
-			effectiveUser.elevate(this, null);
+			effectiveUser.elevate(this, null, null);
 
 		ProcessBuilder pb = new ProcessBuilder(command.getArguments());
 		if (command.isRedirectError()) {

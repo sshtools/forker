@@ -6,7 +6,10 @@ import java.util.List;
 import org.apache.commons.lang.SystemUtils;
 
 import com.sshtools.forker.client.OS.Desktop;
-import com.sshtools.forker.client.impl.CSystem;
+import com.sshtools.forker.client.impl.ForkerProcess;
+import com.sshtools.forker.common.CSystem;
+import com.sshtools.forker.common.Command;
+import com.sshtools.forker.common.Util;
 
 public abstract class EffectiveUserFactory {
 
@@ -40,7 +43,7 @@ public abstract class EffectiveUserFactory {
 						return new GKAdministrator();
 					}
 				} else if (dt == Desktop.CONSOLE) {
-					if(OS.hasCommand("sudo") || OS.hasCommand("su")) {
+					if (OS.hasCommand("sudo") || OS.hasCommand("su")) {
 						return new SUAdministrator();
 					}
 				}
@@ -71,22 +74,24 @@ public abstract class EffectiveUserFactory {
 
 	}
 
-	public class SUAdministrator implements EffectiveUser {
+	public static class SUAdministrator implements EffectiveUser {
 
 		@Override
 		public void descend() {
 		}
 
 		@Override
-		public void elevate(ForkerBuilder builder, Process process) {
+		public void elevate(ForkerBuilder builder, Process process,
+				Command command) {
 			if (OS.hasCommand("sudo")) {
-				/* This is the only thing we can do to determine if to use sudo or not. /etc/shadow could
-				 * not always be read to determine if root has a password which might be a hint. Neither could
+				/*
+				 * This is the only thing we can do to determine if to use sudo
+				 * or not. /etc/shadow could not always be read to determine if
+				 * root has a password which might be a hint. Neither could
 				 * /etc/sudoers
 				 */
 				builder.command().add(0, "sudo");
-			}
-			else {
+			} else {
 				List<String> cmd = builder.command();
 				StringBuilder bui = getQuotedCommandString(cmd);
 				cmd.clear();
@@ -98,8 +103,8 @@ public abstract class EffectiveUserFactory {
 
 	}
 
-	public class SUUser implements EffectiveUser {
-		
+	public static class SUUser implements EffectiveUser {
+
 		private String username;
 
 		public SUUser(String username) {
@@ -111,17 +116,19 @@ public abstract class EffectiveUserFactory {
 		}
 
 		@Override
-		public void elevate(ForkerBuilder builder, Process process) {
+		public void elevate(ForkerBuilder builder, Process process,
+				Command command) {
 			if (OS.hasCommand("sudo")) {
-				/* This is the only thing we can do to determine if to use sudo or not. /etc/shadow could
-				 * not always be read to determine if root has a password which might be a hint. Neither could
+				/*
+				 * This is the only thing we can do to determine if to use sudo
+				 * or not. /etc/shadow could not always be read to determine if
+				 * root has a password which might be a hint. Neither could
 				 * /etc/sudoers
 				 */
 				builder.command().add(0, "sudo");
 				builder.command().add(1, "-u");
 				builder.command().add(2, username);
-			}
-			else {
+			} else {
 				List<String> cmd = builder.command();
 				StringBuilder bui = getQuotedCommandString(cmd);
 				cmd.clear();
@@ -134,20 +141,21 @@ public abstract class EffectiveUserFactory {
 
 	}
 
-	public class GKUser implements EffectiveUser {
+	public static class GKUser implements EffectiveUser {
 
 		private String username;
 
 		public GKUser(String username) {
 			this.username = username;
 		}
-		
+
 		@Override
 		public void descend() {
 		}
 
 		@Override
-		public void elevate(ForkerBuilder builder, Process process) {
+		public void elevate(ForkerBuilder builder, Process process,
+				Command command) {
 			List<String> cmd = builder.command();
 
 			StringBuilder bui = getQuotedCommandString(cmd);
@@ -164,14 +172,15 @@ public abstract class EffectiveUserFactory {
 
 	}
 
-	public class GKAdministrator implements EffectiveUser {
+	public static class GKAdministrator implements EffectiveUser {
 
 		@Override
 		public void descend() {
 		}
 
 		@Override
-		public void elevate(ForkerBuilder builder, Process process) {
+		public void elevate(ForkerBuilder builder, Process process,
+				Command command) {
 			List<String> cmd = builder.command();
 
 			// Take existing command and turn it into one escaped command
@@ -196,10 +205,11 @@ public abstract class EffectiveUserFactory {
 		}
 	}
 
-	public class POSIXEffectiveUser implements EffectiveUser {
+	public static class POSIXEffectiveUser implements EffectiveUser {
 
 		private int uid;
 		private int was = Integer.MIN_VALUE;
+		private boolean setRemote;
 
 		public POSIXEffectiveUser(int uid) {
 			this.uid = uid;
@@ -210,23 +220,33 @@ public abstract class EffectiveUserFactory {
 		}
 
 		@Override
-		public void elevate(ForkerBuilder builder, Process process) {
-			if (was != Integer.MIN_VALUE)
-				throw new IllegalStateException();
-			was = CSystem.INSTANCE.geteuid();
-			doSeteuid(uid);
+		public void elevate(ForkerBuilder builder, Process process,
+				Command command) {
+			if (process instanceof ForkerProcess) {
+				command.setRunAs(String.valueOf(getUID()));
+				setRemote = true;
+			} else {
+				if (was != Integer.MIN_VALUE)
+					throw new IllegalStateException();
+				was = CSystem.INSTANCE.geteuid();
+				doSeteuid(uid);
+			}
 		}
 
 		@Override
 		public synchronized void descend() {
-			if (was == Integer.MIN_VALUE)
-				throw new IllegalStateException();
-			doSeteuid(was);
-			was = Integer.MIN_VALUE;
+			if (setRemote) {
+				setRemote = false;
+			} else {
+				if (was == Integer.MIN_VALUE)
+					throw new IllegalStateException();
+				doSeteuid(was);
+				was = Integer.MIN_VALUE;
+			}
 		}
 
 		private void doSeteuid(int euid) {
-			if (CSystem.INSTANCE.seteuid(was) == -1) {
+			if (CSystem.INSTANCE.seteuid(euid) == -1) {
 				// TODO get errono
 				throw new RuntimeException("Failed to set EUID.");
 			}

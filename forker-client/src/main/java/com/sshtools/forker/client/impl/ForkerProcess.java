@@ -30,13 +30,18 @@ public class ForkerProcess extends Process {
 	private int ptyWidth;
 	private int ptyHeight;
 	private List<Listener> listeners = new ArrayList<Listener>();
+	private Command command;
 
 	public interface Listener {
 		void windowSizeChanged(int ptyWidth, int ptyHeight);
 	}
 
-	public ForkerProcess(Command command) throws NumberFormatException,
-			UnknownHostException, IOException {
+	public ForkerProcess(Command command) {
+		this.command = command;
+	}
+
+	public void start() throws NumberFormatException, UnknownHostException,
+			IOException {
 		final Socket s = new Socket(InetAddress.getLocalHost(),
 				Integer.parseInt(System.getProperty("forker.port",
 						String.valueOf(Defaults.PORT))));
@@ -107,6 +112,9 @@ public class ForkerProcess extends Process {
 							errOut.write(b);
 							errOut.flush();
 							break;
+						case States.FAILED:
+							String mesg = din.readUTF();
+							throw new IOException("Remote error." + mesg);
 						default:
 							throw new IllegalStateException(
 									"Unknown forker command '" + cmd + "'");
