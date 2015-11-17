@@ -21,7 +21,7 @@ import java.util.logging.Logger;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
 
-import com.sshtools.forker.common.IO;
+import com.sshtools.forker.client.ForkerBuilder.IO;
 
 /**
  * Some helper methods for running commands and doing common things, like

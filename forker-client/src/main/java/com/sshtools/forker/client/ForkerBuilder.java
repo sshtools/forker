@@ -15,7 +15,6 @@ import com.sshtools.forker.client.impl.ForkerProcess;
 import com.sshtools.forker.client.impl.POpenProcess;
 import com.sshtools.forker.client.impl.SystemProcess;
 import com.sshtools.forker.common.Command;
-import com.sshtools.forker.common.IO;
 
 /**
  * A replacement for {@link ProcessBuilder} that will either use a 'system' call
@@ -31,7 +30,12 @@ import com.sshtools.forker.common.IO;
  *
  */
 public class ForkerBuilder {
+	public enum IO {
+		INPUT, OUTPUT, IO, SINK
+	}
+
 	private Command command = new Command();
+	private IO io = IO.IO;
 	private boolean background;
 	private EffectiveUser effectiveUser;
 
@@ -78,7 +82,7 @@ public class ForkerBuilder {
 	}
 
 	public IO io() {
-		return command.getIO();
+		return io;
 	}
 
 	public ForkerBuilder io(IO io) {
@@ -86,7 +90,7 @@ public class ForkerBuilder {
 			throw new IllegalStateException("Cannot set IO mode '" + io
 					+ "' because redirectErrorStream() is true.");
 		}
-		command.setIO(io);
+		this.io = io;
 		return this;
 	}
 
@@ -128,9 +132,9 @@ public class ForkerBuilder {
 	}
 
 	public ForkerBuilder redirectErrorStream(boolean redirectErrorStream) {
-		if (redirectErrorStream && command.getIO() != IO.IO && command.getIO() != IO.PTY && command.getIO() != IO.INPUT) {
+		if (redirectErrorStream && io != IO.IO && io != IO.INPUT) {
 			throw new IllegalStateException(
-					"Cannot redirect error stream if using IO mode '" + command.getIO()
+					"Cannot redirect error stream if using IO mode '" + io
 							+ "'");
 		}
 		this.command.setRedirectError(redirectErrorStream);
@@ -138,9 +142,9 @@ public class ForkerBuilder {
 	}
 
 	public Process start() throws IOException {
-		// As far as I know none of this is required on Windows (except for Pty)
-		if (command.getIO() != IO.PTY && ( SystemUtils.IS_OS_WINDOWS
-				|| "true".equals(System.getProperty("forker.forceJavaFork")))) {
+		// As far as I know none of this is required on Windows
+		if (SystemUtils.IS_OS_WINDOWS
+				|| "true".equals(System.getProperty("forker.forceJavaFork"))) {
 			return startProcessBuilder();
 		}
 
@@ -169,7 +173,7 @@ public class ForkerBuilder {
 			}
 		}
 
-		switch (command.getIO()) {
+		switch (io) {
 		case INPUT:
 		case OUTPUT:
 			// We need either input, or output, but not both, so use popen
@@ -189,7 +193,6 @@ public class ForkerBuilder {
 				throw handleIllegalArgumentException(prog, dir, e);
 			}
 		case IO:
-		case PTY:
 			// We need input and output, first try and connect to the forker
 			// daemon
 			try {
@@ -197,8 +200,6 @@ public class ForkerBuilder {
 			} catch (ConnectException ce) {
 				// No forker, we will have to resort to using standard
 				// ProcessBuilder
-				if(command.getIO() == IO.PTY)
-					throw new IOException("PTY IO mode currently requires the daemon.");
 				return startProcessBuilder();
 			} catch (IOException e) {
 				throw handleIOException(prog, security, dir, e);

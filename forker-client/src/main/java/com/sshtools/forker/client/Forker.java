@@ -4,7 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.StringTokenizer;
 
-import com.sshtools.forker.common.IO;
+import com.sshtools.forker.client.ForkerBuilder.IO;
 
 /**
  * Replacement for {@link Runtime#exec(String)} and friends.
