@@ -9,7 +9,7 @@ It provides the ProcessBuilder replacement, ForkerBuilder, as well the helpers i
 	<parent>
 		<groupId>com.sshtools</groupId>
 		<artifactId>forker</artifactId>
-		<version>1.1-SNAPSHOT</version>
+		<version>1.1</version>
 		<relativePath>..</relativePath>
 	</parent>
 
