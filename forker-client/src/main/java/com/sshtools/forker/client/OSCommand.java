@@ -19,6 +19,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.output.NullOutputStream;
 import org.apache.commons.lang.StringUtils;
 
 import com.sshtools.forker.common.IO;
@@ -181,7 +182,7 @@ public class OSCommand {
         }
         pb.redirectErrorStream(true);
         Process p = pb.start();
-        IOUtils.copy(p.getInputStream(), out);
+        IOUtils.copy(p.getInputStream(), out == null ? new NullOutputStream() : out);
         try {
             return p.waitFor();
         } catch (InterruptedException e) {

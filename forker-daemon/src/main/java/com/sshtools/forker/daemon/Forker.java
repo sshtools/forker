@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.ExecutorService;
@@ -13,9 +14,9 @@ import java.util.concurrent.Executors;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.SystemUtils;
+import org.apache.log4j.BasicConfigurator;
 
 import com.pty4j.PtyProcess;
-import com.pty4j.util.PtyUtil;
 import com.sshtools.forker.common.CSystem;
 import com.sshtools.forker.common.Command;
 import com.sshtools.forker.common.Defaults;
@@ -37,8 +38,9 @@ public class Forker {
 	public void start() throws IOException {
 		executor = Executors.newFixedThreadPool(threads);
 
-		socket = new ServerSocket(port, backlog, InetAddress.getLocalHost());
+		socket = new ServerSocket();
 		socket.setReuseAddress(true);
+		socket.bind(new InetSocketAddress(InetAddress.getLocalHost(), port), backlog);
 		while (true) {
 			Socket c = socket.accept();
 			executor.execute(new Client(this, c));
@@ -46,6 +48,7 @@ public class Forker {
 	}
 
 	public static void main(String[] args) throws Exception {
+		BasicConfigurator.configure();
 		Forker f = new Forker();
 		f.start();
 	}
@@ -68,8 +71,6 @@ public class Forker {
 				}
 			};
 			
-			PtyUtil.resolveNativeLibrary();
-
 			// Change the EUID before we fork
 			int euidWas = -1;
 			if (!StringUtils.isBlank(cmd.getRunAs())) {
