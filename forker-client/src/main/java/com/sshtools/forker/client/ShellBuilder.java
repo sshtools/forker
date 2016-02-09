@@ -63,9 +63,12 @@ public class ShellBuilder extends ForkerBuilder {
 			}
 
 		} else if (SystemUtils.IS_OS_WINDOWS) {
-			command().add(0, "start");
+			/* Currently must be handled by forker daemon, this is a special signal to just start a WinPTY shell.
+			 * NOTE: If you change this, also change Forker.java so it handles this correct (in the case of IO.PTY)
+			 */
+			command().add(0, "CMD.exe");
 			command().add(0, "/c");
-			command().add(0, "cmd.exe");
+			command().add(0, "start");
 		}
 		return super.start();
 	}

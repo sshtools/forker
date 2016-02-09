@@ -17,11 +17,13 @@ import org.apache.commons.lang.SystemUtils;
 import org.apache.log4j.BasicConfigurator;
 
 import com.pty4j.PtyProcess;
+import com.pty4j.WinSize;
 import com.sshtools.forker.common.CSystem;
 import com.sshtools.forker.common.Command;
 import com.sshtools.forker.common.Defaults;
 import com.sshtools.forker.common.IO;
 import com.sshtools.forker.common.States;
+import com.sun.jna.Platform;
 
 public class Forker {
 
@@ -30,6 +32,7 @@ public class Forker {
 	private int threads = 5;
 	private ExecutorService executor;
 	private ServerSocket socket;
+	private boolean forked;
 
 	public Forker() {
 
@@ -41,9 +44,17 @@ public class Forker {
 		socket = new ServerSocket();
 		socket.setReuseAddress(true);
 		socket.bind(new InetSocketAddress(InetAddress.getLocalHost(), port), backlog);
-		while (true) {
-			Socket c = socket.accept();
-			executor.execute(new Client(this, c));
+		try {
+			while (true) {
+				Socket c = socket.accept();
+				executor.execute(new Client(this, c));
+			}
+		}
+		catch(IOException ioe) {
+			// Ignore exception if this is forked JVM shutting down the socket,
+			if(!forked) { 
+				throw ioe;
+			}
 		}
 	}
 
@@ -53,8 +64,7 @@ public class Forker {
 		f.start();
 	}
 
-	private static void handlePTYCommand(Forker forker,
-			final DataInputStream din, final DataOutputStream dout,
+	private static void handlePTYCommand(Forker forker, final DataInputStream din, final DataOutputStream dout,
 			final Command cmd) throws IOException {
 
 		try {
@@ -70,7 +80,7 @@ public class Forker {
 				void kill() {
 				}
 			};
-			
+
 			// Change the EUID before we fork
 			int euidWas = -1;
 			if (!StringUtils.isBlank(cmd.getRunAs())) {
@@ -87,9 +97,16 @@ public class Forker {
 
 			PtyProcess ptyorig = null;
 			try {
-				ptyorig = PtyProcess.exec((String[]) cmd.getArguments()
-						.toArray(new String[0]), cmd.getEnvironment(), cmd
-						.getDirectory().getAbsolutePath());
+				// If Windows, and we are starting a shell, strip this commands 
+				if(Platform.isWindows() && cmd.getArguments().size() > 2 &&
+						cmd.getArguments().get(0).equals("start") && cmd.getArguments().get(1).equals("/c") &&
+						cmd.getArguments().get(2).equals("CMD.exe")) {
+					cmd.getArguments().remove(0);
+					cmd.getArguments().remove(0);
+				}
+				
+				ptyorig = PtyProcess.exec((String[]) cmd.getArguments().toArray(new String[0]), cmd.getEnvironment(),
+						cmd.getDirectory().getAbsolutePath());
 			} finally {
 				// And return to previous ID
 				if (euidWas != -1) {
@@ -104,15 +121,17 @@ public class Forker {
 
 			// The JVM is now forked, so free up some resources we won't
 			// actually use
+			forker.forked = true;
 			forker.socket.close();
 
 			InputStream in = pty.getInputStream();
 			OutputStream out = pty.getOutputStream();
 			final InputStream err = pty.getErrorStream();
 
-			int width = pty.getWinSize().ws_col;
-			int height = pty.getWinSize().ws_row;
-
+			WinSize winSize = pty.getWinSize();
+			int width = winSize == null ? 80 : winSize.ws_col;
+			int height = winSize == null ? 24 : winSize.ws_row;
+			
 			dout.writeInt(States.WINDOW_SIZE);
 			dout.writeInt(width);
 			dout.writeInt(height);
@@ -146,8 +165,8 @@ public class Forker {
 		}
 	}
 
-	private static void handleStandardCommand(final DataInputStream din,
-			final DataOutputStream dout, Command cmd) throws IOException {
+	private static void handleStandardCommand(final DataInputStream din, final DataOutputStream dout, Command cmd)
+			throws IOException {
 		ProcessBuilder builder = new ProcessBuilder(cmd.getArguments());
 		if (cmd.getEnvironment() != null) {
 			builder.environment().putAll(cmd.getEnvironment());
@@ -163,8 +182,7 @@ public class Forker {
 			if (!cmd.isRedirectError()) {
 				new Thread() {
 					public void run() {
-						readStreamToOutput(dout, process.getErrorStream(),
-								States.ERR);
+						readStreamToOutput(dout, process.getErrorStream(), States.ERR);
 					}
 				}.start();
 			}
@@ -194,8 +212,7 @@ public class Forker {
 		}
 	}
 
-	static void readStreamToOutput(final DataOutputStream dout,
-			final InputStream stream, final int outStream) {
+	static void readStreamToOutput(final DataOutputStream dout, final InputStream stream, final int outStream) {
 		// Capture stdout if not already doing so via
 		// ProcessBuilder
 		try {
@@ -227,17 +244,15 @@ public class Forker {
 		public void run() {
 
 			try {
-				final DataInputStream din = new DataInputStream(
-						s.getInputStream());
-				final DataOutputStream dout = new DataOutputStream(
-						s.getOutputStream());
+				final DataInputStream din = new DataInputStream(s.getInputStream());
+				final DataOutputStream dout = new DataOutputStream(s.getOutputStream());
 				Command cmd = new Command(din);
 				System.out.println(cmd);
 				if (cmd.getIO() == IO.PTY)
 					handlePTYCommand(forker, din, dout, cmd);
 				else
 					handleStandardCommand(din, dout, cmd);
-			} catch (IOException ioe) {
+			} catch (Exception ioe) {
 				System.err.println("Forker client I/O failed.");
 				ioe.printStackTrace();
 			} finally {

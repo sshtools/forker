@@ -72,9 +72,9 @@
 		<dependency>
 			<groupId>pty4j</groupId>
 			<artifactId>pty4j</artifactId>
-			<classifier>amd64-Linux-gpp-shared</classifier>
+			<classifier>natives</classifier>
 			<version>0.5-SSHTOOLS-SNAPSHOT</version>
-			<type>nar</type>
+			<type>jar</type>
 		</dependency>
 		<!-- <dependency>
 			<groupId>pty4j</groupId>
