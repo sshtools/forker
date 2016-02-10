@@ -11,7 +11,7 @@ import com.sshtools.forker.client.impl.ForkerProcess.Listener;
 import com.sshtools.forker.common.IO;
 
 public class Shell {
-
+	
 	public static void main(String[] args) throws Exception {
 		ForkerBuilder shell = new ShellBuilder().loginShell(true).io(IO.PTY).redirectErrorStream(true);
 		final Process p = shell.start();

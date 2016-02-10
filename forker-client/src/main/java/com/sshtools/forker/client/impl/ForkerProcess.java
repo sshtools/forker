@@ -13,11 +13,18 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.sshtools.forker.client.Forker;
 import com.sshtools.forker.common.Command;
-import com.sshtools.forker.common.Defaults;
+import com.sshtools.forker.common.Cookie;
+import com.sshtools.forker.common.Cookie.Instance;
 import com.sshtools.forker.common.States;
 
 public class ForkerProcess extends Process {
+	
+	static {
+		Forker.loadDaemon();
+	}
+	
 	private DataOutputStream dout;
 	private DataInputStream din;
 	private OutputStream out;
@@ -40,39 +47,62 @@ public class ForkerProcess extends Process {
 		this.command = command;
 	}
 
-	public void start() throws NumberFormatException, UnknownHostException,
-			IOException {
-		final Socket s = new Socket(InetAddress.getLocalHost(),
-				Integer.parseInt(System.getProperty("forker.port",
-						String.valueOf(Defaults.PORT))));
-		dout = new DataOutputStream(s.getOutputStream());
-		command.write(dout);
-		dout.flush();
-		din = new DataInputStream(s.getInputStream());
-		int result = din.readInt();
-		if (result == States.FAILED) {
-			String mesg = din.readUTF();
-			System.out.println("FORK: Command failed " + mesg);
-			try {
-				dout.close();
-			} catch (IOException ioe) {
-			}
-			try {
-				din.close();
-			} catch (IOException ioe) {
-			}
-			throw new IOException(din.readUTF());
-		}
-		if (result == States.WINDOW_SIZE) {
-			ptyWidth = din.readInt();
-			ptyHeight = din.readInt();
+	public void start() throws NumberFormatException, UnknownHostException, IOException {
+
+		Instance cookie = Cookie.get().load();
+		if (cookie == null) {
+			throw new IOException("The forker daemon is not running.");
 		}
 
-		inOut = new PipedOutputStream();
-		errOut = new PipedOutputStream();
-
-		in = new PipedInputStream(inOut);
-		err = new PipedInputStream(errOut);
+		final Socket s = new Socket(InetAddress.getLocalHost(), cookie.getPort());
+		boolean ok = false;
+		
+		try {
+			dout = new DataOutputStream(s.getOutputStream());
+			din = new DataInputStream(s.getInputStream());
+			
+			// Coookie
+			dout.writeUTF(cookie.getCookie());
+			dout.flush();
+			int result = din.readInt();
+			if (result == States.FAILED) {
+				throw new IOException("Cookie rejected.");
+			}
+			
+			// Command
+			command.write(dout);
+			dout.flush();
+			result = din.readInt();
+			if (result == States.FAILED) {
+				String mesg = din.readUTF();
+				System.out.println("FORK: Command failed " + mesg);
+				try {
+					dout.close();
+				} catch (IOException ioe) {
+				}
+				try {
+					din.close();
+				} catch (IOException ioe) {
+				}
+				throw new IOException(din.readUTF());
+			}
+			if (result == States.WINDOW_SIZE) {
+				ptyWidth = din.readInt();
+				ptyHeight = din.readInt();
+			}
+	
+			inOut = new PipedOutputStream();
+			errOut = new PipedOutputStream();
+	
+			in = new PipedInputStream(inOut);
+			err = new PipedInputStream(errOut);
+			
+			ok = true;
+		}
+		finally {
+			if(!ok)
+				s.close();
+		}
 
 		thread = new Thread("ForkerIn" + command.getArguments()) {
 
@@ -116,8 +146,7 @@ public class ForkerProcess extends Process {
 							String mesg = din.readUTF();
 							throw new IOException("Remote error." + mesg);
 						default:
-							throw new IllegalStateException(
-									"Unknown forker command '" + cmd + "'");
+							throw new IllegalStateException("Unknown forker command '" + cmd + "'");
 						}
 					}
 				} catch (IOException ioe) {
@@ -173,8 +202,7 @@ public class ForkerProcess extends Process {
 				}
 
 				@Override
-				public void write(byte[] b, int off, int len)
-						throws IOException {
+				public void write(byte[] b, int off, int len) throws IOException {
 					if (closed) {
 						throw new IOException("Closed.");
 					}
