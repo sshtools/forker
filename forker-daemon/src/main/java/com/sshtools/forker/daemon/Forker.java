@@ -24,7 +24,6 @@ import java.util.concurrent.Executors;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.SystemUtils;
-import org.apache.log4j.BasicConfigurator;
 
 import com.pty4j.PtyProcess;
 import com.pty4j.WinSize;
@@ -130,6 +129,11 @@ public class Forker {
 				@Override
 				void kill() {
 				}
+
+				@Override
+				void setWindowSize(int width, int height) {
+					new WinSize();
+				}
 			};
 
 			// Change the EUID before we fork
@@ -142,7 +146,6 @@ public class Forker {
 						// TODO get errono
 						throw new RuntimeException("Failed to set EUID.");
 					}
-					System.out.println("RUN AS " + euid);
 				}
 			}
 
@@ -164,7 +167,6 @@ public class Forker {
 						// TODO get errono
 						throw new RuntimeException("Failed to set EUID.");
 					}
-					System.out.println("NOW RUNNING AS " + euidWas);
 				}
 			}
 			final PtyProcess pty = ptyorig;
@@ -177,7 +179,7 @@ public class Forker {
 			InputStream in = pty.getInputStream();
 			OutputStream out = pty.getOutputStream();
 			final InputStream err = pty.getErrorStream();
-
+			
 			WinSize winSize = pty.getWinSize();
 			int width = winSize == null ? 80 : winSize.ws_col;
 			int height = winSize == null ? 24 : winSize.ws_row;
@@ -194,6 +196,11 @@ public class Forker {
 				@Override
 				void kill() {
 					pty.destroy();
+				}
+
+				@Override
+				void setWindowSize(int width, int height) {
+					pty.setWinSize(new WinSize(width, height));
 				}
 			};
 			inThread.start();
@@ -242,6 +249,10 @@ public class Forker {
 				@Override
 				void kill() {
 					process.destroy();
+				}
+
+				@Override
+				void setWindowSize(int width, int height) {
 				}
 			};
 			input.start();

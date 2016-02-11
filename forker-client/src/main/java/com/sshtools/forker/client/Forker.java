@@ -79,10 +79,12 @@ public class Forker {
 								if (SystemUtils.IS_OS_WINDOWS)
 									javaExe += ".exe";
 								ForkerBuilder fb = new ForkerBuilder(javaExe,
+										"-Xmx8m",
 										"-Djava.library.path=" + System.getProperty("java.library.path", ""),
 										"-classpath", System.getProperty("java.class.path"),
 										"com.sshtools.forker.daemon.Forker");
 								fb.io(IO.INPUT);
+								fb.background(true);
 								fb.redirectErrorStream(true);
 								try {
 									Process p = fb.start();
@@ -111,10 +113,12 @@ public class Forker {
 							} catch (Exception e) {
 							}
 							now = System.currentTimeMillis();
+							Thread.sleep(500);
 						}
 						if (cookie == null || !cookie.isRunning())
 							throw new RuntimeException("Failed to start forker daemon.");
 					}
+				} catch (InterruptedException e) {
 				} catch (IOException ioe) {
 					System.err.println("[WARNING] Could not load cookie, and so could not start a daemon.");
 				}

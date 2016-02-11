@@ -248,6 +248,16 @@ public class ForkerProcess extends Process {
 
 	public void setPtyWidth(int ptyWidth) {
 		this.ptyWidth = ptyWidth;
+		synchronized (dout) {
+			try {
+				dout.writeInt(States.WINDOW_SIZE);
+				dout.writeInt(ptyWidth);
+				dout.writeInt(ptyHeight);
+				dout.flush();
+			} catch (IOException ioe) {
+				//
+			}
+		}
 	}
 
 	public int getPtyHeight() {
@@ -256,6 +266,32 @@ public class ForkerProcess extends Process {
 
 	public void setPtyHeight(int ptyHeight) {
 		this.ptyHeight = ptyHeight;
+		synchronized (dout) {
+			try {
+				dout.writeInt(States.WINDOW_SIZE);
+				dout.writeInt(ptyWidth);
+				dout.writeInt(ptyHeight);
+				dout.flush();
+			} catch (IOException ioe) {
+				//
+			}
+		}
+	}
+	
+	public void setPtySize(int ptyWidth, int ptyHeight) {
+		this.ptyWidth = ptyWidth;
+		this.ptyHeight= ptyHeight;
+
+		synchronized (dout) {
+			try {
+				dout.writeInt(States.WINDOW_SIZE);
+				dout.writeInt(ptyWidth);
+				dout.writeInt(ptyHeight);
+				dout.flush();
+			} catch (IOException ioe) {
+				//
+			}
+		}
 	}
 
 	@Override
