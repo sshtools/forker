@@ -243,6 +243,9 @@ public abstract class EffectiveUserFactory {
 		@Override
 		public void elevate(ForkerBuilder builder, Process process, Command command) {
 			builder.command().add(0, "sudo");
+			if(SystemUtils.IS_OS_MAC_OSX) {
+				builder.command().add(1, "-A");
+			}
 			builder.environment().put("SUDO_ASKPASS", tempScript.getAbsolutePath());
 		}
 
