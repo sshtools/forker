@@ -14,11 +14,9 @@ import com.sshtools.forker.common.IO;
 public class ShellAsUser {
 
 	public static void main(String[] args) throws Exception {
-		/* Run the daemon itself as an administrator. If this class is currently running as non-privileged account,
-		 * a popup will appear asking for the administrator password (when supported) */
+		/* Run the daemon itself as an administrator */
 		Forker.loadDaemon(true);
 		
-		/* Build a login shell (creating a pty for interactive I/O) */
 		ForkerBuilder shell = new ShellBuilder().loginShell(true).io(IO.PTY).redirectErrorStream(true);
 		
 		/* Run the shell as the user that launches this class. Any valid UID could be 
@@ -28,8 +26,6 @@ public class ShellAsUser {
 		shell.effectiveUser(new EffectiveUserFactory.POSIXEffectiveUser(Integer.parseInt(OSCommand.runCommandAndCaptureOutput("id", "-u").iterator().next())));
 		
 		final Process p = shell.start();
-		
-		/* Read from stdin in the process and pass it the shell. This will continue until stdin ends, or this application exits */
 		Thread t = new Thread() {
 			public void run() {
 				try {
@@ -41,7 +37,6 @@ public class ShellAsUser {
 		t.setDaemon(true);
 		t.start();
 		
-		/* Copy output from the shell to stdout of this process until the shell ends */
 		IOUtils.copy(p.getInputStream(), System.out);
 		int ret = p.waitFor();
 		System.err.println("Exited with code: " +ret);
