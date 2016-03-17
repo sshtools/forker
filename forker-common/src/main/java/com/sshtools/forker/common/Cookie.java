@@ -12,7 +12,9 @@ import java.net.Socket;
 
 public class Cookie {
 
-	private final static Cookie cookie = new Cookie();
+	private static Cookie cookie = new Cookie();
+
+	private Instance isolatedCookieInstance;
 
 	public static class Instance {
 		private String cookie;
@@ -48,8 +50,11 @@ public class Cookie {
 					s.setSoTimeout(1000);
 					DataOutputStream dout = new DataOutputStream(s.getOutputStream());
 					dout.writeUTF(cookie);
+					dout.write(0);
+					dout.flush();
 					DataInputStream din = new DataInputStream(s.getInputStream());
-					if (din.readInt() == States.OK)
+					int state = din.readInt();
+					if (state == States.OK)
 						return true;
 				} finally {
 					s.close();
@@ -59,12 +64,23 @@ public class Cookie {
 			return false;
 		}
 	}
+	
+	public static void set(Cookie cookie) {
+		Cookie.cookie = cookie;
+	}
 
 	public static Cookie get() {
 		return cookie;
 	}
 
+	public void set(Instance isolatedCookieInstance) {
+		this.isolatedCookieInstance = isolatedCookieInstance;
+	}
+
 	public Instance load() throws IOException {
+		if(isolatedCookieInstance != null)
+			return isolatedCookieInstance;
+		
 		try {
 			BufferedReader r = new BufferedReader(new FileReader(getCookieFile()));
 			try {
@@ -78,6 +94,10 @@ public class Cookie {
 	}
 
 	public File getCookieFile() {
+		String cookieFile = System.getProperty("forker.cookie.file");
+		if(cookieFile != null) {
+			return new File(cookieFile);
+		}
 		File dir = new File(new File(System.getProperty("user.home", ".")), ".forker");
 		if (!dir.exists() && !dir.mkdirs())
 			throw new RuntimeException("Could not create cookie directory " + dir);

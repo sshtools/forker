@@ -128,7 +128,7 @@ public class ForkerBuilder {
 	}
 
 	public ForkerBuilder redirectErrorStream(boolean redirectErrorStream) {
-		if (redirectErrorStream && command.getIO() != IO.IO
+		if (redirectErrorStream && command.getIO() != IO.IO&& command.getIO() != IO.DEFAULT
 				&& command.getIO() != IO.PTY && command.getIO() != IO.INPUT) {
 			throw new IllegalStateException(
 					"Cannot redirect error stream if using IO mode '"
@@ -192,9 +192,13 @@ public class ForkerBuilder {
 			}
 		case IO:
 		case PTY:
+		case DEFAULT:
 			// We need input and output, first try and connect to the forker
 			// daemon
 			try {
+				if(command.getIO() == IO.DEFAULT) {
+					throw new ConnectException();
+				}
 				ForkerProcess forkerProcess = new ForkerProcess(command);
 				if (effectiveUser != null)
 					effectiveUser.elevate(this, forkerProcess, command);

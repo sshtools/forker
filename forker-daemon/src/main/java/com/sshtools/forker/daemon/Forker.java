@@ -187,7 +187,7 @@ public class Forker {
 			InputStream in = pty.getInputStream();
 			OutputStream out = pty.getOutputStream();
 			final InputStream err = pty.getErrorStream();
-			
+
 			WinSize winSize = pty.getWinSize();
 			int width = winSize == null ? 80 : winSize.ws_col;
 			int height = winSize == null ? 24 : winSize.ws_row;

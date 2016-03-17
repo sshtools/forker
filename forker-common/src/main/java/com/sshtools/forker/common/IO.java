@@ -1,5 +1,5 @@
 package com.sshtools.forker.common;
 
 public enum IO {
-	INPUT, OUTPUT, IO, SINK, PTY
+	INPUT, OUTPUT, IO, DEFAULT, SINK, PTY
 }
