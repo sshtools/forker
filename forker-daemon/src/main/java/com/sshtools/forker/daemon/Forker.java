@@ -27,7 +27,12 @@ import org.apache.commons.lang.SystemUtils;
 
 import com.pty4j.PtyProcess;
 import com.pty4j.WinSize;
-import com.sshtools.forker.common.CSystem;
+import com.pty4j.unix.PTYOutputStream;
+import com.pty4j.unix.Pty;
+import com.pty4j.unix.PtyHelpers;
+import com.pty4j.unix.UnixPtyProcess;
+import com.pty4j.util.Pair;
+import com.pty4j.util.PtyUtil;
 import com.sshtools.forker.common.Command;
 import com.sshtools.forker.common.Cookie;
 import com.sshtools.forker.common.Cookie.Instance;
@@ -44,6 +49,8 @@ public class Forker {
 	private ExecutorService executor;
 	private ServerSocket socket;
 	private boolean forked;
+	private boolean isolated;
+	private boolean unauthenticated;
 
 	public Forker() {
 
@@ -54,7 +61,7 @@ public class Forker {
 		 * First look to see if there is an existing cookie, and if so, is the
 		 * daemon still running. If it is, we don't need this one
 		 */
-		Instance cookie = Cookie.get().load();
+		Instance cookie = isolated ? null : Cookie.get().load();
 		if (cookie != null && cookie.isRunning()) {
 			throw new IOException("A Forker daemon is already on port " + cookie.getPort());
 		}
@@ -69,7 +76,15 @@ public class Forker {
 		 * Create a new cookie for clients to be able to locate this daemon
 		 */
 		Instance thisCookie = new Instance(UUID.randomUUID().toString(), socket.getLocalPort());
-		save(thisCookie);
+		if (isolated) {
+			System.out.println("FORKER-COOKIE: " + thisCookie.toString());
+		} else if (!unauthenticated) {
+			save(thisCookie);
+		} else {
+			System.out.println(
+					"[WARNING] Forker daemon is running in unauthenticated mode. This should not be used for production use. Use the cookie NOAUTH:"
+							+ socket.getLocalPort());
+		}
 
 		try {
 			while (true) {
@@ -87,6 +102,15 @@ public class Forker {
 	public static void main(String[] args) throws Exception {
 		// BasicConfigurator.configure();
 		Forker f = new Forker();
+		for (String a : args) {
+			if (a.equals("--isolated")) {
+				f.isolated = true;
+			} else if (a.equals("--unauthenticated")) {
+				f.unauthenticated = true;
+			} else if (a.startsWith("--port=")) {
+				f.port = Integer.parseInt(a.substring(7));
+			}
+		}
 		f.start();
 	}
 
@@ -121,54 +145,38 @@ public class Forker {
 			/*
 			 * HACK! Make sure the classes are loaded now so that there are not
 			 * problems when it's forked
-			 * 
-			 * These don't actually get used
 			 */
-			OutputThread outThread = new OutputThread(null, null, null);
-			InputThread inThread = new InputThread(null, null) {
-				@Override
-				void kill() {
-				}
-
-				@Override
-				void setWindowSize(int width, int height) {
-					new WinSize();
-				}
-			};
+			Class.forName(PtyProcess.class.getName(), true, Forker.class.getClassLoader());
+			Class.forName(OutputThread.class.getName(), true, Forker.class.getClassLoader());
+			Class.forName(InputThread.class.getName(), true, Forker.class.getClassLoader());
+			Class.forName(PTYOutputStream.class.getName(), true, Forker.class.getClassLoader());
+			Class.forName(WinSize.class.getName(), true, Forker.class.getClassLoader());
+			Class.forName(UnixPtyProcess.class.getName(), true, Forker.class.getClassLoader());
+			Class.forName(PtyUtil.class.getName(), true, Forker.class.getClassLoader());
+			Class.forName(PtyUtil.class.getName() + "$1", true, Forker.class.getClassLoader());
+			Class.forName(Pty.class.getName(), true, Forker.class.getClassLoader());
+			Class.forName(PtyHelpers.class.getName(), true, Forker.class.getClassLoader());
+			Class.forName(Pair.class.getName(), true, Forker.class.getClassLoader());
+			Class.forName(UnixPtyProcess.class.getName() + "$Reaper", true, Forker.class.getClassLoader());
 
 			// Change the EUID before we fork
-			int euidWas = -1;
+			int euid = -1;
 			if (!StringUtils.isBlank(cmd.getRunAs())) {
 				if (SystemUtils.IS_OS_LINUX || SystemUtils.IS_OS_MAC_OSX) {
-					euidWas = CSystem.INSTANCE.geteuid();
-					int euid = Integer.parseInt(cmd.getRunAs());
-					if (CSystem.INSTANCE.seteuid(euid) == -1) {
-						// TODO get errono
-						throw new RuntimeException("Failed to set EUID.");
-					}
+					euid = Integer.parseInt(cmd.getRunAs());
 				}
 			}
 
 			PtyProcess ptyorig = null;
-			try {
-				// If Windows, and we are starting a shell, strip this commands
-				if (Platform.isWindows() && cmd.getArguments().size() > 2 && cmd.getArguments().get(0).equals("start")
-						&& cmd.getArguments().get(1).equals("/c") && cmd.getArguments().get(2).equals("CMD.exe")) {
-					cmd.getArguments().remove(0);
-					cmd.getArguments().remove(0);
-				}
-
-				ptyorig = PtyProcess.exec((String[]) cmd.getArguments().toArray(new String[0]), cmd.getEnvironment(),
-						cmd.getDirectory().getAbsolutePath());
-			} finally {
-				// And return to previous ID
-				if (euidWas != -1) {
-					if (CSystem.INSTANCE.seteuid(euidWas) == -1) {
-						// TODO get errono
-						throw new RuntimeException("Failed to set EUID.");
-					}
-				}
+			// If Windows, and we are starting a shell, strip this commands
+			if (Platform.isWindows() && cmd.getArguments().size() > 2 && cmd.getArguments().get(0).equals("start")
+					&& cmd.getArguments().get(1).equals("/c") && cmd.getArguments().get(2).equals("CMD.exe")) {
+				cmd.getArguments().remove(0);
+				cmd.getArguments().remove(0);
 			}
+
+			ptyorig = PtyProcess.exec((String[]) cmd.getArguments().toArray(new String[0]), cmd.getEnvironment(),
+					cmd.getDirectory().getAbsolutePath(), euid);
 			final PtyProcess pty = ptyorig;
 
 			// The JVM is now forked, so free up some resources we won't
@@ -179,7 +187,7 @@ public class Forker {
 			InputStream in = pty.getInputStream();
 			OutputStream out = pty.getOutputStream();
 			final InputStream err = pty.getErrorStream();
-			
+
 			WinSize winSize = pty.getWinSize();
 			int width = winSize == null ? 80 : winSize.ws_col;
 			int height = winSize == null ? 24 : winSize.ws_row;
@@ -187,11 +195,11 @@ public class Forker {
 			dout.writeInt(States.WINDOW_SIZE);
 			dout.writeInt(width);
 			dout.writeInt(height);
-			outThread = new OutputThread(dout, cmd, err);
+			OutputThread outThread = new OutputThread(dout, cmd, err);
 			outThread.start();
 
 			// Take any input coming the other way
-			inThread = new InputThread(out, din) {
+			InputThread inThread = new InputThread(out, din) {
 
 				@Override
 				void kill() {
@@ -207,14 +215,13 @@ public class Forker {
 			readStreamToOutput(dout, in, States.IN);
 			synchronized (dout) {
 				dout.writeInt(States.END);
-				dout.writeInt(pty.exitValue());
+				dout.writeInt(pty.waitFor());
 				dout.flush();
 			}
 
 			// Wait for stream other end to close
 			inThread.join();
 		} catch (Throwable t) {
-			t.printStackTrace();
 			synchronized (dout) {
 				dout.writeInt(States.FAILED);
 				dout.writeUTF(t.getMessage());
@@ -309,10 +316,35 @@ public class Forker {
 			try {
 				final DataInputStream din = new DataInputStream(s.getInputStream());
 				String clientCookie = din.readUTF();
-				if (!cookie.getCookie().equals(clientCookie)) {
+				if (!forker.unauthenticated && !cookie.getCookie().equals(clientCookie)) {
+					System.out.println(
+							"[WARNING] Invalid cookie. (got " + clientCookie + ", expected " + cookie.getCookie());
 					throw new Exception("Invalid cookie. (got " + clientCookie + ", expected " + cookie.getCookie());
 				}
 				final DataOutputStream dout = new DataOutputStream(s.getOutputStream());
+
+				//
+				int type = din.readByte();
+				if (type == 1) {
+					dout.writeInt(States.OK);
+					dout.flush();
+
+					/*
+					 * Connection Type 1 is a control connection from the client
+					 * and is used when this is an 'isolated' forker for a
+					 * single JVM only. The client keeps this connection open
+					 * until it dies, so a soon as it does, we shutdown this JVM
+					 * too
+					 */
+
+					// Wait forever
+					try {
+						din.readByte();
+					} finally {
+						System.exit(0);
+					}
+				}
+
 				dout.writeInt(States.OK);
 				dout.flush();
 				Command cmd = new Command(din);
@@ -334,4 +366,5 @@ public class Forker {
 		}
 
 	}
+
 }

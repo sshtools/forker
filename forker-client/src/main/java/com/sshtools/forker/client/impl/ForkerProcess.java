@@ -63,7 +63,11 @@ public class ForkerProcess extends Process {
 			
 			// Coookie
 			dout.writeUTF(cookie.getCookie());
+			
+			// Normal mode
+			dout.write(0);
 			dout.flush();
+			
 			int result = din.readInt();
 			if (result == States.FAILED) {
 				throw new IOException("Cookie rejected.");
