@@ -21,13 +21,13 @@ public abstract class EffectiveUserFactory {
 
 	private final static Object lock = new Object();
 	private static EffectiveUserFactory instance;
-	
+
 	/**
 	 * 
 	 */
 	protected EffectiveUserFactory(boolean registerAsDefault) {
-		if(registerAsDefault) {
-			if(instance == null)
+		if (registerAsDefault) {
+			if (instance == null)
 				instance = this;
 			else
 				throw new IllegalStateException("Default already registered.");
@@ -35,7 +35,8 @@ public abstract class EffectiveUserFactory {
 	}
 
 	/**
-	 * Get the default 
+	 * Get the default
+	 * 
 	 * @return
 	 */
 	public final static EffectiveUserFactory getDefault() {
@@ -93,7 +94,7 @@ public abstract class EffectiveUserFactory {
 
 		public DefaultEffectiveUserFactory() {
 			super(true);
-			
+
 			appName = System.getProperty("forker.app.name", null);
 			if (appName == null) {
 				String thisAppName = null;
@@ -115,28 +116,35 @@ public abstract class EffectiveUserFactory {
 		@Override
 		public EffectiveUser administrator() {
 			if (SystemUtils.IS_OS_LINUX) {
-				Desktop dt = OS.getDesktopEnvironment();
-				if (Arrays.asList(Desktop.CINNAMON, Desktop.GNOME, Desktop.GNOME3).contains(dt)) {
-					// Try gksudo first
-					if (OS.hasCommand("gksudo") || OS.hasCommand("gksu")) {
-						return new GKAdministrator();
-					}
-					else  if(OS.hasCommand("sudo")) {
-						return new SudoAskPassAdministrator();
-					}
-				} else if (dt == Desktop.CONSOLE) {
-					if (OS.hasCommand("sudo") || OS.hasCommand("su")) {
-						return new SUAdministrator();
+				if (getFixedPassword() != null) {
+					return new SudoFixedPasswordAdministrator(getFixedPassword().toCharArray());
+				} else {
+					Desktop dt = OS.getDesktopEnvironment();
+					if (Arrays.asList(Desktop.CINNAMON, Desktop.GNOME, Desktop.GNOME3).contains(dt)) {
+						// Try gksudo first
+						if (OS.hasCommand("gksudo") || OS.hasCommand("gksu")) {
+							return new GKAdministrator();
+						} else if (OS.hasCommand("sudo")) {
+							return new SudoAskPassAdministrator();
+						}
+					} else if (dt == Desktop.CONSOLE) {
+						if (OS.hasCommand("sudo") || OS.hasCommand("su")) {
+							return new SUAdministrator();
+						}
 					}
 				}
-			}
-			else if (SystemUtils.IS_OS_MAC_OSX) {
-				if(OS.hasCommand("sudo")) {
+			} else if (SystemUtils.IS_OS_MAC_OSX) {
+				if (getFixedPassword() != null) {
+					return new SudoFixedPasswordAdministrator(getFixedPassword().toCharArray());
+				} else if (OS.hasCommand("sudo")) {
 					return new SudoAskPassAdministrator();
 				}
 			}
 			throw new UnsupportedOperationException(System.getProperty("os.name")
-					+ " is currently unsupported. Will not be able to get administrative user.");
+					+ " is currently unsupported. Will not be able to get administrative user. "
+					+ "To hard code an adminstrator password, set the system property forker.administrator.password. "
+					+ "This is unsafe, as the password will exist in a file for the life of the process. Do NOT use "
+					+ "this in a production environment.");
 		}
 
 		@Override
@@ -161,6 +169,15 @@ public abstract class EffectiveUserFactory {
 			return appName;
 		}
 
+		private String getFixedPassword() {
+			String p = System.getProperty("forker.administrator.password");
+			// For backwards compatibility
+			return p == null ? System.getProperty("vm.sudo") : p;
+		}
+
+		private static boolean isSuperUser() {
+			return System.getProperty("user.name").equals(System.getProperty("vm.rootUser", "root"));
+		}
 	}
 
 	public static class SUAdministrator implements EffectiveUser {
@@ -190,9 +207,49 @@ public abstract class EffectiveUserFactory {
 		}
 
 	}
-	
+
+	public static class SudoFixedPasswordAdministrator implements EffectiveUser {
+
+		File tempScript;
+
+		public SudoFixedPasswordAdministrator(char[] password) {
+			// Create a temporary script to use to launch AskPass
+			try {
+				tempScript = File.createTempFile("sfpa", ".sh");
+				tempScript.deleteOnExit();
+				OutputStream out = new FileOutputStream(tempScript);
+				PrintWriter pw = new PrintWriter(out);
+				try {
+					pw.println("#!/bin/bash");
+					pw.println("echo '" + new String(password).replace("'", "\\'") + "'");
+					pw.flush();
+				} finally {
+					out.close();
+				}
+
+				tempScript.setExecutable(true);
+
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}
+
+		@Override
+		public void descend() {
+		}
+
+		@Override
+		public void elevate(ForkerBuilder builder, Process process, Command command) {
+			builder.command().add(0, "sudo");
+			if (SystemUtils.IS_OS_MAC_OSX)
+				builder.command().add(1, "-A");
+			builder.environment().put("SUDO_ASKPASS", tempScript.getAbsolutePath());
+		}
+
+	}
+
 	public static class SudoAskPassAdministrator implements EffectiveUser {
-		
+
 		static File tempScript;
 		static {
 			// Create a temporary script to use to launch AskPass
@@ -200,38 +257,36 @@ public abstract class EffectiveUserFactory {
 				tempScript = File.createTempFile("sapa", ".sh");
 				tempScript.deleteOnExit();
 
-				String javaExe = System.getProperty("java.home") + File.separator + "bin"
-						+ File.separator + "java";
+				String javaExe = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
 				if (SystemUtils.IS_OS_WINDOWS)
 					javaExe += ".exe";
-				
+
 				String cp = null;
 				String fullCp = System.getProperty("java.class.path", "");
 				for (String p : fullCp.split(File.pathSeparator)) {
-					if(p.contains("forker-client")) {
+					if (p.contains("forker-client")) {
 						cp = p;
 					}
 				}
-				if(cp == null) {
-					// Couldn't find just forker-common for some reason, just add everything
+				if (cp == null) {
+					// Couldn't find just forker-common for some reason, just
+					// add everything
 					cp = fullCp;
 				}
-				
+
 				OutputStream out = new FileOutputStream(tempScript);
 				PrintWriter pw = new PrintWriter(out);
 				try {
 					pw.println("#!/bin/bash");
 					pw.println("\"" + javaExe + "\" -classpath \"" + cp + "\" " + AskPass.class.getName());
 					pw.flush();
-				}
-				finally {
+				} finally {
 					out.close();
 				}
-				
+
 				tempScript.setExecutable(true);
-				
-			}
-			catch(Exception e) {
+
+			} catch (Exception e) {
 				throw new RuntimeException(e);
 			}
 		}
@@ -347,10 +402,12 @@ public abstract class EffectiveUserFactory {
 			cmd.clear();
 			if (OS.hasCommand("gksudo")) {
 				cmd.add("gksudo");
+				cmd.add("--preserve-env");
 				cmd.add("--description");
 				cmd.add(getDefault().getAppName());
 			} else if (OS.hasCommand("gksu")) {
 				cmd.add("gksu");
+				cmd.add("--preserve-env");
 				cmd.add("--description");
 				cmd.add(getDefault().getAppName());
 			}

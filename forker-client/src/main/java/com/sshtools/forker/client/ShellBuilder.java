@@ -17,9 +17,19 @@ import org.apache.commons.lang.SystemUtils;
 public class ShellBuilder extends ForkerBuilder {
 
 	private boolean loginShell;
+	private File rcfile;
 
 	public ShellBuilder() {
 
+	}
+	
+	public ShellBuilder rcfile(File rcfile) {
+		this.rcfile = rcfile;
+		return this;
+	}
+	
+	public File rcfile() {
+		return rcfile;
 	}
 
 	public ShellBuilder loginShell(boolean loginShell) {
@@ -49,17 +59,26 @@ public class ShellBuilder extends ForkerBuilder {
 						throw new IOException("Nothing to execute.");
 					}
 				} else {
-					command().add(0, shLocation);
 					if (loginShell) {
-						command().add(1, "--login");
+						command().add(0, "--login");
+					}
+					command().add(0, shLocation);
+					if(rcfile != null) {
+						environment().put("ENV", rcfile.getAbsolutePath());
 					}
 				}
 			} else {
+				// rcfile only works with non-login shell :(
+				if(rcfile != null) {
+					command().add(0,rcfile.getAbsolutePath());
+					command().add(0,"--rcfile");
+				}
+				if (loginShell) {
+					command().add(0, "--login");
+				}
+				
 				// Bash
 				command().add(0, shLocation);
-				if (loginShell) {
-					command().add(1, "--login");
-				}
 			}
 
 		} else if (SystemUtils.IS_OS_WINDOWS) {

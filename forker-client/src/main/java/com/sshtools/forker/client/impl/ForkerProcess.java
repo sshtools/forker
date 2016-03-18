@@ -88,7 +88,7 @@ public class ForkerProcess extends Process {
 					din.close();
 				} catch (IOException ioe) {
 				}
-				throw new IOException(din.readUTF());
+				throw new IOException(mesg);
 			}
 			if (result == States.WINDOW_SIZE) {
 				ptyWidth = din.readInt();
@@ -130,7 +130,6 @@ public class ForkerProcess extends Process {
 								dout.writeInt(States.END);
 								dout.flush();
 							}
-							System.out.println("Got exit value " + exitValue);
 							break;
 						case States.IN:
 							int len = din.readInt();

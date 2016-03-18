@@ -14,7 +14,8 @@ import com.sshtools.forker.common.IO;
 public class ShellAsUser {
 
 	public static void main(String[] args) throws Exception {
-		/* Run the daemon itself as an administrator */
+		/* Run the daemon itself as an administrator. This should popup a password request
+		 * (if supported on platform) */
 		Forker.loadDaemon(true);
 		
 		ForkerBuilder shell = new ShellBuilder().loginShell(true).io(IO.PTY).redirectErrorStream(true);
@@ -26,6 +27,8 @@ public class ShellAsUser {
 		shell.effectiveUser(new EffectiveUserFactory.POSIXEffectiveUser(Integer.parseInt(OSCommand.runCommandAndCaptureOutput("id", "-u").iterator().next())));
 		
 		final Process p = shell.start();
+		
+		/* Read input from stdin and pass to the forked shell until this applications exits or stdin is closed */
 		Thread t = new Thread() {
 			public void run() {
 				try {
@@ -36,7 +39,8 @@ public class ShellAsUser {
 		};
 		t.setDaemon(true);
 		t.start();
-		
+
+		/* Read output from the shell and pass it to stdout until the shell exits */
 		IOUtils.copy(p.getInputStream(), System.out);
 		int ret = p.waitFor();
 		System.err.println("Exited with code: " +ret);
