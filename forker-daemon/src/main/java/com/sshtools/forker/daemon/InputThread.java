@@ -1,7 +1,6 @@
 package com.sshtools.forker.daemon;
 
 import java.io.DataInputStream;
-import java.io.IOException;
 import java.io.OutputStream;
 
 import com.sshtools.forker.common.States;

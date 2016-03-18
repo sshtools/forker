@@ -72,6 +72,7 @@ public class OS {
 			} else {
 				String path = System.getenv("PATH");
 				if (path != "") {
+					boolean found = false;
 					for (String p : path.split(File.pathSeparator)) {
 						File f = new File(p);
 						if (f.isDirectory()) {
@@ -80,9 +81,13 @@ public class OS {
 								cmd += ".exe";
 							}
 							File e = new File(f, cmd);
-							return e.exists();
+							if(e.exists()) {
+								found = true;
+								break;
+							}
 						}
 					}
+					return found;
 				}
 				throw new UnsupportedOperationException(
 						System.getProperty("os.name")

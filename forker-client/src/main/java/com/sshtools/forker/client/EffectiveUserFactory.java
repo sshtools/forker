@@ -159,6 +159,9 @@ public abstract class EffectiveUserFactory {
 				} else if (dt == Desktop.CONSOLE) {
 					return new SUUser(username);
 				}
+			} else if(SystemUtils.IS_OS_MAC_OSX) {
+				
+				return new SUUser(username);
 			}
 			throw new UnsupportedOperationException(System.getProperty("os.name")
 					+ " is currently unsupported. Will not be able to get UID for username.");
