@@ -111,6 +111,9 @@ public abstract class EffectiveUserFactory {
 					thisAppName = threadAppName;
 				appName = thisAppName;
 			}
+			if(appName == null) {
+				appName = "Java Application";
+			}
 		}
 
 		@Override

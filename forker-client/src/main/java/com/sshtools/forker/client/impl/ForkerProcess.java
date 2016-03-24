@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
@@ -51,7 +52,7 @@ public class ForkerProcess extends Process {
 
 		Instance cookie = Cookie.get().load();
 		if (cookie == null) {
-			throw new IOException("The forker daemon is not running.");
+			throw new ConnectException("The forker daemon is not running.");
 		}
 
 		final Socket s = new Socket(InetAddress.getLocalHost(), cookie.getPort());
