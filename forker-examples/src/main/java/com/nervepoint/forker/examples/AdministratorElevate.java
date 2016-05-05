@@ -12,7 +12,7 @@ public class AdministratorElevate {
 	public static void main(String[] args) throws Exception {
 
 		ForkerBuilder builder = new ForkerBuilder().effectiveUser(
-				EffectiveUserFactory.getDefault().administrator()).io(IO.IO);
+				EffectiveUserFactory.getDefault().administrator()).io(IO.IO).redirectErrorStream(true);
 
 		if (SystemUtils.IS_OS_LINUX) {
 			// The linux example tries to list the shadow password file

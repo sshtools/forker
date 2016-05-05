@@ -118,9 +118,10 @@ public abstract class EffectiveUserFactory {
 
 		@Override
 		public EffectiveUser administrator() {
+			String fixedPassword = getFixedPassword();
 			if (SystemUtils.IS_OS_LINUX) {
-				if (getFixedPassword() != null) {
-					return new SudoFixedPasswordAdministrator(getFixedPassword().toCharArray());
+				if (fixedPassword != null) {
+					return new SudoFixedPasswordAdministrator(fixedPassword.toCharArray());
 				} else {
 					Desktop dt = OS.getDesktopEnvironment();
 					if (Arrays.asList(Desktop.CINNAMON, Desktop.GNOME, Desktop.GNOME3).contains(dt)) {
@@ -137,8 +138,8 @@ public abstract class EffectiveUserFactory {
 					}
 				}
 			} else if (SystemUtils.IS_OS_MAC_OSX) {
-				if (getFixedPassword() != null) {
-					return new SudoFixedPasswordAdministrator(getFixedPassword().toCharArray());
+				if (fixedPassword != null) {
+					return new SudoFixedPasswordAdministrator(fixedPassword.toCharArray());
 				} else if (OS.hasCommand("sudo")) {
 					return new SudoAskPassAdministrator();
 				}
@@ -247,8 +248,7 @@ public abstract class EffectiveUserFactory {
 		@Override
 		public void elevate(ForkerBuilder builder, Process process, Command command) {
 			builder.command().add(0, "sudo");
-			if (SystemUtils.IS_OS_MAC_OSX)
-				builder.command().add(1, "-A");
+			builder.command().add(1, "-A");
 			builder.environment().put("SUDO_ASKPASS", tempScript.getAbsolutePath());
 		}
 

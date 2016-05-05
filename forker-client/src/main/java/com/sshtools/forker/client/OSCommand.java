@@ -60,6 +60,7 @@ public class OSCommand {
 			if (cwd != null) {
 				pb.directory(cwd);
 			}
+			checkElevated(pb);
 			Process p = pb.start();
 			IOUtils.copy(p.getInputStream(), fos);
 			try {
@@ -109,9 +110,10 @@ public class OSCommand {
 	}
 
 	private static void checkElevated(ForkerBuilder pb) {
-		if (Boolean.TRUE.equals(elevated.get()))
+		if (Boolean.TRUE.equals(elevated.get())) {
 			pb.effectiveUser(sudoPassword == null ? EffectiveUserFactory.getDefault().administrator()
 					: new SudoFixedPasswordAdministrator(sudoPassword));
+		}
 	}
 
 	public static void run(String... args) throws IOException {
