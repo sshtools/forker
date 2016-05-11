@@ -11,6 +11,7 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -32,6 +33,7 @@ public class OSCommand {
 	final static Logger LOG = Logger.getLogger(OSCommand.class.getSimpleName());
 
 	private static ThreadLocal<Boolean> elevated = new ThreadLocal<Boolean>();
+	private static ThreadLocal<Map<String, String>> environment = new ThreadLocal<Map<String, String>>();
 
 	private static char[] sudoPassword = null;
 
@@ -43,12 +45,39 @@ public class OSCommand {
 		elevated.set(Boolean.TRUE);
 	}
 
+	public static Map<String, String> environment() {
+		Map<String, String> env = environment.get();
+		if(env == null) {
+			env = new HashMap<>();
+			environment.set(env);
+		}
+		return env;
+	}
+
+	public static void environment(Map<String, String> env) {
+		environment.set(env);
+	}
+
 	public static void restrict() {
 		elevated.set(Boolean.FALSE);
 	}
 
+	public static int adminCommandAndOutputToFile(File sqlFile, String... args) throws IOException {
+		return adminCommandAndOutputToFile(null, sqlFile, args);
+	}
+
 	public static int runCommandAndOutputToFile(File sqlFile, String... args) throws IOException {
 		return runCommandAndOutputToFile(null, sqlFile, args);
+	}
+	
+	public static int adminCommandAndOutputToFile(File cwd, File sqlFile, String... args) throws IOException {
+		elevate();
+		try {
+			return runCommandAndOutputToFile(cwd, sqlFile, args);
+		}
+		finally {
+			restrict();
+		}
 	}
 
 	public static int runCommandAndOutputToFile(File cwd, File sqlFile, String... args) throws IOException {
@@ -60,7 +89,7 @@ public class OSCommand {
 			if (cwd != null) {
 				pb.directory(cwd);
 			}
-			checkElevated(pb);
+			checkElevationAndEnvironment(pb);
 			Process p = pb.start();
 			IOUtils.copy(p.getInputStream(), fos);
 			try {
@@ -74,8 +103,22 @@ public class OSCommand {
 		}
 	}
 
+	public static Collection<String> adminCommandAndCaptureOutput(String... sargs) throws IOException {
+		return adminCommandAndCaptureOutput(null, sargs);
+	}
+
 	public static Collection<String> runCommandAndCaptureOutput(String... sargs) throws IOException {
 		return runCommandAndCaptureOutput(null, sargs);
+	}
+
+	public static Collection<String> adminCommandAndCaptureOutput(File cwd, String... sargs) throws IOException {
+		elevate();
+		try {
+			return runCommandAndCaptureOutput(cwd, sargs);
+		}
+		finally {
+			restrict();
+		}
 	}
 
 	public static Collection<String> runCommandAndCaptureOutput(File cwd, String... sargs) throws IOException {
@@ -85,7 +128,7 @@ public class OSCommand {
 			LOG.fine("Running command: " + StringUtils.join(args, " "));
 			ForkerBuilder pb = new ForkerBuilder(args);
 			pb.io(IO.INPUT);
-			checkElevated(pb);
+			checkElevationAndEnvironment(pb);
 			if (cwd != null) {
 				pb.directory(cwd);
 			}
@@ -109,19 +152,44 @@ public class OSCommand {
 		}
 	}
 
-	private static void checkElevated(ForkerBuilder pb) {
+	private static void checkElevationAndEnvironment(ForkerBuilder pb) {
+		Map<String, String> env = environment.get();
+		if(env != null) {
+			pb.environment().putAll(env);
+		}
+		
 		if (Boolean.TRUE.equals(elevated.get())) {
 			pb.effectiveUser(sudoPassword == null ? EffectiveUserFactory.getDefault().administrator()
 					: new SudoFixedPasswordAdministrator(sudoPassword));
 		}
 	}
 
+	public static void admin(String... args) throws IOException {
+		admin(null, args);
+	}
+
 	public static void run(String... args) throws IOException {
 		run(null, args);
 	}
 
+	public static void admin(File cwd, String... args) throws IOException {
+		int ret = adminCommand(cwd, args);
+		if (ret != 0) {
+			throw new IOException("Command returned non-zero status '" + ret + "'.");
+		}
+		;
+	}
+
 	public static void run(File cwd, String... args) throws IOException {
 		int ret = runCommand(cwd, args);
+		if (ret != 0) {
+			throw new IOException("Command returned non-zero status '" + ret + "'.");
+		}
+		;
+	}
+
+	public static void admin(File cwd, OutputStream out, String... sargs) throws IOException {
+		int ret = adminCommand(cwd, out, sargs);
 		if (ret != 0) {
 			throw new IOException("Command returned non-zero status '" + ret + "'.");
 		}
@@ -136,16 +204,36 @@ public class OSCommand {
 		;
 	}
 
+	public static void admin(List<String> args) throws IOException, Exception {
+		admin((File) null, args);
+	}
+
 	public static void run(List<String> args) throws IOException, Exception {
 		run((File) null, args);
+	}
+
+	public static void admin(File cwd, List<String> args) throws IOException, Exception {
+		admin(cwd, null, args);
 	}
 
 	public static void run(File cwd, List<String> args) throws IOException, Exception {
 		run(cwd, null, args);
 	}
 
+	public static void admin(OutputStream out, List<String> args) throws IOException, Exception {
+		admin((File) null, out, args);
+	}
+
 	public static void run(OutputStream out, List<String> args) throws IOException, Exception {
 		run((File) null, out, args);
+	}
+
+	public static void admin(File cwd, OutputStream out, List<String> args) throws IOException, Exception {
+		Process process = doAdminCommand(cwd, args, out);
+		if (process.exitValue() != 0) {
+			throw new Exception(
+					"Update process exited with status " + process.exitValue() + ". See log for more details.");
+		}
 	}
 
 	public static void run(File cwd, OutputStream out, List<String> args) throws IOException, Exception {
@@ -156,20 +244,46 @@ public class OSCommand {
 		}
 	}
 
+	public static int adminCommand(OutputStream out, List<String> args) throws IOException {
+		return runCommand((File) null, out, (String[]) args.toArray(new String[0]));
+	}
+
 	public static int runCommand(OutputStream out, List<String> args) throws IOException {
 		return runCommand((File) null, out, (String[]) args.toArray(new String[0]));
+	}
+
+	public static int adminCommand(List<String> args) throws IOException {
+		return runCommand((String[]) args.toArray(new String[0]));
 	}
 
 	public static int runCommand(List<String> args) throws IOException {
 		return runCommand((String[]) args.toArray(new String[0]));
 	}
 
+	public static int adminCommand(String... args) throws IOException {
+		return adminCommand(null, args);
+	}
+
 	public static int runCommand(String... args) throws IOException {
 		return runCommand(null, args);
 	}
 
+	public static int adminCommand(File cwd, String... args) throws IOException {
+		return adminCommand(cwd, System.out, args);
+	}
+
 	public static int runCommand(File cwd, String... args) throws IOException {
 		return runCommand(cwd, System.out, args);
+	}
+
+	public static int adminCommand(File cwd, OutputStream out, String... sargs) throws IOException {
+		elevate();
+		try {
+			return runCommand(cwd, out, sargs);
+		}
+		finally {
+			restrict();
+		}
 	}
 
 	public static int runCommand(File cwd, OutputStream out, String... sargs) throws IOException {
@@ -177,7 +291,7 @@ public class OSCommand {
 		List<String> args = new ArrayList<String>(Arrays.asList(sargs));
 		ForkerBuilder pb = new ForkerBuilder(args);
 		pb.io(IO.INPUT);
-		checkElevated(pb);
+		checkElevationAndEnvironment(pb);
 		if (cwd != null) {
 			pb.directory(cwd);
 		}
@@ -192,16 +306,38 @@ public class OSCommand {
 		}
 	}
 
+	public static Process doAdminCommand(List<String> args) throws IOException {
+		return doAdminCommand((File) null, args);
+	}
+
 	public static Process doCommand(List<String> args) throws IOException {
 		return doCommand((File) null, args);
+	}
+
+	public static Process doAdminCommand(File cwd, List<String> args) throws IOException {
+		return doAdminCommand(cwd, args, null);
 	}
 
 	public static Process doCommand(File cwd, List<String> args) throws IOException {
 		return doCommand(cwd, args, null);
 	}
 
+	public static Process doAdminCommand(List<String> args, OutputStream out) throws IOException {
+		return doAdminCommand((File) null, args, out);
+	}
+
 	public static Process doCommand(List<String> args, OutputStream out) throws IOException {
 		return doCommand((File) null, args, out);
+	}
+
+	public static Process doAdminCommand(File cwd, List<String> args, OutputStream out) throws IOException {
+		elevate();
+		try {
+			return doCommand(cwd, args, out);
+		}
+		finally {
+			restrict();
+		}
 	}
 
 	public static Process doCommand(File cwd, List<String> args, OutputStream out) throws IOException {
@@ -210,10 +346,7 @@ public class OSCommand {
 		LOG.fine("Running command: " + StringUtils.join(args, " "));
 		ForkerBuilder builder = new ForkerBuilder(args);
 		builder.io(IO.INPUT);
-		checkElevated(builder);
-		Map<String, String> environment = builder.environment();
-		// TODO this REALLY should not be here
-		environment.put("DEBIAN_FRONTEND", "noninteractive");
+		checkElevationAndEnvironment(builder);
 		if (cwd != null) {
 			builder.directory(cwd);
 		}
