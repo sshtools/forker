@@ -111,7 +111,7 @@ public abstract class EffectiveUserFactory {
 					thisAppName = threadAppName;
 				appName = thisAppName;
 			}
-			if(appName == null) {
+			if (appName == null) {
 				appName = "Java Application";
 			}
 		}
@@ -163,8 +163,8 @@ public abstract class EffectiveUserFactory {
 				} else if (dt == Desktop.CONSOLE) {
 					return new SUUser(username);
 				}
-			} else if(SystemUtils.IS_OS_MAC_OSX) {
-				
+			} else if (SystemUtils.IS_OS_MAC_OSX) {
+
 				return new SUUser(username);
 			}
 			throw new UnsupportedOperationException(System.getProperty("os.name")
@@ -205,7 +205,7 @@ public abstract class EffectiveUserFactory {
 				builder.command().add(0, "sudo");
 			} else {
 				List<String> cmd = builder.command();
-				StringBuilder bui = getQuotedCommandString(cmd);
+				StringBuilder bui = Util.getQuotedCommandString(cmd);
 				cmd.clear();
 				cmd.add("su");
 				cmd.add("-c");
@@ -341,7 +341,7 @@ public abstract class EffectiveUserFactory {
 				builder.command().add(2, username);
 			} else {
 				List<String> cmd = builder.command();
-				StringBuilder bui = getQuotedCommandString(cmd);
+				StringBuilder bui = Util.getQuotedCommandString(cmd);
 				cmd.clear();
 				cmd.add("su");
 				cmd.add("-c");
@@ -368,7 +368,7 @@ public abstract class EffectiveUserFactory {
 		public void elevate(ForkerBuilder builder, Process process, Command command) {
 			List<String> cmd = builder.command();
 
-			StringBuilder bui = getQuotedCommandString(cmd);
+			StringBuilder bui = Util.getQuotedCommandString(cmd);
 
 			cmd.clear();
 			if (OS.hasCommand("gksudo"))
@@ -421,32 +421,34 @@ public abstract class EffectiveUserFactory {
 		}
 	}
 
-	public static class POSIXEffectiveUser implements EffectiveUser {
+	static abstract class AbstractPOSIXEffectiveUser<T> implements EffectiveUser {
 
-		private int uid;
+		private T value;
 		private int was = Integer.MIN_VALUE;
 		private boolean setRemote;
 
-		public POSIXEffectiveUser(int uid) {
-			this.uid = uid;
-		}
-
-		public int getUID() {
-			return uid;
+		AbstractPOSIXEffectiveUser(T value) {
+			this.value = value;
 		}
 
 		@Override
 		public void elevate(ForkerBuilder builder, Process process, Command command) {
 			if (process instanceof ForkerProcess) {
-				command.setRunAs(String.valueOf(getUID()));
+				command.setRunAs(String.valueOf(value));
 				setRemote = true;
 			} else {
 				if (was != Integer.MIN_VALUE)
 					throw new IllegalStateException();
 				was = CSystem.INSTANCE.geteuid();
-				doSeteuid(uid);
+				doSet(value);
 			}
 		}
+
+		public T getValue() {
+			return value;
+		}
+
+		abstract void doSet(T value);
 
 		@Override
 		public synchronized void descend() {
@@ -455,12 +457,12 @@ public abstract class EffectiveUserFactory {
 			} else {
 				if (was == Integer.MIN_VALUE)
 					throw new IllegalStateException();
-				doSeteuid(was);
+				seteuid(was);
 				was = Integer.MIN_VALUE;
 			}
 		}
 
-		private void doSeteuid(int euid) {
+		protected void seteuid(int euid) {
 			if (CSystem.INSTANCE.seteuid(euid) == -1) {
 				// TODO get errono
 				throw new RuntimeException("Failed to set EUID.");
@@ -470,19 +472,33 @@ public abstract class EffectiveUserFactory {
 
 	}
 
-	private static StringBuilder getQuotedCommandString(List<String> cmd) {
-		// Take existing command and turn it into one escaped command
-		StringBuilder bui = new StringBuilder();
-		for (int i = 0; i < cmd.size(); i++) {
-			if (bui.length() > 0) {
-				bui.append(' ');
-			}
-			if (i > 0)
-				bui.append("'");
-			bui.append(Util.escapeSingleQuotes(cmd.get(i)));
-			if (i > 0)
-				bui.append("'");
+	public static class POSIXUIDEffectiveUser extends AbstractPOSIXEffectiveUser<Integer> {
+
+		public POSIXUIDEffectiveUser(int uid) {
+			super(uid);
 		}
-		return bui;
+
+		@Override
+		void doSet(Integer value) {
+			seteuid(value);
+		}
+
+	}
+
+	public static class POSIXUsernameEffectiveUser extends AbstractPOSIXEffectiveUser<String> {
+
+		public POSIXUsernameEffectiveUser(String username) {
+			super(username);
+		}
+
+		@Override
+		void doSet(String value) {
+			try {
+				seteuid(Integer.parseInt(Util.getIDForUsername(value)));
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}
+
 	}
 }

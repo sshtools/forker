@@ -47,7 +47,7 @@ public class OSCommand {
 
 	public static Map<String, String> environment() {
 		Map<String, String> env = environment.get();
-		if(env == null) {
+		if (env == null) {
 			env = new HashMap<>();
 			environment.set(env);
 		}
@@ -69,13 +69,12 @@ public class OSCommand {
 	public static int runCommandAndOutputToFile(File sqlFile, String... args) throws IOException {
 		return runCommandAndOutputToFile(null, sqlFile, args);
 	}
-	
+
 	public static int adminCommandAndOutputToFile(File cwd, File sqlFile, String... args) throws IOException {
 		elevate();
 		try {
 			return runCommandAndOutputToFile(cwd, sqlFile, args);
-		}
-		finally {
+		} finally {
 			restrict();
 		}
 	}
@@ -115,8 +114,7 @@ public class OSCommand {
 		elevate();
 		try {
 			return runCommandAndCaptureOutput(cwd, sargs);
-		}
-		finally {
+		} finally {
 			restrict();
 		}
 	}
@@ -127,7 +125,8 @@ public class OSCommand {
 			List<String> args = new ArrayList<String>(Arrays.asList(sargs));
 			LOG.fine("Running command: " + StringUtils.join(args, " "));
 			ForkerBuilder pb = new ForkerBuilder(args);
-			pb.io(IO.INPUT);
+			if(pb.io() == null)
+				pb.io(IO.INPUT);
 			checkElevationAndEnvironment(pb);
 			if (cwd != null) {
 				pb.directory(cwd);
@@ -154,13 +153,17 @@ public class OSCommand {
 
 	private static void checkElevationAndEnvironment(ForkerBuilder pb) {
 		Map<String, String> env = environment.get();
-		if(env != null) {
+		if (env != null) {
 			pb.environment().putAll(env);
 		}
-		
+
 		if (Boolean.TRUE.equals(elevated.get())) {
-			pb.effectiveUser(sudoPassword == null ? EffectiveUserFactory.getDefault().administrator()
-					: new SudoFixedPasswordAdministrator(sudoPassword));
+			if (Forker.isDaemonRunning()) {
+				pb.effectiveUser(new EffectiveUserFactory.POSIXUIDEffectiveUser(0));
+			} else {
+				pb.effectiveUser(sudoPassword == null ? EffectiveUserFactory.getDefault().administrator()
+						: new SudoFixedPasswordAdministrator(sudoPassword));
+			}
 		}
 	}
 
@@ -280,8 +283,7 @@ public class OSCommand {
 		elevate();
 		try {
 			return runCommand(cwd, out, sargs);
-		}
-		finally {
+		} finally {
 			restrict();
 		}
 	}
@@ -290,7 +292,8 @@ public class OSCommand {
 		LOG.fine("Running command: " + StringUtils.join(sargs, " "));
 		List<String> args = new ArrayList<String>(Arrays.asList(sargs));
 		ForkerBuilder pb = new ForkerBuilder(args);
-		pb.io(IO.INPUT);
+		if(pb.io() == null)
+			pb.io(IO.INPUT);
 		checkElevationAndEnvironment(pb);
 		if (cwd != null) {
 			pb.directory(cwd);
@@ -334,8 +337,7 @@ public class OSCommand {
 		elevate();
 		try {
 			return doCommand(cwd, args, out);
-		}
-		finally {
+		} finally {
 			restrict();
 		}
 	}
@@ -345,7 +347,8 @@ public class OSCommand {
 
 		LOG.fine("Running command: " + StringUtils.join(args, " "));
 		ForkerBuilder builder = new ForkerBuilder(args);
-		builder.io(IO.INPUT);
+		if(builder.io() == null)
+			builder.io(IO.INPUT);
 		checkElevationAndEnvironment(builder);
 		if (cwd != null) {
 			builder.directory(cwd);

@@ -128,8 +128,13 @@ public class ForkerProcess extends Process {
 							inOut.close();
 							errOut.close();
 							synchronized (dout) {
-								dout.writeInt(States.END);
-								dout.flush();
+								try {
+									dout.writeInt(States.END);
+									dout.flush();
+								}
+								catch(IOException ioe) {
+									// Other side may have closed
+								}
 							}
 							break;
 						case States.IN:

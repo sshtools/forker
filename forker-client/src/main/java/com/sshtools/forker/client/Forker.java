@@ -130,6 +130,8 @@ public class Forker {
 
 	private final static Forker INSTANCE = new Forker();
 	private static boolean daemonLoaded;
+	private static boolean daemonRunning;
+	private static boolean daemonAdministrator;
 
 	public static Forker get() {
 		return INSTANCE;
@@ -185,6 +187,7 @@ public class Forker {
 	 */
 	public static void loadDaemon(boolean asAdministrator) {
 		loadDaemon(asAdministrator ? EffectiveUserFactory.getDefault().administrator() : null);
+		daemonAdministrator = asAdministrator;
 	}
 
 	/**
@@ -270,6 +273,8 @@ public class Forker {
 						if (cookie == null || !cookie.isRunning())
 							throw new RuntimeException("Failed to start forker daemon.");
 
+						daemonRunning = true;
+						
 						if (isolated) {
 							/*
 							 * Open a connection to the forker daemon and keep
@@ -295,6 +300,7 @@ public class Forker {
 							}
 						}
 					} else {
+						daemonRunning = true;
 						if (fixedCookie != null) {
 							Cookie.get().set(fixedCookie);
 						}
@@ -311,4 +317,13 @@ public class Forker {
 			}
 		}
 	}
+
+	public static boolean isDaemonLoadedAsAdministrator() {
+		return daemonRunning && daemonAdministrator;
+	}
+
+	public static boolean isDaemonRunning() {
+		return daemonRunning;
+	}
+
 }

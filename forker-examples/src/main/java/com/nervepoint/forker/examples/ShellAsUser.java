@@ -24,7 +24,7 @@ public class ShellAsUser {
 		 * used, but we just get the current UID (using 'id -u' command) and ask for the shell we
 		 * spawn to use the that user.
 		 */
-		shell.effectiveUser(new EffectiveUserFactory.POSIXEffectiveUser(Integer.parseInt(OSCommand.runCommandAndCaptureOutput("id", "-u").iterator().next())));
+		shell.effectiveUser(new EffectiveUserFactory.POSIXUIDEffectiveUser(Integer.parseInt(OSCommand.runCommandAndCaptureOutput("id", "-u").iterator().next())));
 		
 		final Process p = shell.start();
 		

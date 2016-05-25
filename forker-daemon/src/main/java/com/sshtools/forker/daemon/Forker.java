@@ -16,7 +16,9 @@ import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -38,6 +40,7 @@ import com.sshtools.forker.common.Cookie;
 import com.sshtools.forker.common.Cookie.Instance;
 import com.sshtools.forker.common.IO;
 import com.sshtools.forker.common.States;
+import com.sshtools.forker.common.Util;
 import com.sun.jna.Platform;
 
 public class Forker {
@@ -228,9 +231,17 @@ public class Forker {
 			}
 		}
 	}
+	
+	private static boolean isAdministrator() {
+		// TODO make better
+		return System.getProperty("user.name").equals("root");
+	}
 
 	private static void handleStandardCommand(final DataInputStream din, final DataOutputStream dout, Command cmd)
 			throws IOException {
+		
+		
+		
 		ProcessBuilder builder = new ProcessBuilder(cmd.getArguments());
 		if (cmd.getEnvironment() != null) {
 			builder.environment().putAll(cmd.getEnvironment());
@@ -241,6 +252,33 @@ public class Forker {
 		}
 
 		try {
+			if(StringUtils.isNotBlank(cmd.getRunAs())) {
+				int uid = -1;
+				String username = null;
+				try {
+					uid = Integer.parseInt(cmd.getRunAs());
+					username = Util.getUsernameForID(cmd.getRunAs());
+					if(username == null)
+						throw new IOException(String.format("Could not determine username for UID %d", uid));
+				}
+				catch(NumberFormatException nfe) {
+					username = cmd.getRunAs();
+				}
+				if(!username.equals(System.getProperty("user.name"))) {
+					if(isAdministrator()) {
+						List<String> args = new ArrayList<String>(cmd.getArguments());
+						cmd.getArguments().clear();			
+						cmd.getArguments().add("su");
+						cmd.getArguments().add(username);
+						cmd.getArguments().add("-c");
+						cmd.getArguments().add(Util.getQuotedCommandString(args).toString());
+					}
+					else {
+						throw new IOException("Not an administrator.");
+					}
+				}
+			}
+			
 			final Process process = builder.start();
 			dout.writeInt(States.OK);
 			if (!cmd.isRedirectError()) {
@@ -266,13 +304,14 @@ public class Forker {
 			readStreamToOutput(dout, process.getInputStream(), States.IN);
 			synchronized (dout) {
 				dout.writeInt(States.END);
-				dout.writeInt(process.exitValue());
+				dout.writeInt(process.waitFor());
 				dout.flush();
 			}
 
 			// Wait for stream other end to close
 			input.join();
 		} catch (Throwable t) {
+			t.printStackTrace();
 			synchronized (dout) {
 				dout.writeInt(States.FAILED);
 				dout.writeUTF(t.getMessage());

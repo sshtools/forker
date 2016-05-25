@@ -39,10 +39,12 @@ public class ForkerBuilder {
 		if (command == null)
 			throw new NullPointerException();
 		this.command.getArguments().addAll(command);
+		initBuilder();
 	}
 
 	public ForkerBuilder(String... command) {
 		this.command.getArguments().addAll(Arrays.asList(command));
+		initBuilder();
 	}
 
 	public ForkerBuilder command(List<String> command) {
@@ -129,7 +131,7 @@ public class ForkerBuilder {
 
 	public ForkerBuilder redirectErrorStream(boolean redirectErrorStream) {
 		if (redirectErrorStream && command.getIO() != IO.IO&& command.getIO() != IO.DEFAULT
-				&& command.getIO() != IO.PTY && command.getIO() != IO.INPUT) {
+				&& command.getIO() != IO.PTY && command.getIO() != IO.INPUT && command.getIO() != IO.DAEMON) {
 			throw new IllegalStateException(
 					"Cannot redirect error stream if using IO mode '"
 							+ command.getIO() + "'");
@@ -192,6 +194,7 @@ public class ForkerBuilder {
 			}
 		case IO:
 		case PTY:
+		case DAEMON:
 		case DEFAULT:
 			// We need input and output, first try and connect to the forker
 			// daemon
@@ -224,6 +227,11 @@ public class ForkerBuilder {
 		default:
 			throw new UnsupportedOperationException();
 		}
+	}
+
+	protected void initBuilder() {
+		if(Forker.isDaemonRunning())
+			this.command.setIO(IO.DAEMON);
 	}
 
 	protected IOException handleIllegalArgumentException(String prog,
