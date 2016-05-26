@@ -281,6 +281,14 @@ public class Forker {
 							 * Open a connection to the forker daemon and keep
 							 * it open. When forker see this connection go down,
 							 * it will shut itself down
+							 * 
+							 * NOTE
+							 * 
+							 * VERY STRANGE. Unless this Socket object has a strong reference,
+							 * it will close when we leave this scope!?!?!?! As far as I know
+							 * the should not happen. The symptom is forker daemon will shutdown
+							 * as this socket has been closed (so any any new commands to execute
+							 * will get rejected). 
 							 */
 							daemonMaintenanceSocket = null;
 							try {
