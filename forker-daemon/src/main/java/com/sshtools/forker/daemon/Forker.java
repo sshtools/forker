@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.SystemUtils;
@@ -378,9 +379,10 @@ public class Forker {
 
 					// Wait forever
 					try {
-						din.readByte();
+						while(true)
+							din.readByte();
 					} finally {
-						System.exit(0);
+						forker.exit();
 					}
 				}
 
@@ -404,6 +406,15 @@ public class Forker {
 			}
 		}
 
+	}
+
+	public void exit() {
+		executor.shutdown();
+		try {
+			executor.awaitTermination(60, TimeUnit.SECONDS);
+		} catch (InterruptedException e) {
+		}
+		System.exit(0);
 	}
 
 }

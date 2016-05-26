@@ -104,7 +104,7 @@ public class Forker {
 					}
 
 					// Now just read till it dies (or we die)
-					IOUtils.copy(inputStream, System.out);
+					IOUtils.copy(inputStream, System.err);
 				} finally {
 					process.waitFor();
 				}
@@ -132,6 +132,7 @@ public class Forker {
 	private static boolean daemonLoaded;
 	private static boolean daemonRunning;
 	private static boolean daemonAdministrator;
+	private static Socket daemonMaintenanceSocket;
 
 	public static Forker get() {
 		return INSTANCE;
@@ -281,21 +282,21 @@ public class Forker {
 							 * it open. When forker see this connection go down,
 							 * it will shut itself down
 							 */
-							Socket s = null;
+							daemonMaintenanceSocket = null;
 							try {
-								s = new Socket(InetAddress.getLocalHost(), cookie.getPort());
-								DataOutputStream dos = new DataOutputStream(s.getOutputStream());
+								daemonMaintenanceSocket = new Socket(InetAddress.getLocalHost(), cookie.getPort());
+								DataOutputStream dos = new DataOutputStream(daemonMaintenanceSocket.getOutputStream());
 								dos.writeUTF(cookie.getCookie());
 								dos.writeByte(1);
 								dos.flush();
-								DataInputStream din = new DataInputStream(s.getInputStream());
+								DataInputStream din = new DataInputStream(daemonMaintenanceSocket.getInputStream());
 								if (din.readInt() != States.OK)
 									throw new Exception("Unexpected response.");
 
 								// Now we leave this open
 							} catch (Exception e) {
-								if (s != null) {
-									s.close();
+								if (daemonMaintenanceSocket != null) {
+									daemonMaintenanceSocket.close();
 								}
 							}
 						}
