@@ -141,9 +141,10 @@ public class ForkerBuilder {
 	}
 
 	public Process start() throws IOException {
-		// As far as I know none of this is required on Windows (except for Pty)
+		// As far as I know none of this is required on Windows (except for Pty and runAs reasons)
 		if (command.getIO() != IO.PTY
-				&& (SystemUtils.IS_OS_WINDOWS || "true".equals(System
+			&& command.getIO() != IO.DAEMON
+						&& (SystemUtils.IS_OS_WINDOWS || "true".equals(System
 						.getProperty("forker.forceJavaFork")))) {
 			return startProcessBuilder();
 		}

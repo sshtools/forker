@@ -9,18 +9,21 @@ public class OSCommandElevate {
 		Forker.loadDaemon(true);
 		OSCommand.elevate();
 		try {
-			OSCommand.run("ls");
+			OSCommand.run("id");
 		} finally {
 			OSCommand.restrict();
 		}
 
-		// 2nd time should not ask for password
+		// // 2nd time should not ask for password
 		OSCommand.elevate();
 		try {
-			OSCommand.run("ls");
+			OSCommand.run("id");
 		} finally {
 			OSCommand.restrict();
 		}
+
+		// 3rd should run as current user (via root)
+		OSCommand.run("id");
 
 	}
 

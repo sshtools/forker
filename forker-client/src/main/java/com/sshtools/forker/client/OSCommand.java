@@ -165,6 +165,10 @@ public class OSCommand {
 						: new SudoFixedPasswordAdministrator(sudoPassword));
 			}
 		}
+		else {
+			if(Forker.isDaemonLoadedAsAdministrator())
+				pb.effectiveUser(new EffectiveUserFactory.POSIXUsernameEffectiveUser(System.getProperty("user.name")));
+		}
 	}
 
 	public static void admin(String... args) throws IOException {

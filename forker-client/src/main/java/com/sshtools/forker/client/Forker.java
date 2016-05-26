@@ -187,8 +187,10 @@ public class Forker {
 	 * @param asAdministrator
 	 */
 	public static void loadDaemon(boolean asAdministrator) {
-		loadDaemon(asAdministrator ? EffectiveUserFactory.getDefault().administrator() : null);
-		daemonAdministrator = asAdministrator;
+		if (!daemonLoaded) {
+			loadDaemon(asAdministrator ? EffectiveUserFactory.getDefault().administrator() : null);
+			daemonAdministrator = asAdministrator;
+		}
 	}
 
 	/**
@@ -275,7 +277,7 @@ public class Forker {
 							throw new RuntimeException("Failed to start forker daemon.");
 
 						daemonRunning = true;
-						
+
 						if (isolated) {
 							/*
 							 * Open a connection to the forker daemon and keep
@@ -284,11 +286,12 @@ public class Forker {
 							 * 
 							 * NOTE
 							 * 
-							 * VERY STRANGE. Unless this Socket object has a strong reference,
-							 * it will close when we leave this scope!?!?!?! As far as I know
-							 * the should not happen. The symptom is forker daemon will shutdown
-							 * as this socket has been closed (so any any new commands to execute
-							 * will get rejected). 
+							 * VERY STRANGE. Unless this Socket object has a
+							 * strong reference, it will close when we leave
+							 * this scope!?!?!?! As far as I know the should not
+							 * happen. The symptom is forker daemon will
+							 * shutdown as this socket has been closed (so any
+							 * any new commands to execute will get rejected).
 							 */
 							daemonMaintenanceSocket = null;
 							try {
