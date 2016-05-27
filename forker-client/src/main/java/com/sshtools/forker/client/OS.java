@@ -1,19 +1,17 @@
 package com.sshtools.forker.client;
 
 import java.io.File;
-import java.io.IOException;
+import java.util.Collection;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.SystemUtils;
-
-import com.sshtools.forker.common.IO;
 
 public class OS {
 
 	public enum Desktop {
 		GNOME, KDE, CINNAMON, XFCE, GNOME3, WINDOWS, MAC_OSX, MAC, OTHER, UNITY, LXDE, CONSOLE, NONE
 	}
-	
+
 	public static boolean isRunningOnDesktop() {
 		return !getDesktopEnvironment().equals(Desktop.CONSOLE);
 	}
@@ -49,8 +47,7 @@ public class OS {
 			return Desktop.XFCE;
 		}
 		if ("KDE".equalsIgnoreCase(desktopSession)
-				|| (StringUtils.isBlank(desktopSession) && gdmSession
-						.equals("kde-plasma"))) {
+				|| (StringUtils.isBlank(desktopSession) && gdmSession.equals("kde-plasma"))) {
 			return Desktop.KDE;
 		}
 		if ("UNITY".equalsIgnoreCase(desktopSession)) {
@@ -66,39 +63,35 @@ public class OS {
 	}
 
 	public static boolean hasCommand(String command) {
-		try {
-			if (SystemUtils.IS_OS_LINUX) {
-				return Forker.get().exec(IO.SINK, "which", command).waitFor() == 0;
-			} else {
-				String path = System.getenv("PATH");
-				if (path != "") {
-					boolean found = false;
-					for (String p : path.split(File.pathSeparator)) {
-						File f = new File(p);
-						if (f.isDirectory()) {
-							String cmd = command;
-							if (SystemUtils.IS_OS_WINDOWS) {
-								cmd += ".exe";
-							}
-							File e = new File(f, cmd);
-							if(e.exists()) {
-								found = true;
-								break;
-							}
+		if (SystemUtils.IS_OS_LINUX) {
+			try {
+				Collection<String> out = OSCommand.runCommandAndCaptureOutput("which", command);
+				return !out.isEmpty();
+			} catch (Exception e) {
+				return false;
+			}
+		} else {
+			String path = System.getenv("PATH");
+			if (path != "") {
+				boolean found = false;
+				for (String p : path.split(File.pathSeparator)) {
+					File f = new File(p);
+					if (f.isDirectory()) {
+						String cmd = command;
+						if (SystemUtils.IS_OS_WINDOWS) {
+							cmd += ".exe";
+						}
+						File e = new File(f, cmd);
+						if (e.exists()) {
+							found = true;
+							break;
 						}
 					}
-					return found;
 				}
-				throw new UnsupportedOperationException(
-						System.getProperty("os.name")
-								+ " is not supported. Cannot determine if command "
-								+ command + " exists");
+				return found;
 			}
-		} catch (IOException ioe) {
-			throw new RuntimeException(
-					"Could not determine if command exists.", ioe);
-		} catch (InterruptedException ie) {
-			throw new RuntimeException(ie);
+			throw new UnsupportedOperationException(System.getProperty("os.name")
+					+ " is not supported. Cannot determine if command " + command + " exists");
 		}
 	}
 }

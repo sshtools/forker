@@ -17,8 +17,10 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -232,7 +234,7 @@ public class Forker {
 			}
 		}
 	}
-	
+
 	private static boolean isAdministrator() {
 		// TODO make better
 		return System.getProperty("user.name").equals("root");
@@ -240,46 +242,56 @@ public class Forker {
 
 	private static void handleStandardCommand(final DataInputStream din, final DataOutputStream dout, Command cmd)
 			throws IOException {
-		
-		
-		
+
 		ProcessBuilder builder = new ProcessBuilder(cmd.getArguments());
-		if (cmd.getEnvironment() != null) {
-			builder.environment().putAll(cmd.getEnvironment());
+
+		// TODO way to control this
+		Map<String, String> builderEnv = builder.environment();
+		builderEnv.putAll(System.getenv());
+
+		Map<String, String> cmdEnvironment = cmd.getEnvironment();
+		if (cmdEnvironment != null) {
+			cmdEnvironment = new HashMap<String, String>();
+			// We want to preserve the path?
+			// TODO merge this instead?
+			if(builderEnv.containsKey("PATH"))
+				cmdEnvironment.remove("PATH");	
+			if(builderEnv.containsKey("HOME"))
+				cmdEnvironment.remove("HOME");
+			builderEnv.putAll(cmdEnvironment);
 		}
+		
 		builder.directory(cmd.getDirectory());
 		if (cmd.isRedirectError()) {
 			builder.redirectErrorStream(true);
 		}
 
 		try {
-			if(StringUtils.isNotBlank(cmd.getRunAs())) {
+			if (StringUtils.isNotBlank(cmd.getRunAs())) {
 				int uid = -1;
 				String username = null;
 				try {
 					uid = Integer.parseInt(cmd.getRunAs());
 					username = Util.getUsernameForID(cmd.getRunAs());
-					if(username == null)
+					if (username == null)
 						throw new IOException(String.format("Could not determine username for UID %d", uid));
-				}
-				catch(NumberFormatException nfe) {
+				} catch (NumberFormatException nfe) {
 					username = cmd.getRunAs();
 				}
-				if(!username.equals(System.getProperty("user.name"))) {
-					if(isAdministrator()) {
+				if (!username.equals(System.getProperty("user.name"))) {
+					if (isAdministrator()) {
 						List<String> args = new ArrayList<String>(cmd.getArguments());
-						cmd.getArguments().clear();			
+						cmd.getArguments().clear();
 						cmd.getArguments().add("su");
 						cmd.getArguments().add(username);
 						cmd.getArguments().add("-c");
 						cmd.getArguments().add(Util.getQuotedCommandString(args).toString());
-					}
-					else {
+					} else {
 						throw new IOException("Not an administrator.");
 					}
 				}
 			}
-			
+
 			final Process process = builder.start();
 			dout.writeInt(States.OK);
 			if (!cmd.isRedirectError()) {
@@ -379,7 +391,7 @@ public class Forker {
 
 					// Wait forever
 					try {
-						while(true)
+						while (true)
 							din.readByte();
 					} finally {
 						forker.exit();

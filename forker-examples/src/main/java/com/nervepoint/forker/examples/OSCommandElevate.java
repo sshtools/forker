@@ -15,15 +15,15 @@ public class OSCommandElevate {
 		}
 
 		// // 2nd time should not ask for password
-//		OSCommand.elevate();
-//		try {
-//			OSCommand.run("id");
-//		} finally {
-//			OSCommand.restrict();
-//		}
+		OSCommand.elevate();
+		try {
+			OSCommand.run("id");
+		} finally {
+			OSCommand.restrict();
+		}
 //
 //		// 3rd should run as current user (via root)
-//		OSCommand.run("id");
+		OSCommand.run("id");
 
 	}
 
