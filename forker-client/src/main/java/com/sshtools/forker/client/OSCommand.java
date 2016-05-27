@@ -166,7 +166,7 @@ public class OSCommand {
 			}
 		}
 		else {
-			if(Forker.isDaemonLoadedAsAdministrator())
+			if(Forker.isDaemonRunningAsAdministrator())
 				pb.effectiveUser(new EffectiveUserFactory.POSIXUsernameEffectiveUser(System.getProperty("user.name")));
 		}
 	}

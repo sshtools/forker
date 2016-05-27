@@ -34,6 +34,7 @@ public class Forker {
 		private boolean errored;
 
 		private ForkerDaemonThread(EffectiveUser effectiveUser, boolean isolated) {
+			super("ForkerDaemon");
 			this.effectiveUser = effectiveUser;
 			this.isolated = isolated;
 			setDaemon(true);
@@ -49,7 +50,9 @@ public class Forker {
 			 * needs
 			 */
 			StringBuilder cp = new StringBuilder();
-			for (String p : System.getProperty("java.class.path", "").split(File.pathSeparator)) {
+			System.getProperties().list(System.out);
+			for (String p : ( daemonClasspath == null ? System.getProperty("java.class.path", "") :daemonClasspath).split(File.pathSeparator)) {
+				System.out.println("PP: " + p);
 				File f = new File(p);
 				if (f.isDirectory()) {
 					/*
@@ -133,11 +136,12 @@ public class Forker {
 	private static boolean daemonRunning;
 	private static boolean daemonAdministrator;
 	private static Socket daemonMaintenanceSocket;
+	private static String daemonClasspath;
 
 	public static Forker get() {
 		return INSTANCE;
 	}
-
+	
 	public Process exec(IO io, String command) throws IOException {
 		return exec(io, command, null, null);
 	}
@@ -167,6 +171,20 @@ public class Forker {
 
 	public Process exec(IO io, String[] cmdarray, String[] envp, File dir) throws IOException {
 		return new ForkerBuilder(cmdarray).io(io).environment(envp).directory(dir).start();
+	}
+	
+	/**
+	 * Set the classpath to be used to load the daemon. Attempts will be made to 
+	 * determine this automatically, but this may not always work, for example
+	 * when running inside Maven the classpath must be built from the plugin
+	 * dependencies.
+	 * 
+	 * This must be called before the daemon is loaded
+	 */
+	public static void setDaemonClasspath(String cp) {
+		if(isDaemonRunning())
+			throw new IllegalStateException("Daemon is already running.");
+		daemonClasspath = cp;
 	}
 
 	/**
@@ -330,12 +348,16 @@ public class Forker {
 		}
 	}
 
-	public static boolean isDaemonLoadedAsAdministrator() {
+	public static boolean isDaemonRunningAsAdministrator() {
 		return daemonRunning && daemonAdministrator;
 	}
 
 	public static boolean isDaemonRunning() {
 		return daemonRunning;
+	}
+
+	public static boolean isDaemonLoaded() {
+		return daemonLoaded;
 	}
 
 }
