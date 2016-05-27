@@ -36,6 +36,11 @@ public class Command {
 				environment.put(din.readUTF(), din.readUTF());
 			}
 		}
+		else {
+			// Otherwise pass on our own environment. 
+			// TODO i think better handling of environment in general is needed. Something for 1.3
+			environment = new ProcessBuilder("dummy").environment();
+		}
 		String r = din.readUTF();
 		runAs = r.equals("") ? null : r;
 		io = IO.valueOf(din.readUTF());

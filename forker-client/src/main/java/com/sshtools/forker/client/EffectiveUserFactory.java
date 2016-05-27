@@ -1,5 +1,6 @@
 package com.sshtools.forker.client;
 
+import java.io.Console;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
@@ -13,6 +14,7 @@ import org.apache.commons.lang.SystemUtils;
 import com.sshtools.forker.client.OS.Desktop;
 import com.sshtools.forker.client.impl.ForkerProcess;
 import com.sshtools.forker.client.ui.AskPass;
+import com.sshtools.forker.client.ui.AskPassConsole;
 import com.sshtools.forker.common.CSystem;
 import com.sshtools.forker.common.Command;
 import com.sshtools.forker.common.Util;
@@ -129,11 +131,17 @@ public abstract class EffectiveUserFactory {
 						if (OS.hasCommand("gksudo") || OS.hasCommand("gksu")) {
 							return new GKAdministrator();
 						} else if (OS.hasCommand("sudo")) {
-							return new SudoAskPassAdministrator();
+							return new SudoAskPassGuiAdministrator();
 						}
 					} else if (dt == Desktop.CONSOLE) {
-						if (OS.hasCommand("sudo") || OS.hasCommand("su")) {
-							return new SUAdministrator();
+
+						Console console = System.console();
+						if(OS.hasCommand("sudo") && console == null)
+							return new SudoAskPassAdministrator();
+						else {
+							if (OS.hasCommand("sudo") || OS.hasCommand("su")) {
+								return new SUAdministrator();
+							}
 						}
 					}
 				}
@@ -141,7 +149,7 @@ public abstract class EffectiveUserFactory {
 				if (fixedPassword != null) {
 					return new SudoFixedPasswordAdministrator(fixedPassword.toCharArray());
 				} else if (OS.hasCommand("sudo")) {
-					return new SudoAskPassAdministrator();
+					return new SudoAskPassGuiAdministrator();
 				}
 			}
 			throw new UnsupportedOperationException(System.getProperty("os.name")
@@ -284,6 +292,62 @@ public abstract class EffectiveUserFactory {
 				PrintWriter pw = new PrintWriter(out);
 				try {
 					pw.println("#!/bin/bash");
+					pw.println("\"" + javaExe + "\" -classpath \"" + cp + "\" " + AskPassConsole.class.getName());
+					pw.flush();
+				} finally {
+					out.close();
+				}
+
+				tempScript.setExecutable(true);
+
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}
+
+		@Override
+		public void descend() {
+		}
+
+		@Override
+		public void elevate(ForkerBuilder builder, Process process, Command command) {
+			builder.command().add(0, "sudo");
+			builder.command().add(1, "-A");
+			builder.command().add(2, "-E");
+			builder.environment().put("SUDO_ASKPASS", tempScript.getAbsolutePath());
+		}
+
+	}
+	public static class SudoAskPassGuiAdministrator implements EffectiveUser {
+
+		static File tempScript;
+		static {
+			// Create a temporary script to use to launch AskPass
+			try {
+				tempScript = File.createTempFile("sapa", ".sh");
+				tempScript.deleteOnExit();
+
+				String javaExe = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
+				if (SystemUtils.IS_OS_WINDOWS)
+					javaExe += ".exe";
+
+				String cp = null;
+				String fullCp = System.getProperty("java.class.path", "");
+				for (String p : fullCp.split(File.pathSeparator)) {
+					if (p.contains("forker-client")) {
+						cp = p;
+					}
+				}
+				if (cp == null) {
+					// Couldn't find just forker-common for some reason, just
+					// add everything
+					cp = fullCp;
+				}
+
+				OutputStream out = new FileOutputStream(tempScript);
+				PrintWriter pw = new PrintWriter(out);
+				try {
+					pw.println("#!/bin/bash");
 					pw.println("\"" + javaExe + "\" -classpath \"" + cp + "\" " + AskPass.class.getName());
 					pw.flush();
 				} finally {
@@ -310,7 +374,6 @@ public abstract class EffectiveUserFactory {
 		}
 
 	}
-
 	/**
 	 * Effective user implementation that raises privileges using sudo (or
 	 * 'su'). Generally you would only use this in console applications.

@@ -7,6 +7,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.util.StringTokenizer;
@@ -50,9 +51,7 @@ public class Forker {
 			 * needs
 			 */
 			StringBuilder cp = new StringBuilder();
-			System.getProperties().list(System.out);
 			for (String p : ( daemonClasspath == null ? System.getProperty("java.class.path", "") :daemonClasspath).split(File.pathSeparator)) {
-				System.out.println("PP: " + p);
 				File f = new File(p);
 				if (f.isDirectory()) {
 					/*
@@ -94,14 +93,69 @@ public class Forker {
 				try {
 					InputStream inputStream = process.getInputStream();
 
+					/* Need stdin in case we need to elevate and dont have a GUI. Must
+					 * flush after every character too
+					 */
+					new Thread() {
+						public void run() {
+							try {
+								OutputStream outputStream = process.getOutputStream();
+								while(true) {
+									int r = System.in.read();
+									if(r == -1)
+										break;
+									outputStream.write(r);
+									outputStream.flush();
+								}
+							} catch (IOException e) {
+							}
+						}
+					}.start();
+					
 					if (isolated) {
-						// Wait for cookie
-						BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-						String line;
-						while ((line = reader.readLine()) != null) {
-							if (line.startsWith("FORKER-COOKIE: ")) {
-								Cookie.get().set(new Instance(line.substring(15)));
+						/* Wait for cookie. We can't just read stdout line by line, as there
+						 * may be output from a console based 'askpass' that we need to display
+						 * immediately, but we want to extract and NOT display the forker cookie when
+						 * authentication succeeds.
+						 */
+						StringBuffer line = new StringBuffer();
+						String matchStr = "FORKER-COOKIE: ";
+						int matched = 0;
+						while(true) {
+							int r = inputStream.read();
+							if(r == -1) {
 								break;
+							}
+							else {
+								char chr = (char)r;
+								if(r == 13 || r == 10) {
+									matched = 0;
+									String l = line.toString();
+									if (l.startsWith("FORKER-COOKIE: ")) {
+										Cookie.get().set(new Instance(l.substring(15)));
+										break;
+									}
+									line.setLength(0);
+									System.out.print(chr);
+								}
+								else {
+									line.append(chr);
+									if(chr == matchStr.charAt(matched)) {
+										matched++;
+										if(matched == matchStr.length()) {
+											Cookie.get().set(new Instance(new BufferedReader(new InputStreamReader(inputStream)).readLine()));
+											break;											
+										}
+									}
+									else {
+										if(matched > 0) {
+											matched = 0;
+											System.out.print(line.toString());
+										}
+										System.out.print(chr);
+									}
+								}
+								
 							}
 						}
 					}

@@ -153,7 +153,7 @@ public class OSCommand {
 
 	private static void checkElevationAndEnvironment(ForkerBuilder pb) {
 		Map<String, String> env = environment.get();
-		if (env != null) {
+		if (env != null && !env.isEmpty()) {
 			pb.environment().putAll(env);
 		}
 
