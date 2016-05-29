@@ -41,8 +41,10 @@ public class OSCommand {
 		sudoPassword = password;
 	}
 
-	public static void elevate() {
+	public static boolean elevate() {
+		boolean res = !Boolean.TRUE.equals(elevated.get());
 		elevated.set(Boolean.TRUE);
+		return res;
 	}
 
 	public static Map<String, String> environment() {
@@ -58,8 +60,10 @@ public class OSCommand {
 		environment.set(env);
 	}
 
-	public static void restrict() {
+	public static boolean restrict() {
+		boolean el = Boolean.TRUE.equals(elevated.get());
 		elevated.set(Boolean.FALSE);
+		return el;
 	}
 
 	public static int adminCommandAndOutputToFile(File sqlFile, String... args) throws IOException {

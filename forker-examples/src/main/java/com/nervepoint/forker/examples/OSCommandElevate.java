@@ -7,22 +7,12 @@ public class OSCommandElevate {
 
 	public static void main(String[] args) throws Exception {
 		Forker.loadDaemon(true);
-		OSCommand.elevate();
-		try {
-			OSCommand.run("ifconfig");
-		} finally {
-			OSCommand.restrict();
-		}
+		OSCommand.admin("ifconfig");
 
 		// // 2nd time should not ask for password
-		OSCommand.elevate();
-		try {
-			OSCommand.run("id");
-		} finally {
-			OSCommand.restrict();
-		}
-//
-//		// 3rd should run as current user (via root)
+		OSCommand.admin("id");
+		//
+		// // 3rd should run as current user (via root)
 		OSCommand.run("id");
 
 	}

@@ -64,11 +64,15 @@ public class OS {
 
 	public static boolean hasCommand(String command) {
 		if (SystemUtils.IS_OS_LINUX) {
+			boolean el = OSCommand.restrict();
 			try {
 				Collection<String> out = OSCommand.runCommandAndCaptureOutput("which", command);
 				return !out.isEmpty();
 			} catch (Exception e) {
 				return false;
+			} finally {
+				if (el)
+					OSCommand.elevate();
 			}
 		} else {
 			String path = System.getenv("PATH");

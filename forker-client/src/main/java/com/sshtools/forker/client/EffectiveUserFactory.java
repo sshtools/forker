@@ -212,6 +212,10 @@ public abstract class EffectiveUserFactory {
 				 */
 				builder.command().add(0, "sudo");
 			} else {
+				if(System.console() == null)
+					throw new IllegalStateException("This program requires elevated privileges, "
+							+ "but sudo is not available, and the fallback 'su' is not capable of "
+							+ "running without a controlling terminal.");
 				List<String> cmd = builder.command();
 				StringBuilder bui = Util.getQuotedCommandString(cmd);
 				cmd.clear();
@@ -471,11 +475,13 @@ public abstract class EffectiveUserFactory {
 			cmd.clear();
 			if (OS.hasCommand("gksudo")) {
 				cmd.add("gksudo");
+				cmd.add("--sudo-mode");
 				cmd.add("--preserve-env");
 				cmd.add("--description");
 				cmd.add(getDefault().getAppName());
 			} else if (OS.hasCommand("gksu")) {
 				cmd.add("gksu");
+				cmd.add("--su-mode");
 				cmd.add("--preserve-env");
 				cmd.add("--description");
 				cmd.add(getDefault().getAppName());
