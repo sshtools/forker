@@ -23,11 +23,11 @@ When both input and output to a process is required, and you want low fork costs
 	<url>http://www.nervepoint.com</url>
 	<packaging>pom</packaging>
 
-	<parent>
+	<!-- <parent>
 		<groupId>org.sonatype.oss</groupId>
 		<artifactId>oss-parent</artifactId>
 		<version>7</version>
-	</parent>
+	</parent> -->
 
 	<licenses>
 		<license>
