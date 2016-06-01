@@ -63,6 +63,7 @@ When both input and output to a process is required, and you want low fork costs
 		<module>forker-daemon</module>
 		<module>forker-client</module>
 		<module>forker-examples</module>
+		<module>forker-wrapper</module>
 	</modules>
 
 	<dependencies>
