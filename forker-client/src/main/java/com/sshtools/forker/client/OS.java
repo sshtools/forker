@@ -1,6 +1,7 @@
 package com.sshtools.forker.client;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Collection;
 
 import org.apache.commons.lang.StringUtils;
@@ -14,6 +15,31 @@ public class OS {
 
 	public static boolean isRunningOnDesktop() {
 		return !getDesktopEnvironment().equals(Desktop.CONSOLE);
+	}
+
+	public static boolean isAdministrator() {
+		if (SystemUtils.IS_OS_WINDOWS) {
+			try {
+				String programFiles = System.getenv("ProgramFiles");
+				if (programFiles == null) {
+					programFiles = "C:\\Program Files";
+				}
+				File temp = new File(programFiles, "foo.txt");
+				temp.deleteOnExit();
+				if (temp.createNewFile()) {
+					temp.delete();
+					return true;
+				} else {
+					return false;
+				}
+			} catch (IOException e) {
+				return false;
+			}
+		}
+		if (SystemUtils.IS_OS_UNIX) {
+			return "root".equals(System.getProperty("user.name"));
+		}
+		throw new UnsupportedOperationException();
 	}
 
 	public static Desktop getDesktopEnvironment() {

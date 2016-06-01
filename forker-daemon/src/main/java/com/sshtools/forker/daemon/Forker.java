@@ -13,6 +13,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
@@ -57,12 +58,39 @@ public class Forker {
 	private boolean forked;
 	private boolean isolated;
 	private boolean unauthenticated;
+	private long lastPing;
 
 	public Forker() {
 
 	}
 
-	public void start() throws IOException {
+	public long getLastPing() {
+		return lastPing;
+	}
+
+	public boolean isIsolated() {
+		return isolated;
+	}
+
+	public void setIsolated(boolean isolated) {
+		this.isolated = isolated;
+	}
+
+	public void start(Instance thisCookie) throws IOException {
+		try {
+			while (true) {
+				Socket c = socket.accept();
+				executor.execute(new Client(this, c, thisCookie));
+			}
+		} catch (IOException ioe) {
+			// Ignore exception if this is forked JVM shutting down the socket,
+			if (!forked) {
+				throw ioe;
+			}
+		}
+	}
+
+	public Instance prepare() throws IOException {
 		/*
 		 * First look to see if there is an existing cookie, and if so, is the
 		 * daemon still running. If it is, we don't need this one
@@ -78,31 +106,22 @@ public class Forker {
 		socket.setReuseAddress(true);
 		socket.bind(new InetSocketAddress(InetAddress.getLocalHost(), port), backlog);
 
+		return createCookie();
+	}
+
+	protected Instance createCookie() throws IOException {
 		/*
 		 * Create a new cookie for clients to be able to locate this daemon
 		 */
 		Instance thisCookie = new Instance(UUID.randomUUID().toString(), socket.getLocalPort());
-		if (isolated) {
-			System.out.println("FORKER-COOKIE: " + thisCookie.toString());
-		} else if (!unauthenticated) {
+		if (!unauthenticated) {
 			save(thisCookie);
-		} else {
+		} else if (!isolated) {
 			System.out.println(
 					"[WARNING] Forker daemon is running in unauthenticated mode. This should not be used for production use. Use the cookie NOAUTH:"
 							+ socket.getLocalPort());
 		}
-
-		try {
-			while (true) {
-				Socket c = socket.accept();
-				executor.execute(new Client(this, c, thisCookie));
-			}
-		} catch (IOException ioe) {
-			// Ignore exception if this is forked JVM shutting down the socket,
-			if (!forked) {
-				throw ioe;
-			}
-		}
+		return thisCookie;
 	}
 
 	public static void main(String[] args) throws Exception {
@@ -117,7 +136,11 @@ public class Forker {
 				f.port = Integer.parseInt(a.substring(7));
 			}
 		}
-		f.start();
+		Instance cookie = f.prepare();
+		if (f.isolated) {
+			System.out.println("FORKER-COOKIE: " + cookie.toString());
+		} 
+		f.start(cookie);
 	}
 
 	private void save(Instance cookie) throws IOException {
@@ -254,13 +277,13 @@ public class Forker {
 			cmdEnvironment = new HashMap<String, String>();
 			// We want to preserve the path?
 			// TODO merge this instead?
-			if(builderEnv.containsKey("PATH"))
-				cmdEnvironment.remove("PATH");	
-			if(builderEnv.containsKey("HOME"))
+			if (builderEnv.containsKey("PATH"))
+				cmdEnvironment.remove("PATH");
+			if (builderEnv.containsKey("HOME"))
 				cmdEnvironment.remove("HOME");
 			builderEnv.putAll(cmdEnvironment);
 		}
-		
+
 		builder.directory(cmd.getDirectory());
 		if (cmd.isRedirectError()) {
 			builder.redirectErrorStream(true);
@@ -396,6 +419,32 @@ public class Forker {
 					} finally {
 						forker.exit();
 					}
+				} else if (type == 2) {
+
+					// dout.writeInt(States.OK);
+					// dout.flush();
+
+					/**
+					 * Connection type 2 is held open by the client waiting for
+					 * reply (that we never send). So when this runtime dies,
+					 * the client can detect this (and also close itself down).
+					 * This is also used for JVM timeout detection
+					 */
+
+					forker.lastPing = System.currentTimeMillis();
+					try {
+						while (true) {
+							dout.writeInt(States.OK);
+							dout.flush();
+							din.readByte();
+							forker.lastPing = System.currentTimeMillis();
+							Thread.sleep(1);
+						}
+					} catch (InterruptedException ie) {
+						throw new EOFException();
+					} catch(SocketException se) {
+						throw new EOFException();
+					}
 				}
 
 				dout.writeInt(States.OK);
@@ -421,12 +470,20 @@ public class Forker {
 	}
 
 	public void exit() {
-		executor.shutdown();
+		shutdown(false);
+		System.exit(0);
+	}
+
+	public void shutdown(boolean now) {
+		lastPing = 0;
+		if (now)
+			executor.shutdownNow();
+		else
+			executor.shutdown();
 		try {
 			executor.awaitTermination(60, TimeUnit.SECONDS);
 		} catch (InterruptedException e) {
 		}
-		System.exit(0);
 	}
 
 }

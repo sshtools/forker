@@ -10,6 +10,9 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.StringTokenizer;
 
 import org.apache.commons.io.IOUtils;
@@ -51,7 +54,8 @@ public class Forker {
 			 * needs
 			 */
 			StringBuilder cp = new StringBuilder();
-			for (String p : ( daemonClasspath == null ? System.getProperty("java.class.path", "") :daemonClasspath).split(File.pathSeparator)) {
+			for (String p : (daemonClasspath == null ? System.getProperty("java.class.path", "") : daemonClasspath)
+					.split(File.pathSeparator)) {
 				File f = new File(p);
 				if (f.isDirectory()) {
 					/*
@@ -93,16 +97,17 @@ public class Forker {
 				try {
 					InputStream inputStream = process.getInputStream();
 
-					/* Need stdin in case we need to elevate and dont have a GUI. Must
-					 * flush after every character too
+					/*
+					 * Need stdin in case we need to elevate and dont have a
+					 * GUI. Must flush after every character too
 					 */
 					new Thread() {
 						public void run() {
 							try {
 								OutputStream outputStream = process.getOutputStream();
-								while(true) {
+								while (true) {
 									int r = System.in.read();
-									if(r == -1)
+									if (r == -1)
 										break;
 									outputStream.write(r);
 									outputStream.flush();
@@ -111,24 +116,25 @@ public class Forker {
 							}
 						}
 					}.start();
-					
+
 					if (isolated) {
-						/* Wait for cookie. We can't just read stdout line by line, as there
-						 * may be output from a console based 'askpass' that we need to display
-						 * immediately, but we want to extract and NOT display the forker cookie when
-						 * authentication succeeds.
+						/*
+						 * Wait for cookie. We can't just read stdout line by
+						 * line, as there may be output from a console based
+						 * 'askpass' that we need to display immediately, but we
+						 * want to extract and NOT display the forker cookie
+						 * when authentication succeeds.
 						 */
 						StringBuffer line = new StringBuffer();
 						String matchStr = "FORKER-COOKIE: ";
 						int matched = 0;
-						while(true) {
+						while (true) {
 							int r = inputStream.read();
-							if(r == -1) {
+							if (r == -1) {
 								break;
-							}
-							else {
-								char chr = (char)r;
-								if(r == 13 || r == 10) {
+							} else {
+								char chr = (char) r;
+								if (r == 13 || r == 10) {
 									matched = 0;
 									String l = line.toString();
 									if (l.startsWith("FORKER-COOKIE: ")) {
@@ -137,25 +143,24 @@ public class Forker {
 									}
 									line.setLength(0);
 									System.out.print(chr);
-								}
-								else {
+								} else {
 									line.append(chr);
-									if(chr == matchStr.charAt(matched)) {
+									if (chr == matchStr.charAt(matched)) {
 										matched++;
-										if(matched == matchStr.length()) {
-											Cookie.get().set(new Instance(new BufferedReader(new InputStreamReader(inputStream)).readLine()));
-											break;											
+										if (matched == matchStr.length()) {
+											Cookie.get().set(new Instance(
+													new BufferedReader(new InputStreamReader(inputStream)).readLine()));
+											break;
 										}
-									}
-									else {
-										if(matched > 0) {
+									} else {
+										if (matched > 0) {
 											matched = 0;
 											System.out.print(line.toString());
 										}
 										System.out.print(chr);
 									}
 								}
-								
+
 							}
 						}
 					}
@@ -195,7 +200,7 @@ public class Forker {
 	public static Forker get() {
 		return INSTANCE;
 	}
-	
+
 	public Process exec(IO io, String command) throws IOException {
 		return exec(io, command, null, null);
 	}
@@ -226,9 +231,9 @@ public class Forker {
 	public Process exec(IO io, String[] cmdarray, String[] envp, File dir) throws IOException {
 		return new ForkerBuilder(cmdarray).io(io).environment(envp).directory(dir).start();
 	}
-	
+
 	/**
-	 * Set the classpath to be used to load the daemon. Attempts will be made to 
+	 * Set the classpath to be used to load the daemon. Attempts will be made to
 	 * determine this automatically, but this may not always work, for example
 	 * when running inside Maven the classpath must be built from the plugin
 	 * dependencies.
@@ -236,7 +241,7 @@ public class Forker {
 	 * This must be called before the daemon is loaded
 	 */
 	public static void setDaemonClasspath(String cp) {
-		if(isDaemonRunning())
+		if (isDaemonRunning())
 			throw new IllegalStateException("Daemon is already running.");
 		daemonClasspath = cp;
 	}
@@ -412,6 +417,73 @@ public class Forker {
 
 	public static boolean isDaemonLoaded() {
 		return daemonLoaded;
+	}
+
+	/**
+	 * This is used when an application is launched from Forker Wrapper. The
+	 * daemon cookie is passed in as the first line of stdin. The first argument
+	 * is a boolean indicating if the daemon is running as an administrator, the
+	 * second is the class name to actually load, the remaining arguments are
+	 * the program arguments.
+	 * 
+	 * @param args
+	 */
+	public static void main(String[] args) throws Exception {
+		BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+		final Instance cookie = new Instance(reader.readLine());
+		Cookie.get().set(cookie);
+		daemonLoaded = true;
+		daemonRunning = true;
+		List<String> argList = new ArrayList<String>(Arrays.asList(args));
+		daemonAdministrator = "true".equals(argList.remove(0));
+		String classname = argList.remove(0);
+		Class<?> clazz = Class.forName(classname);
+
+		/*
+		 * Make a connection back to forker daemon and keep it open, waiting for
+		 * a reply that will never come. If the connection closes, forker
+		 * wrapper process has died, and so we should shutdown too
+		 */
+		new Thread() {
+			Socket daemonSocket = null;
+
+			{
+				setDaemon(true);
+				setPriority(MIN_PRIORITY);
+				setName("ForkerWrapperLink");
+			}
+
+			public void run() {
+				try {
+					daemonSocket = new Socket(InetAddress.getLocalHost(), cookie.getPort());
+					DataOutputStream dos = new DataOutputStream(daemonSocket.getOutputStream());
+					dos.writeUTF(cookie.getCookie());
+					dos.writeByte(2);
+					dos.flush();
+					DataInputStream din = new DataInputStream(daemonSocket.getInputStream());
+					while(true) {
+						if (din.readInt() != States.OK)
+							throw new Exception("Unexpected response.");
+						dos.writeByte(0);
+						dos.flush();
+					}
+
+					// Now we leave this open
+				} catch (Exception e) {
+					if (daemonSocket != null) {
+						try {
+							daemonSocket.close();
+						} catch (IOException e1) {
+						}
+					}
+				} finally {
+					System.err.println("Process terminated due to wrapper process terminating");
+					System.exit(1);
+				}
+			}
+		}.start();
+
+		clazz.getMethod("main", String[].class).invoke(null, new Object[] { argList.toArray(new String[0]) });
 	}
 
 }
