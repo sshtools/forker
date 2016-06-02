@@ -4,7 +4,6 @@ import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileDescriptor;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
@@ -29,6 +28,7 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.io.output.TeeOutputStream;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.SystemUtils;
 
@@ -87,7 +87,11 @@ public class ForkerWrapper {
 
 	protected void addOptions(Options options) {
 		options.addOption(new Option("r", "restart-on", true,
-				"Which exit values from the spawned process will cause the wrapper to attempt to restart it. By default, this is '99'"));
+				"Which exit values from the spawned process will cause the wrapper to attempt to restart it. When not specified, all exit "
+						+ "values will cause a restart except those that are configure not to (see dont-restart-on)."));
+		options.addOption(new Option("R", "dont-restart-on", true,
+				"Which exit values from the spawned process will NOT cause the wrapper to attempt to restart it. By default,"
+						+ "this is set to 0, 1 and 2. See also 'restart-on'"));
 		options.addOption(
 				new Option("w", "restart-wait", true, "How long (in seconds) to wait before attempting a restart."));
 		options.addOption(
@@ -148,13 +152,16 @@ public class ForkerWrapper {
 		boolean daemonize = getSwitch("daemon", false);
 		String pidfile = getOptionValue("pidfile", null);
 		final int timeout = Integer.parseInt(getOptionValue("timeout", "60"));
-		if (daemonize && System.getenv("FORKER_FALLBACK_ACTIVE") == null) {
+		if (daemonize && getOptionValue("fallback-active", null) == null) {
 
 			if ("true".equals(getOptionValue("native-fork", "false"))) {
-				/* This doesn't yet work before of how JNA / Pty4J work with their native library extraction.
-				 * The forked VM will not completely exit. It you use 'pstack' to show the native stack of
-				 * the process, it will that it is in a native call for a file that has been deleted (when
-				 * the parent process exited) */
+				/*
+				 * This doesn't yet work before of how JNA / Pty4J work with
+				 * their native library extraction. The forked VM will not
+				 * completely exit. It you use 'pstack' to show the native stack
+				 * of the process, it will that it is in a native call for a
+				 * file that has been deleted (when the parent process exited)
+				 */
 				int pid = PtyHelpers.getInstance().fork();
 				if (pid > 0) {
 					if (pidfile != null) {
@@ -178,17 +185,17 @@ public class ForkerWrapper {
 						fb.command().add("-D" + s + "=" + System.getProperty(s));
 				}
 				fb.environment().put("FORKER_FALLBACK_ACTIVE", "true");
-				
+
 				// Currently needs to be quiet :(
 				fb.environment().put("FORKER_QUIET", "true");
-				
+
 				// Doesnt seemm to work
-//				fb.environment().put("FORKER_FDOUT", "1");
-//				fb.environment().put("FORKER_FDERR", "2");
-				
+				// fb.environment().put("FORKER_FDOUT", "1");
+				// fb.environment().put("FORKER_FDERR", "2");
+
 				fb.command().add(ForkerWrapper.class.getName());
-//				fb.command().add("--fdout=1");
-//				fb.command().add("--fderr=2");
+				// fb.command().add("--fdout=1");
+				// fb.command().add("--fderr=2");
 				fb.command().addAll(Arrays.asList(originalArgs));
 				fb.background(true);
 				fb.io(IO.OUTPUT);
@@ -362,8 +369,8 @@ public class ForkerWrapper {
 			if (errpath == null)
 				errpath = logpath;
 
-			OutputStream outlog = quiet ? null : System.out;
-			OutputStream errlog = quiet ? null : System.err;
+			OutputStream outlog = null;
+			OutputStream errlog = null;
 
 			if (StringUtils.isNotBlank(logpath))
 				outlog = new FileOutputStream(new File(logpath), !logoverwrite);
@@ -373,7 +380,35 @@ public class ForkerWrapper {
 				else
 					errlog = new FileOutputStream(new File(errpath), !logoverwrite);
 
-			Thread errThread = new Thread(copyRunnable(process.getErrorStream(), errlog), "StdErr");
+			OutputStream stdout = quiet ? null : System.out;
+			OutputStream out = null;
+			if (stdout != null) {
+				if (outlog != null) {
+					out = new TeeOutputStream(stdout, outlog);
+				} else {
+					out = stdout;
+				}
+			} else if (outlog != null)
+				out = outlog;
+			if (out == null) {
+				out = new SinkOutputStream();
+			}
+
+			OutputStream stderr = quiet ? null : System.err;
+			OutputStream err = null;
+			if (stderr != null) {
+				if (errlog != null) {
+					err = new TeeOutputStream(stderr, errlog);
+				} else {
+					err = stderr;
+				}
+			} else if (errlog != null)
+				err = errlog;
+			if (err == null) {
+				err = out;
+			}
+
+			Thread errThread = new Thread(copyRunnable(process.getErrorStream(), err), "StdErr");
 			errThread.setDaemon(true);
 			errThread.start();
 			Thread inThread = null;
@@ -383,7 +418,7 @@ public class ForkerWrapper {
 					inThread.setDaemon(true);
 					inThread.start();
 				}
-				copy(process.getInputStream(), outlog == null ? new SinkOutputStream() : outlog, newBuffer());
+				copy(process.getInputStream(), out, newBuffer());
 
 				retval = process.waitFor();
 			} finally {
@@ -402,11 +437,16 @@ public class ForkerWrapper {
 				}
 			}
 
-			String[] restartValues = getOptionValue("restart-on", "99").split(",");
-			if (!tempRestartOnExit
-					&& (restartValues.length == 0 || !Arrays.asList(restartValues).contains(String.valueOf(retval))))
-				break;
-			else {
+			List<String> restartValues = Arrays.asList(getOptionValue("restart-on", "").split(","));
+			List<String> dontRestartValues = Arrays.asList(getOptionValue("dont-restart-on", "0,1,2").split(","));
+
+			String strret = String.valueOf(retval);
+
+			boolean restart = (((restartValues.size() == 1 && restartValues.get(0).equals(""))
+					|| restartValues.size() == 0 || restartValues.contains(strret))
+					&& !dontRestartValues.contains(strret));
+
+			if (tempRestartOnExit || restart) {
 				try {
 					tempRestartOnExit = false;
 					int waitSec = Integer.parseInt(getOptionValue("restart-wait", "0"));
@@ -418,7 +458,8 @@ public class ForkerWrapper {
 				} catch (NumberFormatException nfe) {
 					System.err.println(String.format("Process exited with %d, attempting restart", retval));
 				}
-			}
+			} else
+				break;
 		}
 
 		// TODO cant find out why just exiting fails (process stays running).
@@ -426,8 +467,6 @@ public class ForkerWrapper {
 		// PtyHelpers.getInstance().kill(PtyHelpers.getInstance().getpid(), 9);
 		// OSCommand.run("kill", "-9",
 		// String.valueOf(PtyHelpers.getInstance().getpid()));
-
-		Runtime.getRuntime().runFinalization();
 		System.exit(retval);
 
 	}
