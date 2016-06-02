@@ -293,4 +293,10 @@ public class ForkerBuilder {
 		IOUtils.copy(p.getInputStream(), System.out);
 		System.out.println("Exit value: " + p.exitValue());
 	}
+
+	@Override
+	public String toString() {
+		return "ForkerBuilder [command=" + command + ", background=" + background + ", effectiveUser=" + effectiveUser
+				+ "]";
+	}
 }

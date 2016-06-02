@@ -2,6 +2,7 @@ package com.sshtools.forker.client.impl;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -21,11 +22,11 @@ import com.sshtools.forker.common.Cookie.Instance;
 import com.sshtools.forker.common.States;
 
 public class ForkerProcess extends Process {
-	
+
 	static {
 		Forker.loadDaemon();
 	}
-	
+
 	private DataOutputStream dout;
 	private DataInputStream din;
 	private OutputStream out;
@@ -39,6 +40,8 @@ public class ForkerProcess extends Process {
 	private int ptyHeight;
 	private List<Listener> listeners = new ArrayList<Listener>();
 	private Command command;
+	
+	private static int debugId = 0;
 
 	public interface Listener {
 		void windowSizeChanged(int ptyWidth, int ptyHeight);
@@ -57,23 +60,23 @@ public class ForkerProcess extends Process {
 
 		final Socket s = new Socket(InetAddress.getLocalHost(), cookie.getPort());
 		boolean ok = false;
-		
+
 		try {
 			dout = new DataOutputStream(s.getOutputStream());
 			din = new DataInputStream(s.getInputStream());
-			
+
 			// Coookie
 			dout.writeUTF(cookie.getCookie());
-			
+
 			// Normal mode
 			dout.write(0);
 			dout.flush();
-			
+
 			int result = din.readInt();
 			if (result == States.FAILED) {
 				throw new IOException("Cookie rejected.");
 			}
-			
+
 			// Command
 			command.write(dout);
 			dout.flush();
@@ -95,17 +98,16 @@ public class ForkerProcess extends Process {
 				ptyWidth = din.readInt();
 				ptyHeight = din.readInt();
 			}
-	
+
 			inOut = new PipedOutputStream();
 			errOut = new PipedOutputStream();
-	
+
 			in = new PipedInputStream(inOut);
 			err = new PipedInputStream(errOut);
-			
+
 			ok = true;
-		}
-		finally {
-			if(!ok)
+		} finally {
+			if (!ok)
 				s.close();
 		}
 
@@ -123,18 +125,19 @@ public class ForkerProcess extends Process {
 							windowSizeChange(ptyWidth, ptyHeight);
 							break;
 						case States.END:
+							// Do not close ourselves when we break out, the
+							// daemon end will close the socket
 							run = false;
 							exitValue = din.readInt();
-							inOut.close();
-							errOut.close();
 							synchronized (dout) {
 								try {
 									dout.writeInt(States.END);
 									dout.flush();
-								}
-								catch(IOException ioe) {
+								} catch (IOException ioe) {
 									// Other side may have closed
 								}
+								inOut.close();
+								errOut.close();
 							}
 							break;
 						case States.IN:
@@ -286,10 +289,10 @@ public class ForkerProcess extends Process {
 			}
 		}
 	}
-	
+
 	public void setPtySize(int ptyWidth, int ptyHeight) {
 		this.ptyWidth = ptyWidth;
-		this.ptyHeight= ptyHeight;
+		this.ptyHeight = ptyHeight;
 
 		synchronized (dout) {
 			try {

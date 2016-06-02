@@ -378,6 +378,8 @@ public class Forker {
 		private Socket s;
 		private Forker forker;
 		private Instance cookie;
+		
+		private static int debugId;
 
 		public Client(Forker forker, Socket s, Cookie.Instance cookie) {
 			this.s = s;
@@ -450,10 +452,12 @@ public class Forker {
 				dout.writeInt(States.OK);
 				dout.flush();
 				Command cmd = new Command(din);
-				if (cmd.getIO() == IO.PTY)
+				if (cmd.getIO() == IO.PTY) {
 					handlePTYCommand(forker, din, dout, cmd);
-				else
+				}
+				else {
 					handleStandardCommand(din, dout, cmd);
+				}
 			} catch (EOFException eof) {
 				// Normal
 			} catch (Exception ioe) {

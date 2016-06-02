@@ -438,6 +438,8 @@ public class Forker {
 		daemonAdministrator = "true".equals(argList.remove(0));
 		String classname = argList.remove(0);
 		Class<?> clazz = Class.forName(classname);
+		
+		final Socket daemonSocket = new Socket(InetAddress.getLocalHost(), cookie.getPort());
 
 		/*
 		 * Make a connection back to forker daemon and keep it open, waiting for
@@ -445,7 +447,6 @@ public class Forker {
 		 * wrapper process has died, and so we should shutdown too
 		 */
 		new Thread() {
-			Socket daemonSocket = null;
 
 			{
 				setDaemon(true);
@@ -455,7 +456,6 @@ public class Forker {
 
 			public void run() {
 				try {
-					daemonSocket = new Socket(InetAddress.getLocalHost(), cookie.getPort());
 					DataOutputStream dos = new DataOutputStream(daemonSocket.getOutputStream());
 					dos.writeUTF(cookie.getCookie());
 					dos.writeByte(2);

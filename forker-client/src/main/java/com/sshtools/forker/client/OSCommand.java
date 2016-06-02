@@ -92,6 +92,7 @@ public class OSCommand {
 			if (cwd != null) {
 				pb.directory(cwd);
 			}
+			pb.redirectErrorStream(true);
 			checkElevationAndEnvironment(pb);
 			Process p = pb.start();
 			IOUtils.copy(p.getInputStream(), fos);
@@ -135,6 +136,7 @@ public class OSCommand {
 			if (cwd != null) {
 				pb.directory(cwd);
 			}
+			pb.redirectErrorStream(true);
 			Process p = pb.start();
 			Collection<String> lines = IOUtils.readLines(p.getInputStream());
 			try {

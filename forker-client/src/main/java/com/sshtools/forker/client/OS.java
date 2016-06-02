@@ -73,7 +73,7 @@ public class OS {
 			return Desktop.XFCE;
 		}
 		if ("KDE".equalsIgnoreCase(desktopSession)
-				|| (StringUtils.isBlank(desktopSession) && gdmSession.equals("kde-plasma"))) {
+				|| (StringUtils.isBlank(desktopSession) && "kde-plasma".equals(gdmSession))) {
 			return Desktop.KDE;
 		}
 		if ("UNITY".equalsIgnoreCase(desktopSession)) {

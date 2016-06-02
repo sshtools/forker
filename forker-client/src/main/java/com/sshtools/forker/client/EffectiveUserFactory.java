@@ -168,11 +168,10 @@ public abstract class EffectiveUserFactory {
 					if (OS.hasCommand("gksudo") || OS.hasCommand("gksu")) {
 						return new GKUser(username);
 					}
-				} else if (dt == Desktop.CONSOLE) {
+				} else {
 					return new SUUser(username);
 				}
 			} else if (SystemUtils.IS_OS_MAC_OSX) {
-
 				return new SUUser(username);
 			}
 			throw new UnsupportedOperationException(System.getProperty("os.name")

@@ -15,7 +15,7 @@ public abstract class InputThread extends Thread {
 	}
 
 	abstract void kill();
-	
+
 	abstract void setWindowSize(int width, int height);
 
 	public void run() {
@@ -34,13 +34,12 @@ public abstract class InputThread extends Thread {
 					out.close();
 				} else if (cmd == States.FLUSH_OUT) {
 					out.flush();
-				}  else if (cmd == States.WINDOW_SIZE) {
+				} else if (cmd == States.WINDOW_SIZE) {
 					setWindowSize(din.readInt(), din.readInt());
 				} else if (cmd == States.END) {
 					run = false;
 				} else {
-					throw new IllegalStateException(
-							"Unknown state code from client '" + cmd + "'");
+					throw new IllegalStateException("Unknown state code from client '" + cmd + "'");
 				}
 			}
 		} catch (Exception ioe) {
