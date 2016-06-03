@@ -20,6 +20,7 @@ import java.util.logging.Logger;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.NullOutputStream;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.SystemUtils;
 
 import com.sshtools.forker.client.EffectiveUserFactory.SudoFixedPasswordAdministrator;
 import com.sshtools.forker.common.IO;
@@ -349,6 +350,43 @@ public class OSCommand {
 			return doCommand(cwd, args, out);
 		} finally {
 			restrict();
+		}
+	}
+
+	public static boolean hasCommand(String command) {
+		if (SystemUtils.IS_OS_LINUX) {
+			boolean el = OSCommand.restrict();
+			try {
+				Collection<String> out = OSCommand.runCommandAndCaptureOutput("which", command);
+				return !out.isEmpty();
+			} catch (Exception e) {
+				return false;
+			} finally {
+				if (el)
+					OSCommand.elevate();
+			}
+		} else {
+			String path = System.getenv("PATH");
+			if (path != "") {
+				boolean found = false;
+				for (String p : path.split(File.pathSeparator)) {
+					File f = new File(p);
+					if (f.isDirectory()) {
+						String cmd = command;
+						if (SystemUtils.IS_OS_WINDOWS) {
+							cmd += ".exe";
+						}
+						File e = new File(f, cmd);
+						if (e.exists()) {
+							found = true;
+							break;
+						}
+					}
+				}
+				return found;
+			}
+			throw new UnsupportedOperationException(System.getProperty("os.name")
+					+ " is not supported. Cannot determine if command " + command + " exists");
 		}
 	}
 

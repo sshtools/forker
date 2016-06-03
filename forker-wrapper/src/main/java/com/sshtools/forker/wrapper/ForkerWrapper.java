@@ -35,10 +35,11 @@ import org.apache.commons.lang.SystemUtils;
 import com.pty4j.unix.PtyHelpers;
 import com.sshtools.forker.client.EffectiveUserFactory;
 import com.sshtools.forker.client.ForkerBuilder;
-import com.sshtools.forker.client.OS;
 import com.sshtools.forker.common.Cookie.Instance;
 import com.sshtools.forker.common.IO;
+import com.sshtools.forker.common.OS;
 import com.sshtools.forker.daemon.Forker;
+import com.sshtools.forker.daemon.Forker.Client;
 
 public class ForkerWrapper {
 
@@ -86,6 +87,10 @@ public class ForkerWrapper {
 	private String[] originalArgs;
 
 	protected void addOptions(Options options) {
+		options.addOption(new Option("F", "no-forker-classpath", true,
+				"When the forker daemon is being used, the wrappers own classpath will be appened to "
+						+ "to the application classpath. This option prevents that behaviour for example if "
+						+ "the application includes the modules itself."));
 		options.addOption(new Option("r", "restart-on", true,
 				"Which exit values from the spawned process will cause the wrapper to attempt to restart it. When not specified, all exit "
 						+ "values will cause a restart except those that are configure not to (see dont-restart-on)."));
@@ -123,6 +128,8 @@ public class ForkerWrapper {
 		options.addOption(new Option("m", "main", true,
 				"The classname to run. If this is specified, then the first argument passed to the command "
 						+ "becomes the first app argument."));
+		options.addOption(new Option("E", "exit-wait", true,
+				"How long to wait after attempting to stop a wrapped appllication before giving up and forcibly killing the applicaton."));
 		options.addOption(new Option("A", "apparg", true,
 				"Application arguments. These are overridden by any application arguments provided on the command line."));
 	}
@@ -139,7 +146,28 @@ public class ForkerWrapper {
 		return classname;
 	}
 
+	public File relativize(File context, String path) throws IOException {
+		File p = new File(path);
+		if (p.isAbsolute()) {
+			return p.getCanonicalFile();
+		}
+		return new File(context, p.getPath()).getCanonicalFile();
+	}
+
 	public void start() throws IOException, InterruptedException {
+
+		/*
+		 * Calculate CWD. All file paths from this point are calculated relative
+		 * to the CWD
+		 */
+
+		String cwdpath = getOptionValue("cwd", null);
+		File cwd = new File(System.getProperty("user.dir"));
+		if (StringUtils.isNotBlank(cwdpath)) {
+			cwd = relativize(cwd, cwdpath);
+			if (!cwd.exists())
+				throw new IOException(String.format("No such directory %s", cwd));
+		}
 
 		String javaExe = getOptionValue("java",
 				System.getProperty("java.home") + File.separator + "bin" + File.separator + "java");
@@ -149,23 +177,30 @@ public class ForkerWrapper {
 		String forkerClasspath = System.getProperty("java.class.path");
 		String wrapperClasspath = getOptionValue("classpath", forkerClasspath);
 
+		final boolean useDaemon = !getSwitch("no-forker-daemon", false);
 		boolean daemonize = getSwitch("daemon", false);
 		String pidfile = getOptionValue("pidfile", null);
 		final int timeout = Integer.parseInt(getOptionValue("timeout", "60"));
+		final int exitWait = Integer.parseInt(getOptionValue("exit-wait", "10"));
 		if (daemonize && getOptionValue("fallback-active", null) == null) {
 
 			if ("true".equals(getOptionValue("native-fork", "false"))) {
 				/*
-				 * This doesn't yet work before of how JNA / Pty4J work with
+				 * This doesn't yet work because of how JNA / Pty4J work with
 				 * their native library extraction. The forked VM will not
 				 * completely exit. It you use 'pstack' to show the native stack
 				 * of the process, it will that it is in a native call for a
-				 * file that has been deleted (when the parent process exited)
+				 * file that has been deleted (when the parent process exited).
+				 * Both of these libraries by default will extract the native
+				 * libraries to files, and mark them as to be deleted when JVM
+				 * exit. Because once forked, the original JVM does exit, these
+				 * files are deleted, but they are needed by the forked process.
 				 */
 				int pid = PtyHelpers.getInstance().fork();
 				if (pid > 0) {
 					if (pidfile != null) {
-						FileUtils.writeLines(new File(pidfile), Arrays.asList(String.valueOf(pid)));
+						FileUtils.writeLines(makeDirectoryForFile(relativize(cwd, pidfile)),
+								Arrays.asList(String.valueOf(pid)));
 					}
 					System.exit(0);
 				}
@@ -204,12 +239,67 @@ public class ForkerWrapper {
 			}
 		} else {
 			if (pidfile != null) {
-				FileUtils.writeLines(new File(pidfile),
+				FileUtils.writeLines(makeDirectoryForFile(relativize(cwd, pidfile)),
 						Arrays.asList(String.valueOf(PtyHelpers.getInstance().getpid())));
 			}
 		}
 
-		boolean useDaemon = !getSwitch("no-forker-daemon", false);
+		Runtime.getRuntime().addShutdownHook(new Thread() {
+			@Override
+			public void run() {
+				Process p = process;
+				Forker f = daemon;
+				if (p != null && useDaemon && f != null) {
+					/*
+					 * Close the client control connection. This will cause the
+					 * wrapped process to System.exit(), and so cleanly shutdown
+					 */
+					for (Client c : f.getClients()) {
+						if (c.getType() == 2) {
+							try {
+								c.close();
+							} catch (IOException e) {
+							}
+						}
+					}
+				} else {
+					/* Not using daemon, so just destroy process */
+					p.destroy();
+				}
+
+				final Thread current = Thread.currentThread();
+				Thread exitWaitThread = null;
+				if (exitWait > 0) {
+					exitWaitThread = new Thread() {
+						{
+							setDaemon(true);
+							setName("ExitMonitor");
+						}
+
+						public void run() {
+							try {
+								Thread.sleep(exitWait * 1000);
+								current.interrupt();
+							} catch (InterruptedException e) {
+							}
+						}
+					};
+					exitWaitThread.start();
+				}
+
+				/* Now wait for it to actually exit */
+				try {
+					p.waitFor();
+				} catch (InterruptedException e) {
+					p.destroy();
+				} finally {
+					if (exitWaitThread != null) {
+						exitWaitThread.interrupt();
+					}
+				}
+			}
+		});
+
 		if (useDaemon && timeout > 0) {
 			new Thread() {
 				{
@@ -243,6 +333,8 @@ public class ForkerWrapper {
 
 		int retval = 2;
 		while (true) {
+			process = null;
+
 			boolean quiet = getSwitch("quiet", false);
 			boolean logoverwrite = getSwitch("log-overwrite", false);
 
@@ -256,7 +348,7 @@ public class ForkerWrapper {
 					String basename = FilenameUtils.getName(el);
 					if (basename.contains("*") || basename.contains("?")) {
 						String dirname = FilenameUtils.getFullPathNoEndSeparator(el);
-						File dir = new File(dirname);
+						File dir = relativize(cwd, dirname);
 						if (dir.isDirectory()) {
 							File[] files = dir.listFiles();
 							if (files != null) {
@@ -278,6 +370,12 @@ public class ForkerWrapper {
 					}
 				}
 
+				if (!getSwitch("no-forker-classpath", false)) {
+					for (String el : forkerClasspath.split(File.pathSeparator)) {
+						appendPath(newClasspath, el);
+					}
+				}
+
 				if (newClasspath.length() > 0) {
 					appBuilder.command().add("-classpath");
 					appBuilder.command().add(newClasspath.toString());
@@ -287,6 +385,7 @@ public class ForkerWrapper {
 			for (String val : getOptionValues("jvmarg")) {
 				appBuilder.command().add(val);
 			}
+			
 
 			/*
 			 * If the daemon should be used, we assume that forker-client is on
@@ -310,14 +409,7 @@ public class ForkerWrapper {
 			}
 
 			appBuilder.io(IO.DEFAULT);
-
-			String cwd = getOptionValue("cwd", null);
-			if (StringUtils.isNotBlank(cwd)) {
-				File directory = new File(cwd);
-				if (!directory.exists())
-					throw new IOException(String.format("No such directory %s", directory));
-				appBuilder.directory(directory);
-			}
+			appBuilder.directory(cwd);
 
 			String runas = getOptionValue("run-as", null);
 			if (runas != null && !runas.equals(System.getProperty("user.name"))) {
@@ -351,17 +443,6 @@ public class ForkerWrapper {
 			if (useDaemon) {
 				PrintWriter pw = new PrintWriter(process.getOutputStream(), true);
 				pw.println(cookie.toString());
-			} else {
-				/*
-				 * This is an attempt to make sure any spawned processes are
-				 * also killed when this process dies
-				 */
-				Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
-					@Override
-					public void run() {
-						process.destroy();
-					}
-				}));
 			}
 
 			String logpath = getOptionValue("log", null);
@@ -373,12 +454,12 @@ public class ForkerWrapper {
 			OutputStream errlog = null;
 
 			if (StringUtils.isNotBlank(logpath))
-				outlog = new FileOutputStream(new File(logpath), !logoverwrite);
+				outlog = new FileOutputStream(makeDirectoryForFile(relativize(cwd, logpath)), !logoverwrite);
 			if (errpath != null)
 				if (Objects.equals(logpath, errpath))
 					errlog = outlog;
 				else
-					errlog = new FileOutputStream(new File(errpath), !logoverwrite);
+					errlog = new FileOutputStream(makeDirectoryForFile(relativize(cwd, errpath)), !logoverwrite);
 
 			OutputStream stdout = quiet ? null : System.out;
 			OutputStream out = null;
@@ -475,6 +556,13 @@ public class ForkerWrapper {
 		if (newClasspath.length() > 0)
 			newClasspath.append(File.pathSeparator);
 		newClasspath.append(el);
+	}
+
+	private File makeDirectoryForFile(File file) throws IOException {
+		File dir = file.getParentFile();
+		if (dir != null && !dir.exists() && !dir.mkdirs())
+			throw new IOException(String.format("Failed to create directory %s", dir));
+		return file;
 	}
 
 	private byte[] newBuffer() {

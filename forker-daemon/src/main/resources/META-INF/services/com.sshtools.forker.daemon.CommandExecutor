@@ -1,0 +1,2 @@
+com.sshtools.forker.daemon.PTYExecutor
+com.sshtools.forker.daemon.StandardExecutor

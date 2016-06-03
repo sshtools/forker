@@ -11,13 +11,14 @@ import java.util.Map;
 
 import org.apache.commons.lang.SystemUtils;
 
-import com.sshtools.forker.client.OS.Desktop;
 import com.sshtools.forker.client.impl.ForkerProcess;
 import com.sshtools.forker.client.ui.AskPass;
 import com.sshtools.forker.client.ui.AskPassConsole;
 import com.sshtools.forker.common.CSystem;
 import com.sshtools.forker.common.Command;
+import com.sshtools.forker.common.OS;
 import com.sshtools.forker.common.Util;
+import com.sshtools.forker.common.OS.Desktop;
 
 public abstract class EffectiveUserFactory {
 
@@ -128,18 +129,18 @@ public abstract class EffectiveUserFactory {
 					Desktop dt = OS.getDesktopEnvironment();
 					if (Arrays.asList(Desktop.CINNAMON, Desktop.GNOME, Desktop.GNOME3).contains(dt)) {
 						// Try gksudo first
-						if (OS.hasCommand("gksudo") || OS.hasCommand("gksu")) {
+						if (OSCommand.hasCommand("gksudo") || OSCommand.hasCommand("gksu")) {
 							return new GKAdministrator();
-						} else if (OS.hasCommand("sudo")) {
+						} else if (OSCommand.hasCommand("sudo")) {
 							return new SudoAskPassGuiAdministrator();
 						}
 					} else if (dt == Desktop.CONSOLE) {
 
 						Console console = System.console();
-						if(OS.hasCommand("sudo") && console == null)
+						if(OSCommand.hasCommand("sudo") && console == null)
 							return new SudoAskPassAdministrator();
 						else {
-							if (OS.hasCommand("sudo") || OS.hasCommand("su")) {
+							if (OSCommand.hasCommand("sudo") || OSCommand.hasCommand("su")) {
 								return new SUAdministrator();
 							}
 						}
@@ -148,7 +149,7 @@ public abstract class EffectiveUserFactory {
 			} else if (SystemUtils.IS_OS_MAC_OSX) {
 				if (fixedPassword != null) {
 					return new SudoFixedPasswordAdministrator(fixedPassword.toCharArray());
-				} else if (OS.hasCommand("sudo")) {
+				} else if (OSCommand.hasCommand("sudo")) {
 					return new SudoAskPassGuiAdministrator();
 				}
 			}
@@ -165,7 +166,7 @@ public abstract class EffectiveUserFactory {
 				Desktop dt = OS.getDesktopEnvironment();
 				if (Arrays.asList(Desktop.CINNAMON, Desktop.GNOME, Desktop.GNOME3).contains(dt)) {
 					// Try gksudo first
-					if (OS.hasCommand("gksudo") || OS.hasCommand("gksu")) {
+					if (OSCommand.hasCommand("gksudo") || OSCommand.hasCommand("gksu")) {
 						return new GKUser(username);
 					}
 				} else {
@@ -202,7 +203,7 @@ public abstract class EffectiveUserFactory {
 
 		@Override
 		public void elevate(ForkerBuilder builder, Process process, Command command) {
-			if (OS.hasCommand("sudo")) {
+			if (OSCommand.hasCommand("sudo")) {
 				/*
 				 * This is the only thing we can do to determine if to use sudo
 				 * or not. /etc/shadow could not always be read to determine if
@@ -395,7 +396,7 @@ public abstract class EffectiveUserFactory {
 
 		@Override
 		public void elevate(ForkerBuilder builder, Process process, Command command) {
-			if (OS.hasCommand("sudo")) {
+			if (OSCommand.hasCommand("sudo")) {
 				/*
 				 * This is the only thing we can do to determine if to use sudo
 				 * or not. /etc/shadow could not always be read to determine if
@@ -437,9 +438,9 @@ public abstract class EffectiveUserFactory {
 			StringBuilder bui = Util.getQuotedCommandString(cmd);
 
 			cmd.clear();
-			if (OS.hasCommand("gksudo"))
+			if (OSCommand.hasCommand("gksudo"))
 				cmd.add("gksudo");
-			else if (OS.hasCommand("gksu"))
+			else if (OSCommand.hasCommand("gksu"))
 				cmd.add("gksudo");
 			cmd.add("--user");
 			cmd.add(username);
@@ -472,13 +473,13 @@ public abstract class EffectiveUserFactory {
 			}
 
 			cmd.clear();
-			if (OS.hasCommand("gksudo")) {
+			if (OSCommand.hasCommand("gksudo")) {
 				cmd.add("gksudo");
 				cmd.add("--sudo-mode");
 				cmd.add("--preserve-env");
 				cmd.add("--description");
 				cmd.add(getDefault().getAppName());
-			} else if (OS.hasCommand("gksu")) {
+			} else if (OSCommand.hasCommand("gksu")) {
 				cmd.add("gksu");
 				cmd.add("--su-mode");
 				cmd.add("--preserve-env");
