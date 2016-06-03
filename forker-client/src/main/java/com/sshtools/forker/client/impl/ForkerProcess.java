@@ -2,7 +2,6 @@ package com.sshtools.forker.client.impl;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -19,12 +18,17 @@ import com.sshtools.forker.client.Forker;
 import com.sshtools.forker.common.Command;
 import com.sshtools.forker.common.Cookie;
 import com.sshtools.forker.common.Cookie.Instance;
+import com.sshtools.forker.common.IO;
 import com.sshtools.forker.common.States;
 
 public class ForkerProcess extends Process {
 
 	static {
 		Forker.loadDaemon();
+	}
+
+	public enum OutputFlushMode {
+		MANUAL, AUTO, LOCAL, BOTH
 	}
 
 	private DataOutputStream dout;
@@ -40,8 +44,7 @@ public class ForkerProcess extends Process {
 	private int ptyHeight;
 	private List<Listener> listeners = new ArrayList<Listener>();
 	private Command command;
-	
-	private static int debugId = 0;
+	private OutputFlushMode outputFlushMode = OutputFlushMode.AUTO;
 
 	public interface Listener {
 		void windowSizeChanged(int ptyWidth, int ptyHeight);
@@ -111,7 +114,7 @@ public class ForkerProcess extends Process {
 						this.notifyAll();
 					}
 				}
-				
+
 			};
 			err = new PipedInputStream(errOut);
 
@@ -208,7 +211,7 @@ public class ForkerProcess extends Process {
 						dout.writeInt(States.OUT);
 						dout.writeInt(1);
 						dout.write((byte) b);
-						dout.flush();
+						maybeFlush();
 					}
 				}
 
@@ -221,7 +224,7 @@ public class ForkerProcess extends Process {
 						dout.writeInt(States.OUT);
 						dout.writeInt(b.length);
 						dout.write(b);
-						dout.flush();
+						maybeFlush();
 					}
 				}
 
@@ -234,7 +237,7 @@ public class ForkerProcess extends Process {
 						dout.writeInt(States.OUT);
 						dout.writeInt(len);
 						dout.write(b, off, len);
-						dout.flush();
+						maybeFlush();
 					}
 				}
 
@@ -244,6 +247,7 @@ public class ForkerProcess extends Process {
 						throw new IOException("Closed.");
 					}
 					synchronized (dout) {
+						dout.writeInt(States.FLUSH_OUT);
 						dout.flush();
 					}
 				}
@@ -257,11 +261,29 @@ public class ForkerProcess extends Process {
 					try {
 						synchronized (dout) {
 							dout.writeInt(States.CLOSE_OUT);
+							flush();
 						}
 					} catch (IOException ioe) {
 					}
 				}
 
+				private void maybeFlush() throws IOException {
+					switch (outputFlushMode) {
+					case AUTO:
+						if (command.getIO().equals(IO.PTY)) {
+							flush();
+						}
+						break;
+					case LOCAL:
+						dout.flush();
+						break;
+					case BOTH:
+						flush();
+						break;
+					default:
+						break;
+					}
+				}
 			};
 		}
 		return out;
