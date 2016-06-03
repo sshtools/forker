@@ -102,7 +102,17 @@ public class ForkerProcess extends Process {
 			inOut = new PipedOutputStream();
 			errOut = new PipedOutputStream();
 
-			in = new PipedInputStream(inOut);
+			in = new PipedInputStream(inOut) {
+
+				@Override
+				public void close() throws IOException {
+					super.close();
+					synchronized (this) {
+						this.notifyAll();
+					}
+				}
+				
+			};
 			err = new PipedInputStream(errOut);
 
 			ok = true;
@@ -198,6 +208,7 @@ public class ForkerProcess extends Process {
 						dout.writeInt(States.OUT);
 						dout.writeInt(1);
 						dout.write((byte) b);
+						dout.flush();
 					}
 				}
 
@@ -210,6 +221,7 @@ public class ForkerProcess extends Process {
 						dout.writeInt(States.OUT);
 						dout.writeInt(b.length);
 						dout.write(b);
+						dout.flush();
 					}
 				}
 
@@ -222,6 +234,7 @@ public class ForkerProcess extends Process {
 						dout.writeInt(States.OUT);
 						dout.writeInt(len);
 						dout.write(b, off, len);
+						dout.flush();
 					}
 				}
 

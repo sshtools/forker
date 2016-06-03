@@ -52,4 +52,9 @@ public class WrapperHandler implements Handler {
 		}
 	}
 
+	@Override
+	public void stop() {
+		lastPing = 0;		
+	}
+
 }

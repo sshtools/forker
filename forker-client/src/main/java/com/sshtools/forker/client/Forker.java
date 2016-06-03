@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -407,6 +408,117 @@ public class Forker {
 		}
 	}
 
+	public static InputStream readFile(File file) throws IOException {
+		Cookie cookie = Cookie.get();
+		Instance instance = cookie.load();
+		final Socket daemonSocket = new Socket(InetAddress.getLocalHost(), instance.getPort());
+		try {
+			DataOutputStream dos = new DataOutputStream(daemonSocket.getOutputStream());
+			dos.writeUTF(instance.getCookie());
+			dos.writeByte(3);
+			dos.writeUTF(file.getAbsolutePath());
+			dos.flush();
+			DataInputStream din = new DataInputStream(daemonSocket.getInputStream());
+			if (din.readInt() != States.OK)
+				throw new IOException(din.readUTF());
+			din.readLong(); // Length, not needed for now
+			return new FilterInputStream(daemonSocket.getInputStream()) {
+				@Override
+				public void close() throws IOException {
+					try {
+						super.close();
+					} finally {
+						daemonSocket.close();
+					}
+				}
+			};
+			// Now we leave this open
+		} catch (IOException e) {
+			daemonSocket.close();
+			throw e;
+		}
+	}
+
+	public static OutputStream writeFile(File file, boolean append) throws IOException {
+
+		Cookie cookie = Cookie.get();
+		Instance instance = cookie.load();
+		final Socket daemonSocket = new Socket(InetAddress.getLocalHost(), instance.getPort());
+		try {
+			final DataOutputStream dos = new DataOutputStream(daemonSocket.getOutputStream());
+			dos.writeUTF(instance.getCookie());
+			dos.writeByte(4);
+			dos.writeUTF(file.getAbsolutePath());
+			dos.writeBoolean(append);
+			dos.flush();
+			final DataInputStream din = new DataInputStream(daemonSocket.getInputStream());
+			if (din.readInt() != States.OK)
+				throw new IOException(din.readUTF());
+			return new OutputStream() {
+				@Override
+				public void write(int b) throws IOException {
+					try {
+						dos.writeInt(1);
+						dos.writeByte(b);
+					} catch (IOException ioe) {
+						daemonSocket.close();
+						throw ioe;
+					}
+				}
+
+				@Override
+				public void write(byte[] b) throws IOException {
+					try {
+						if (b.length > 0) {
+							dos.writeInt(b.length);
+							dos.write(b);
+						}
+					} catch (IOException ioe) {
+						daemonSocket.close();
+						throw ioe;
+					}
+				}
+
+				@Override
+				public void write(byte[] b, int off, int len) throws IOException {
+					try {
+						if (len > 0) {
+							dos.writeInt(len);
+							dos.write(b, off, len);
+						}
+					} catch (IOException ioe) {
+						daemonSocket.close();
+						throw ioe;
+					}
+				}
+
+				@Override
+				public void flush() throws IOException {
+					try {
+						dos.flush();
+					} catch (IOException ioe) {
+						daemonSocket.close();
+						throw ioe;
+					}
+				}
+
+				@Override
+				public void close() throws IOException {
+					try {
+						dos.writeInt(0);
+						din.readInt();
+					} catch (IOException ioe) {
+						daemonSocket.close();
+						throw ioe;
+					}
+				}
+			};
+		} catch (IOException e) {
+			daemonSocket.close();
+			throw e;
+		}
+	}
+
 	public static boolean isDaemonRunningAsAdministrator() {
 		return daemonRunning && daemonAdministrator;
 	}
@@ -438,7 +550,7 @@ public class Forker {
 		daemonAdministrator = "true".equals(argList.remove(0));
 		String classname = argList.remove(0);
 		Class<?> clazz = Class.forName(classname);
-		
+
 		final Socket daemonSocket = new Socket(InetAddress.getLocalHost(), cookie.getPort());
 
 		/*
@@ -461,7 +573,7 @@ public class Forker {
 					dos.writeByte(2);
 					dos.flush();
 					DataInputStream din = new DataInputStream(daemonSocket.getInputStream());
-					while(true) {
+					while (true) {
 						if (din.readInt() != States.OK)
 							throw new Exception("Unexpected response.");
 						dos.writeByte(0);

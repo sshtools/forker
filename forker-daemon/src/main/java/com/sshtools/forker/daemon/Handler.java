@@ -9,4 +9,6 @@ public interface Handler {
 	int getType();
 
 	void handle(Forker forker, DataInputStream din, DataOutputStream dos) throws IOException;
+
+	void stop();
 }

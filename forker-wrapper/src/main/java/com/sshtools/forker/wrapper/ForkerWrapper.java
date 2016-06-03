@@ -38,6 +38,7 @@ import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.common.Cookie.Instance;
 import com.sshtools.forker.common.IO;
 import com.sshtools.forker.common.OS;
+import com.sshtools.forker.daemon.CommandHandler;
 import com.sshtools.forker.daemon.Forker;
 import com.sshtools.forker.daemon.Forker.Client;
 
@@ -87,49 +88,82 @@ public class ForkerWrapper {
 	private String[] originalArgs;
 
 	protected void addOptions(Options options) {
-		options.addOption(new Option("F", "no-forker-classpath", true,
+
+		options.addOption(new Option("x", "allow-execute", true,
+				"The wrapped application can use it's wrapper to execute commands on it's behalf. If the "
+						+ "wrapper itself runs under an administrative user, and the application as a non-privileged user,"
+						+ "you may wish to restrict which commands may be run. One or more of these options specifies the "
+						+ "name of the command that may be run. The value may be a regular expression, see also 'prevent-execute'"));
+
+		options.addOption(new Option("X", "reject-execute", true,
+				"The wrapped application can use it's wrapper to execute commands on it's behalf. If the "
+						+ "wrapper itself runs under an administrative user, and the application as a non-privileged user,"
+						+ "you may wish to restrict which commands may be run. One or more of these options specifies the "
+						+ "name of the commands that may NOT be run. The value may be a regular expression, see also 'allow-execute'"));
+
+		options.addOption(new Option("F", "no-forker-classpath", false,
 				"When the forker daemon is being used, the wrappers own classpath will be appened to "
 						+ "to the application classpath. This option prevents that behaviour for example if "
 						+ "the application includes the modules itself."));
+
 		options.addOption(new Option("r", "restart-on", true,
 				"Which exit values from the spawned process will cause the wrapper to attempt to restart it. When not specified, all exit "
 						+ "values will cause a restart except those that are configure not to (see dont-restart-on)."));
+
 		options.addOption(new Option("R", "dont-restart-on", true,
 				"Which exit values from the spawned process will NOT cause the wrapper to attempt to restart it. By default,"
 						+ "this is set to 0, 1 and 2. See also 'restart-on'"));
+
 		options.addOption(
 				new Option("w", "restart-wait", true, "How long (in seconds) to wait before attempting a restart."));
+
 		options.addOption(
 				new Option("d", "daemon", false, "Fork the process and exit, leaving it running in the background."));
+
 		options.addOption(new Option("n", "no-forker-daemon", false,
 				"Do not enable the forker daemon. This will prevent the forked application from executing elevated commands via the daemon and will also disable JVM timeout detection."));
+
 		options.addOption(new Option("q", "quiet", false,
 				"Do not output anything on stderr or stdout from the wrapped process."));
+
 		options.addOption(new Option("o", "log-overwrite", false, "Overwriite logfiles instead of appending."));
+
 		options.addOption(new Option("l", "log", true,
 				"Where to log stdout (and by default stderr) output. If not specified, will be output on stdout (or stderr) of this process."));
+
 		options.addOption(new Option("e", "errors", true,
 				"Where to log stderr. If not specified, will be output on stderr of this process or to 'log' if specified."));
+
 		options.addOption(new Option("cp", "classpath", true,
 				"The classpath to use to run the application. If not set, the current runtime classpath is used (the java.class.path system property)."));
+
 		options.addOption(new Option("u", "run-as", true, "The user to run the application as."));
+
 		options.addOption(new Option("p", "pidfile", true, "A filename to write the process ID to. May be used "
 				+ "by external application to obtain the PID to send signals to."));
+
 		options.addOption(new Option("b", "buffer-size", true,
 				"How big (in byte) to make the I/O buffer. By default this is 1 byte for immediate output."));
+
 		options.addOption(new Option("j", "java", true, "Alternative path to java runtime launcher."));
+
 		options.addOption(new Option("J", "jvmarg", true,
 				"Additional VM argument. Specify multiple times for multiple arguments."));
+
 		options.addOption(new Option("W", "cwd", true,
 				"Change working directory, the wrapped process will be run from this location."));
+
 		options.addOption(new Option("t", "timeout", true,
 				"How long to wait since the last 'ping' from the launched application before "
 						+ "considering the process as hung. Requires forker daemon is enabled."));
+
 		options.addOption(new Option("m", "main", true,
 				"The classname to run. If this is specified, then the first argument passed to the command "
 						+ "becomes the first app argument."));
+
 		options.addOption(new Option("E", "exit-wait", true,
 				"How long to wait after attempting to stop a wrapped appllication before giving up and forcibly killing the applicaton."));
+
 		options.addOption(new Option("A", "apparg", true,
 				"Application arguments. These are overridden by any application arguments provided on the command line."));
 	}
@@ -310,17 +344,22 @@ public class ForkerWrapper {
 				public void run() {
 					try {
 						while (true) {
-							if (process != null && daemon != null && daemon.getLastPing() > 0
-									&& (daemon.getLastPing() + timeout * 1000) <= System.currentTimeMillis()) {
-								System.err.println(String.format(
-										"Process has not sent a ping in %d seconds, attempting to terminate", timeout));
-								tempRestartOnExit = true;
+							if (process != null && daemon != null) {
+								WrapperHandler wrapper = daemon.getHandler(WrapperHandler.class);
+								if (wrapper.getLastPing() > 0
+										&& (wrapper.getLastPing() + timeout * 1000) <= System.currentTimeMillis()) {
 
-								/*
-								 * TODO may need to be more forceful than this,
-								 * e.g. OS kill
-								 */
-								process.destroy();
+									System.err.println(String.format(
+											"Process has not sent a ping in %d seconds, attempting to terminate",
+											timeout));
+									tempRestartOnExit = true;
+
+									/*
+									 * TODO may need to be more forceful than
+									 * this, e.g. OS kill
+									 */
+									process.destroy();
+								}
 							}
 							Thread.sleep(1000);
 						}
@@ -385,7 +424,6 @@ public class ForkerWrapper {
 			for (String val : getOptionValues("jvmarg")) {
 				appBuilder.command().add(val);
 			}
-			
 
 			/*
 			 * If the daemon should be used, we assume that forker-client is on
@@ -427,6 +465,13 @@ public class ForkerWrapper {
 				 */
 				daemon = new Forker();
 				daemon.setIsolated(true);
+
+				/* Prepare command permissions if there are any */
+				CommandHandler cmd = daemon.getHandler(CommandHandler.class);
+				CheckCommandPermission permi = cmd.getExecutor(CheckCommandPermission.class);
+				permi.setAllow(getOptionValues("allow-execute"));
+				permi.setReject(getOptionValues("reject-execute"));
+
 				cookie = daemon.prepare();
 				new Thread() {
 
@@ -566,7 +611,7 @@ public class ForkerWrapper {
 	}
 
 	private byte[] newBuffer() {
-		return new byte[Integer.parseInt(getOptionValue("buffer-size", "1"))];
+		return new byte[Integer.parseInt(getOptionValue("buffer-size", "1024"))];
 	}
 
 	private void copy(final InputStream in, final OutputStream out, byte[] buf) throws IOException {

@@ -42,7 +42,6 @@ public class Forker {
 	private boolean forked;
 	private boolean isolated;
 	private boolean unauthenticated;
-	private long lastPing;
 	private List<Client> clients = new ArrayList<>();
 	private Map<Integer, Handler> handlers = new HashMap<>();
 
@@ -52,13 +51,18 @@ public class Forker {
 			handlers.put(handler.getType(), handler);
 		}
 	}
+	
+	@SuppressWarnings("unchecked")
+	public <T extends Handler> T getHandler(Class<T> handler) {
+		for(Handler h : handlers.values()) {
+			if(h.getClass().equals(handler))
+				return (T)h;
+		}
+		return null;
+	}
 
 	void setForked() {
 		forked = true;
-	}
-
-	public long getLastPing() {
-		return lastPing;
 	}
 
 	public boolean isIsolated() {
@@ -247,7 +251,8 @@ public class Forker {
 	}
 
 	public void shutdown(boolean now) {
-		lastPing = 0;
+		for(Handler h : handlers.values())
+			h.stop();
 		if (now)
 			executor.shutdownNow();
 		else

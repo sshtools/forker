@@ -45,8 +45,8 @@ public class PTYExecutor implements CommandExecutor {
 	}
 
 	@Override
-	public boolean willHandle(Forker forker, Command command) {
-		return command.getIO() == IO.PTY;
+	public ExecuteCheckResult willHandle(Forker forker, Command command) {
+		return command.getIO() == IO.PTY ? ExecuteCheckResult.YES : ExecuteCheckResult.DONT_CARE;
 	}
 
 	@Override

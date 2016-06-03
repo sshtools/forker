@@ -37,4 +37,8 @@ public class ControlHandler implements Handler {
 		}
 	}
 
+	@Override
+	public void stop() {
+	}
+
 }

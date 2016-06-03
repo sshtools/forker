@@ -28,22 +28,24 @@ public class ShellAsUser {
 		
 		final Process p = shell.start();
 		
-		/* Read input from stdin and pass to the forked shell until this applications exits or stdin is closed */
-		Thread t = new Thread() {
+		new Thread() {
 			public void run() {
 				try {
 					IOUtils.copy(System.in, p.getOutputStream());
 				} catch (IOException e) {
+				} finally {
+					// Close the process input stream when stdin closes, this
+					// will end the process
+					try {
+						p.getOutputStream().close();
+					} catch (IOException e) {
+					}
 				}
 			}
-		};
-		t.setDaemon(true);
-		t.start();
-
-		/* Read output from the shell and pass it to stdout until the shell exits */
+		}.start();
 		IOUtils.copy(p.getInputStream(), System.out);
 		int ret = p.waitFor();
-		System.err.println("Exited with code: " +ret);
+		System.err.println("Exited with code: " + ret);
 		System.exit(ret);
 	}
 }

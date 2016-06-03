@@ -1,5 +1,12 @@
 package com.sshtools.forker.wrapper;
 
+import java.io.File;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+import org.apache.commons.io.IOUtils;
+
+import com.sshtools.forker.client.Forker;
 import com.sshtools.forker.client.OSCommand;
 
 public class Test1 {
@@ -16,6 +23,10 @@ public class Test1 {
 		// finally {
 		// OSCommand.restrict();
 		// }
+		
+		InputStream fin = Forker.readFile(new File("/etc/passwd"));
+		OutputStream fout = Forker.writeFile(new File("/tmp/1111"), false);
+		IOUtils.copy(fin, fout);
 
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			@Override
