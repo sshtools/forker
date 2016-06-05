@@ -16,6 +16,17 @@ public class OS {
 		return !getDesktopEnvironment().equals(Desktop.CONSOLE);
 	}
 
+	public static String getAdministratorUsername() {
+		if (SystemUtils.IS_OS_WINDOWS) {
+			return System.getProperty("forker.administratorUsername",
+					System.getProperty("vm.rootUser", "Administrator"));
+		}
+		if (SystemUtils.IS_OS_UNIX) {
+			return System.getProperty("forker.administratorUsername", System.getProperty("vm.rootUser", "root"));
+		}
+		throw new UnsupportedOperationException();
+	}
+
 	public static boolean isAdministrator() {
 		if (SystemUtils.IS_OS_WINDOWS) {
 			try {
@@ -36,7 +47,8 @@ public class OS {
 			}
 		}
 		if (SystemUtils.IS_OS_UNIX) {
-			return "root".equals(System.getProperty("user.name"));
+			return System.getProperty("forker.administratorUsername", System.getProperty("vm.rootUser", "root"))
+					.equals(System.getProperty("user.name"));
 		}
 		throw new UnsupportedOperationException();
 	}
@@ -85,5 +97,12 @@ public class OS {
 			return Desktop.GNOME;
 		}
 		return Desktop.OTHER;
+	}
+
+	public static String getJavaPath() {
+		String javaExe = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
+		if (SystemUtils.IS_OS_WINDOWS)
+			javaExe += ".exe";
+		return javaExe;
 	}
 }

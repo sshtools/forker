@@ -17,11 +17,11 @@ import java.util.List;
 import java.util.StringTokenizer;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.SystemUtils;
 
 import com.sshtools.forker.common.Cookie;
 import com.sshtools.forker.common.Cookie.Instance;
 import com.sshtools.forker.common.IO;
+import com.sshtools.forker.common.OS;
 import com.sshtools.forker.common.States;
 
 /**
@@ -46,43 +46,17 @@ public class Forker {
 		}
 
 		public void run() {
-			String javaExe = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
-			if (SystemUtils.IS_OS_WINDOWS)
-				javaExe += ".exe";
+			String javaExe = OS.getJavaPath();
 
 			/*
 			 * Build up a cut down classpath with only the jars forker daemon
 			 * needs
 			 */
-			StringBuilder cp = new StringBuilder();
-			for (String p : (daemonClasspath == null ? System.getProperty("java.class.path", "") : daemonClasspath)
-					.split(File.pathSeparator)) {
-				File f = new File(p);
-				if (f.isDirectory()) {
-					/*
-					 * A directory, so this is likely in dev environment
-					 */
-					for (String regex : FORKER_DIRS) {
-						if (f.getPath().matches(regex)) {
-							if (cp.length() > 0)
-								cp.append(File.pathSeparator);
-							cp.append(p);
-						}
-					}
-				} else {
-					for (String regex : FORKER_JARS) {
-						if (f.getName().matches(regex)) {
-							if (cp.length() > 0)
-								cp.append(File.pathSeparator);
-							cp.append(p);
-							break;
-						}
-					}
-				}
-			}
-
+			String forkerClasspath = (daemonClasspath == null ? System.getProperty("java.class.path", "") : daemonClasspath);
+			String classpath = getForkerClasspath(forkerClasspath);
+			
 			ForkerBuilder fb = new ForkerBuilder(javaExe, "-Xmx" + System.getProperty("forker.daemon.maxMemory", "8m"),
-					"-Djava.library.path=" + System.getProperty("java.library.path", ""), "-classpath", cp.toString(),
+					"-Djava.library.path=" + System.getProperty("java.library.path", ""), "-classpath", classpath,
 					"com.sshtools.forker.daemon.Forker");
 			if (effectiveUser != null) {
 				fb.effectiveUser(effectiveUser);
@@ -178,6 +152,7 @@ public class Forker {
 				errored = true;
 			}
 		}
+		
 	}
 
 	/*
@@ -188,8 +163,8 @@ public class Forker {
 	 * meta-data
 	 */
 	final static String[] FORKER_JARS = { "^jna-.*", "^commons-lang-.*", "^commons-io.*", "^jna-platform-.*",
-			"^purejavacomm-.*", "^guava-.*", "^log4j-.*", "^forker-common-.*", "^forker-daemon-.*", "^pty4j-.*" };
-	final static String[] FORKER_DIRS = { ".*/forker-common/.*", ".*/forker-daemon/.*", ".*/pty4j/.*" };
+			"^purejavacomm-.*", "^guava-.*", "^log4j-.*", "^forker-common-.*", "^forker-client-.*", "^forker-daemon-.*", "^pty4j-.*" };
+	final static String[] FORKER_DIRS = { ".*[/\\\\]forker-client[/\\\\].*", ".*[/\\\\]forker-common[/\\\\].*", ".*[/\\\\]forker-daemon[/\\\\].*", ".*[/\\\\]pty4j[/\\\\].*" };
 
 	private final static Forker INSTANCE = new Forker();
 	private static boolean daemonLoaded;
@@ -245,6 +220,10 @@ public class Forker {
 		if (isDaemonRunning())
 			throw new IllegalStateException("Daemon is already running.");
 		daemonClasspath = cp;
+	}
+	
+	public static String getDaemonClasspath() {
+		return daemonClasspath == null ? System.getProperty("java.class.path") : daemonClasspath;
 	}
 
 	/**
@@ -309,6 +288,54 @@ public class Forker {
 	 */
 	public static void loadDaemon(final EffectiveUser effectiveUser) {
 		loadDaemon(null, effectiveUser, effectiveUser != null);
+	}
+
+	
+	/**
+	 * Get a cut-down classpath that may be used to launch forker from the current classpath.
+	 *  
+	 * @param forkerClasspath
+	 * @return forker classpath
+	 */
+	public static String getForkerClasspath() {
+		return getForkerClasspath(getDaemonClasspath());
+	}
+	
+	/**
+	 * Get a cut-down classpath that may be used to launch forker given a complete classpath.
+	 *  
+	 * @param forkerClasspath
+	 * @return forker classpath
+	 */
+	public static String getForkerClasspath(String forkerClasspath) {
+		StringBuilder cp = new StringBuilder();
+		for (String p : forkerClasspath
+				.split(File.pathSeparator)) {
+			File f = new File(p);
+			if (f.isDirectory()) {
+				/*
+				 * A directory, so this is likely in dev environment
+				 */
+				for (String regex : FORKER_DIRS) {
+					if (f.getPath().matches(regex)) {
+						if (cp.length() > 0)
+							cp.append(File.pathSeparator);
+						cp.append(p);
+					}
+				}
+			} else {
+				for (String regex : FORKER_JARS) {
+					if (f.getName().matches(regex)) {
+						if (cp.length() > 0)
+							cp.append(File.pathSeparator);
+						cp.append(p);
+						break;
+					}
+				}
+			}
+		}
+		String classpath = cp.toString();
+		return classpath;
 	}
 
 	private static void loadDaemon(Instance fixedCookie, final EffectiveUser effectiveUser, boolean isolated) {

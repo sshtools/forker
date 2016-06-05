@@ -85,8 +85,7 @@ public class ForkerBuilder {
 
 	public ForkerBuilder io(IO io) {
 		if ((io == IO.SINK || io == IO.OUTPUT) && redirectErrorStream()) {
-			throw new IllegalStateException("Cannot set IO mode '" + io
-					+ "' because redirectErrorStream() is true.");
+			throw new IllegalStateException("Cannot set IO mode '" + io + "' because redirectErrorStream() is true.");
 		}
 		command.setIO(io);
 		return this;
@@ -108,8 +107,7 @@ public class ForkerBuilder {
 					envstring = envstring.replaceFirst("\u0000.*", "");
 				int eqlsign = envstring.indexOf('=', 0);
 				if (eqlsign != -1)
-					this.command.getEnvironment().put(
-							envstring.substring(0, eqlsign),
+					this.command.getEnvironment().put(envstring.substring(0, eqlsign),
 							envstring.substring(eqlsign + 1));
 			}
 		}
@@ -130,29 +128,25 @@ public class ForkerBuilder {
 	}
 
 	public ForkerBuilder redirectErrorStream(boolean redirectErrorStream) {
-		if (redirectErrorStream && command.getIO() != IO.IO&& command.getIO() != IO.DEFAULT
+		if (redirectErrorStream && command.getIO() != IO.IO && command.getIO() != IO.DEFAULT
 				&& command.getIO() != IO.PTY && command.getIO() != IO.INPUT && command.getIO() != IO.DAEMON) {
-			throw new IllegalStateException(
-					"Cannot redirect error stream if using IO mode '"
-							+ command.getIO() + "'");
+			throw new IllegalStateException("Cannot redirect error stream if using IO mode '" + command.getIO() + "'");
 		}
 		this.command.setRedirectError(redirectErrorStream);
 		return this;
 	}
 
 	public Process start() throws IOException {
-		// As far as I know none of this is required on Windows (except for Pty and runAs reasons)
-		if (command.getIO() != IO.PTY
-			&& command.getIO() != IO.DAEMON
-						&& (SystemUtils.IS_OS_WINDOWS || "true".equals(System
-						.getProperty("forker.forceJavaFork")))) {
-			return startProcessBuilder();
+		// As far as I know none of this is required on Windows (except for Pty
+		// and runAs reasons)
+		if (command.getIO() != IO.PTY && command.getIO() != IO.DAEMON
+				&& (SystemUtils.IS_OS_WINDOWS || "true".equals(System.getProperty("forker.forceJavaFork")))) {
+			return startLocalProcess();
 		}
 
 		// Must convert to array first -- a malicious user-supplied
 		// list might try to circumvent the security check.
-		String[] cmdarray = command.getArguments().toArray(
-				new String[command.getArguments().size()]);
+		String[] cmdarray = command.getArguments().toArray(new String[command.getArguments().size()]);
 		cmdarray = cmdarray.clone();
 		for (String arg : cmdarray)
 			if (arg == null)
@@ -165,8 +159,7 @@ public class ForkerBuilder {
 			security.checkExec(prog);
 		}
 
-		String dir = command.getDirectory() == null ? null : command
-				.getDirectory().toString();
+		String dir = command.getDirectory() == null ? null : command.getDirectory().toString();
 
 		for (int i = 1; i < cmdarray.length; i++) {
 			if (cmdarray[i].indexOf('\u0000') >= 0) {
@@ -200,7 +193,7 @@ public class ForkerBuilder {
 			// We need input and output, first try and connect to the forker
 			// daemon
 			try {
-				if(command.getIO() == IO.DEFAULT) {
+				if (command.getIO() == IO.DEFAULT) {
 					throw new ConnectException();
 				}
 				ForkerProcess forkerProcess = new ForkerProcess(command);
@@ -217,9 +210,8 @@ public class ForkerBuilder {
 				// No forker, we will have to resort to using standard
 				// ProcessBuilder
 				if (command.getIO() == IO.PTY)
-					throw new IOException(
-							"PTY IO mode currently requires the daemon.");
-				return startProcessBuilder();
+					throw new IOException("PTY IO mode currently requires the daemon.");
+				return startLocalProcess();
 			} catch (IOException e) {
 				throw handleIOException(prog, security, dir, e);
 			} catch (IllegalArgumentException e) {
@@ -231,20 +223,17 @@ public class ForkerBuilder {
 	}
 
 	protected void initBuilder() {
-		if(Forker.isDaemonRunning())
+		if (Forker.isDaemonRunning())
 			this.command.setIO(IO.DAEMON);
 	}
 
-	protected IOException handleIllegalArgumentException(String prog,
-			String dir, IllegalArgumentException e) {
+	protected IOException handleIllegalArgumentException(String prog, String dir, IllegalArgumentException e) {
 		String exceptionInfo = ": " + e.getMessage();
 		return new IOException("Cannot run program \"" + prog + "\""
-				+ (dir == null ? "" : " (in directory \"" + dir + "\")")
-				+ exceptionInfo, e);
+				+ (dir == null ? "" : " (in directory \"" + dir + "\")") + exceptionInfo, e);
 	}
 
-	protected IOException handleIOException(String prog,
-			SecurityManager security, String dir, IOException e)
+	protected IOException handleIOException(String prog, SecurityManager security, String dir, IOException e)
 			throws IOException {
 		String exceptionInfo = ": " + e.getMessage();
 		Throwable cause = e;
@@ -257,31 +246,29 @@ public class ForkerBuilder {
 			}
 		}
 		return new IOException("Cannot run program \"" + prog + "\""
-				+ (dir == null ? "" : " (in directory \"" + dir + "\")")
-				+ exceptionInfo, cause);
+				+ (dir == null ? "" : " (in directory \"" + dir + "\")") + exceptionInfo, cause);
 	}
 
-	protected Process startProcessBuilder() throws IOException {
-		// Fallback to standard ProcessBuilder
-
-		if (effectiveUser != null)
-			effectiveUser.elevate(this, null, null);
-
-		ProcessBuilder pb = new ProcessBuilder(command.getArguments());
-		if (command.isRedirectError()) {
-			pb.redirectErrorStream(true);
-		}
-		if (command.getDirectory() != null) {
-			pb.directory(command.getDirectory());
-		}
-		if (command.getEnvironment() != null) {
-			pb.environment().putAll(command.getEnvironment());
+	protected Process startLocalProcess() throws IOException {
+		if (effectiveUser != null) {
+			effectiveUser.elevate(this, null, command);
 		}
 		try {
+			ProcessBuilder pb = new ProcessBuilder(command.getArguments());
+			if (command.isRedirectError()) {
+				pb.redirectErrorStream(true);
+			}
+			if (command.getDirectory() != null) {
+				pb.directory(command.getDirectory());
+			}
+			if (command.getEnvironment() != null) {
+				pb.environment().putAll(command.getEnvironment());
+			}
 			return pb.start();
 		} finally {
-			if (effectiveUser != null)
+			if (effectiveUser != null) {
 				effectiveUser.descend();
+			}
 		}
 	}
 

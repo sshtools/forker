@@ -1,5 +1,7 @@
 package com.sshtools.forker.client;
 
+import java.io.IOException;
+
 import com.sshtools.forker.common.Command;
 
 

@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -14,11 +15,12 @@ import org.apache.commons.lang.SystemUtils;
 import com.sshtools.forker.client.impl.ForkerProcess;
 import com.sshtools.forker.client.ui.AskPass;
 import com.sshtools.forker.client.ui.AskPassConsole;
+import com.sshtools.forker.client.ui.WinRunAs;
 import com.sshtools.forker.common.CSystem;
 import com.sshtools.forker.common.Command;
 import com.sshtools.forker.common.OS;
-import com.sshtools.forker.common.Util;
 import com.sshtools.forker.common.OS.Desktop;
+import com.sshtools.forker.common.Util;
 
 public abstract class EffectiveUserFactory {
 
@@ -137,7 +139,7 @@ public abstract class EffectiveUserFactory {
 					} else if (dt == Desktop.CONSOLE) {
 
 						Console console = System.console();
-						if(OSCommand.hasCommand("sudo") && console == null)
+						if (OSCommand.hasCommand("sudo") && console == null)
 							return new SudoAskPassAdministrator();
 						else {
 							if (OSCommand.hasCommand("sudo") || OSCommand.hasCommand("su")) {
@@ -151,6 +153,12 @@ public abstract class EffectiveUserFactory {
 					return new SudoFixedPasswordAdministrator(fixedPassword.toCharArray());
 				} else if (OSCommand.hasCommand("sudo")) {
 					return new SudoAskPassGuiAdministrator();
+				}
+			} else if (SystemUtils.IS_OS_WINDOWS) {
+				if (fixedPassword != null) {
+					return new RunAs(OS.getAdministratorUsername(), fixedPassword.toCharArray());
+				} else {
+					return new RunAs(OS.getAdministratorUsername());
 				}
 			}
 			throw new UnsupportedOperationException(System.getProperty("os.name")
@@ -174,6 +182,8 @@ public abstract class EffectiveUserFactory {
 				}
 			} else if (SystemUtils.IS_OS_MAC_OSX) {
 				return new SUUser(username);
+			} else if (SystemUtils.IS_OS_WINDOWS) {
+				return new RunAs(username);
 			}
 			throw new UnsupportedOperationException(System.getProperty("os.name")
 					+ " is currently unsupported. Will not be able to get UID for username.");
@@ -190,12 +200,13 @@ public abstract class EffectiveUserFactory {
 			return p == null ? System.getProperty("vm.sudo") : p;
 		}
 
-		private static boolean isSuperUser() {
-			return System.getProperty("user.name").equals(System.getProperty("vm.rootUser", "root"));
-		}
 	}
 
-	public static class SUAdministrator implements EffectiveUser {
+	public static abstract class AbstractProcessBuilderEffectiveUser implements EffectiveUser {
+
+	}
+
+	public static class SUAdministrator extends AbstractProcessBuilderEffectiveUser implements EffectiveUser {
 
 		@Override
 		public void descend() {
@@ -212,7 +223,7 @@ public abstract class EffectiveUserFactory {
 				 */
 				builder.command().add(0, "sudo");
 			} else {
-				if(System.console() == null)
+				if (System.console() == null)
 					throw new IllegalStateException("This program requires elevated privileges, "
 							+ "but sudo is not available, and the fallback 'su' is not capable of "
 							+ "running without a controlling terminal.");
@@ -227,7 +238,8 @@ public abstract class EffectiveUserFactory {
 
 	}
 
-	public static class SudoFixedPasswordAdministrator implements EffectiveUser {
+	public static class SudoFixedPasswordAdministrator extends AbstractProcessBuilderEffectiveUser
+			implements EffectiveUser {
 
 		File tempScript;
 
@@ -266,7 +278,7 @@ public abstract class EffectiveUserFactory {
 
 	}
 
-	public static class SudoAskPassAdministrator implements EffectiveUser {
+	public static class SudoAskPassAdministrator extends AbstractProcessBuilderEffectiveUser implements EffectiveUser {
 
 		static File tempScript;
 		static {
@@ -322,7 +334,9 @@ public abstract class EffectiveUserFactory {
 		}
 
 	}
-	public static class SudoAskPassGuiAdministrator implements EffectiveUser {
+
+	public static class SudoAskPassGuiAdministrator extends AbstractProcessBuilderEffectiveUser
+			implements EffectiveUser {
 
 		static File tempScript;
 		static {
@@ -378,11 +392,12 @@ public abstract class EffectiveUserFactory {
 		}
 
 	}
+
 	/**
 	 * Effective user implementation that raises privileges using sudo (or
 	 * 'su'). Generally you would only use this in console applications.
 	 */
-	public static class SUUser implements EffectiveUser {
+	public static class SUUser extends AbstractProcessBuilderEffectiveUser implements EffectiveUser {
 
 		private String username;
 
@@ -419,7 +434,7 @@ public abstract class EffectiveUserFactory {
 
 	}
 
-	public static class GKUser implements EffectiveUser {
+	public static class GKUser extends AbstractProcessBuilderEffectiveUser implements EffectiveUser {
 
 		private String username;
 
@@ -449,7 +464,61 @@ public abstract class EffectiveUserFactory {
 
 	}
 
-	public static class GKAdministrator implements EffectiveUser {
+	public static class RunAs extends AbstractProcessBuilderEffectiveUser implements EffectiveUser {
+
+		private String username;
+		private boolean setRemote;
+		private String was;
+		private Command command;
+		private char[] password;
+
+		public RunAs(String username) {
+			this(username, null);
+		}
+
+		public RunAs(String username, char[] password) {
+			this.username = username;
+			this.password = password;
+		}
+
+		@Override
+		public void descend() {
+			if (setRemote) {
+				setRemote = false;
+				command.setRunAs(was);
+			}
+		}
+
+		@Override
+		public void elevate(ForkerBuilder builder, Process process, Command command) {
+			if (process instanceof ForkerProcess) {
+				if (setRemote)
+					descend();
+				was = command.getRunAs();
+				this.command = command;
+				command.setRunAs(username);
+				setRemote = true;
+			} else {
+				List<String> cmd = builder.command();
+				List<String> args = new ArrayList<>(cmd);
+				cmd.clear();
+				cmd.add(OS.getJavaPath());
+				cmd.add("-classpath");
+				cmd.add(Forker.getForkerClasspath());
+				cmd.add(WinRunAs.class.getName());
+				cmd.add("--username");
+				cmd.add(username);
+				if (password != null) {
+					command.getEnvironment().put("W32RUNAS_PASSWORD", new String(password));
+				}
+				cmd.add("--");
+				cmd.addAll(args);
+				System.out.println(cmd);
+			}
+		}
+	}
+
+	public static class GKAdministrator extends AbstractProcessBuilderEffectiveUser implements EffectiveUser {
 
 		@Override
 		public void descend() {
@@ -490,7 +559,7 @@ public abstract class EffectiveUserFactory {
 		}
 	}
 
-	static abstract class AbstractPOSIXEffectiveUser<T> implements EffectiveUser {
+	static abstract class AbstractPOSIXEffectiveUser<T> extends AbstractProcessBuilderEffectiveUser {
 
 		private T value;
 		private int was = Integer.MIN_VALUE;

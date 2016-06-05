@@ -17,6 +17,8 @@ import com.pty4j.unix.PtyHelpers;
 import com.pty4j.unix.UnixPtyProcess;
 import com.pty4j.util.Pair;
 import com.pty4j.util.PtyUtil;
+import com.pty4j.windows.WinPty;
+import com.pty4j.windows.WinPtyProcess;
 import com.sshtools.forker.common.Command;
 import com.sshtools.forker.common.IO;
 import com.sshtools.forker.common.States;
@@ -34,13 +36,19 @@ public class PTYExecutor implements CommandExecutor {
 		Class.forName(InputThread.class.getName(), true, PTYExecutor.class.getClassLoader());
 		Class.forName(PTYOutputStream.class.getName(), true, PTYExecutor.class.getClassLoader());
 		Class.forName(WinSize.class.getName(), true, PTYExecutor.class.getClassLoader());
-		Class.forName(UnixPtyProcess.class.getName(), true, PTYExecutor.class.getClassLoader());
 		Class.forName(PtyUtil.class.getName(), true, PTYExecutor.class.getClassLoader());
 		Class.forName(PtyUtil.class.getName() + "$1", true, PTYExecutor.class.getClassLoader());
 		Class.forName(Pty.class.getName(), true, PTYExecutor.class.getClassLoader());
-		Class.forName(PtyHelpers.class.getName(), true, PTYExecutor.class.getClassLoader());
+
+		if (SystemUtils.IS_OS_UNIX) {
+			Class.forName(PtyHelpers.class.getName(), true, PTYExecutor.class.getClassLoader());
+			Class.forName(UnixPtyProcess.class.getName(), true, PTYExecutor.class.getClassLoader());
+			Class.forName(UnixPtyProcess.class.getName() + "$Reaper", true, PTYExecutor.class.getClassLoader());
+		} else if (SystemUtils.IS_OS_WINDOWS) {
+			Class.forName(WinPtyProcess.class.getName(), true, PTYExecutor.class.getClassLoader());
+			Class.forName(WinPty.class.getName(), true, PTYExecutor.class.getClassLoader());
+		}
 		Class.forName(Pair.class.getName(), true, PTYExecutor.class.getClassLoader());
-		Class.forName(UnixPtyProcess.class.getName() + "$Reaper", true, PTYExecutor.class.getClassLoader());
 
 	}
 
@@ -70,6 +78,7 @@ public class PTYExecutor implements CommandExecutor {
 				cmd.getArguments().remove(0);
 			}
 
+			System.err.println("REMOVEME " + cmd.getArguments());
 			ptyorig = PtyProcess.exec((String[]) cmd.getArguments().toArray(new String[0]), cmd.getEnvironment(),
 					cmd.getDirectory().getAbsolutePath(), euid);
 			final PtyProcess pty = ptyorig;

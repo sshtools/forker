@@ -28,6 +28,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang.SystemUtils;
+
 import com.sshtools.forker.common.Cookie;
 import com.sshtools.forker.common.Cookie.Instance;
 
@@ -51,12 +53,12 @@ public class Forker {
 			handlers.put(handler.getType(), handler);
 		}
 	}
-	
+
 	@SuppressWarnings("unchecked")
 	public <T extends Handler> T getHandler(Class<T> handler) {
-		for(Handler h : handlers.values()) {
-			if(h.getClass().equals(handler))
-				return (T)h;
+		for (Handler h : handlers.values()) {
+			if (h.getClass().equals(handler))
+				return (T) h;
 		}
 		return null;
 	}
@@ -154,16 +156,23 @@ public class Forker {
 			pw.println(cookie.toString());
 
 			/* Try to set permissions so only the current user can access it */
-			try {
-				Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
-				perms.add(PosixFilePermission.OWNER_READ);
-				perms.add(PosixFilePermission.OWNER_WRITE);
-				perms.add(PosixFilePermission.OWNER_EXECUTE);
-				Files.setPosixFilePermissions(Paths.get(cookieFile.toURI()), perms);
-			} catch (Exception e) {
-				System.err.println(
-						"[FATAL] Could not reduce file permission of cookie file %s. Other users may be able to execute processes under this user!");
-				System.exit(3);
+			if (SystemUtils.IS_OS_UNIX) {
+				try {
+					Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
+					perms.add(PosixFilePermission.OWNER_READ);
+					perms.add(PosixFilePermission.OWNER_WRITE);
+					perms.add(PosixFilePermission.OWNER_EXECUTE);
+					Files.setPosixFilePermissions(Paths.get(cookieFile.toURI()), perms);
+				} catch (Exception e) {
+					System.err.println(String.format(
+							"[FATAL] Could not reduce file permission of cookie file %s. Other users may be able to execute processes under this user!",
+							cookieFile));
+					System.exit(3);
+				}
+			} else {
+				System.err.println(String.format(
+						"[SERIOUS] Could not reduce file permission of cookie file %s. Other users may be able to execute processes under this user!",
+						cookieFile));
 			}
 		} finally {
 			pw.close();
@@ -251,7 +260,7 @@ public class Forker {
 	}
 
 	public void shutdown(boolean now) {
-		for(Handler h : handlers.values())
+		for (Handler h : handlers.values())
 			h.stop();
 		if (now)
 			executor.shutdownNow();
