@@ -6,6 +6,9 @@ import java.io.IOException;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.SystemUtils;
 
+import com.sun.jna.platform.win32.Kernel32;
+import com.sun.jna.platform.win32.Kernel32Util;
+
 public class OS {
 
 	public enum Desktop {
@@ -14,6 +17,16 @@ public class OS {
 
 	public static boolean isRunningOnDesktop() {
 		return !getDesktopEnvironment().equals(Desktop.CONSOLE);
+	}
+	
+	public static int getPID() {
+		if (SystemUtils.IS_OS_WINDOWS) {
+			return Kernel32.INSTANCE.GetCurrentProcessId();
+		}
+		if (SystemUtils.IS_OS_UNIX) {
+			return CSystem.INSTANCE.getpid();
+		}
+		throw new UnsupportedOperationException();
 	}
 
 	public static String getAdministratorUsername() {
@@ -101,8 +114,12 @@ public class OS {
 
 	public static String getJavaPath() {
 		String javaExe = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
-		if (SystemUtils.IS_OS_WINDOWS)
+		if (SystemUtils.IS_OS_WINDOWS) {
+			if(!javaExe.toLowerCase().endsWith("w")) {
+				javaExe += "w";
+			}
 			javaExe += ".exe";
+		}
 		return javaExe;
 	}
 }

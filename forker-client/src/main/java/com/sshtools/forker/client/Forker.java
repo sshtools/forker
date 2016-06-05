@@ -568,6 +568,7 @@ public class Forker {
 	 * @param args
 	 */
 	public static void main(String[] args) throws Exception {
+		
 		BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
 		final Instance cookie = new Instance(reader.readLine());
 		Cookie.get().set(cookie);
@@ -621,7 +622,6 @@ public class Forker {
 				}
 			}
 		}.start();
-
 		clazz.getMethod("main", String[].class).invoke(null, new Object[] { argList.toArray(new String[0]) });
 	}
 

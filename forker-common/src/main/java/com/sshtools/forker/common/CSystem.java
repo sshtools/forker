@@ -23,6 +23,8 @@ public interface CSystem extends Library {
     
     int getuid();
     
+    int getpid();
+    
     int seteuid(int uid);
     
     int geteuid();

@@ -139,6 +139,8 @@ public class ForkerWrapper {
 
 		options.addOption(new Option("u", "run-as", true, "The user to run the application as."));
 
+		options.addOption(new Option("a", "administrator", false, "Run as administrator."));
+
 		options.addOption(new Option("p", "pidfile", true, "A filename to write the process ID to. May be used "
 				+ "by external application to obtain the PID to send signals to."));
 
@@ -274,7 +276,7 @@ public class ForkerWrapper {
 		} else {
 			if (pidfile != null) {
 				FileUtils.writeLines(makeDirectoryForFile(relativize(cwd, pidfile)),
-						Arrays.asList(String.valueOf(PtyHelpers.getInstance().getpid())));
+						Arrays.asList(String.valueOf(OS.getPID())));
 			}
 		}
 
@@ -449,9 +451,14 @@ public class ForkerWrapper {
 			appBuilder.io(IO.DEFAULT);
 			appBuilder.directory(cwd);
 
-			String runas = getOptionValue("run-as", null);
-			if (runas != null && !runas.equals(System.getProperty("user.name"))) {
-				appBuilder.effectiveUser(EffectiveUserFactory.getDefault().getUserForUsername(runas));
+			if (getSwitch("administrator", false)) {
+				if(!OS.isAdministrator())
+					appBuilder.effectiveUser(EffectiveUserFactory.getDefault().administrator());
+			} else {
+				String runas = getOptionValue("run-as", null);
+				if (runas != null && !runas.equals(System.getProperty("user.name"))) {
+					appBuilder.effectiveUser(EffectiveUserFactory.getDefault().getUserForUsername(runas));
+				}
 			}
 
 			daemon = null;
@@ -630,7 +637,6 @@ public class ForkerWrapper {
 					copy(in, out == null ? new SinkOutputStream() : out, newBuffer());
 				} catch (EOFException e) {
 				} catch (IOException ioe) {
-					ioe.printStackTrace();
 				}
 			}
 		};
