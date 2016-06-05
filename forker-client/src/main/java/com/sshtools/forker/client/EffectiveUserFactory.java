@@ -18,6 +18,7 @@ import com.sshtools.forker.client.ui.AskPassConsole;
 import com.sshtools.forker.client.ui.WinRunAs;
 import com.sshtools.forker.common.CSystem;
 import com.sshtools.forker.common.Command;
+import com.sshtools.forker.common.IO;
 import com.sshtools.forker.common.OS;
 import com.sshtools.forker.common.OS.Desktop;
 import com.sshtools.forker.common.Util;
@@ -131,10 +132,18 @@ public abstract class EffectiveUserFactory {
 					Desktop dt = OS.getDesktopEnvironment();
 					if (Arrays.asList(Desktop.CINNAMON, Desktop.GNOME, Desktop.GNOME3).contains(dt)) {
 						// Try gksudo first
-						if (OSCommand.hasCommand("gksudo") || OSCommand.hasCommand("gksu")) {
-							return new GKAdministrator();
+
+						if (OSCommand.hasCommand("sudo")
+								&& (OSCommand.hasCommand("gksudo") || OSCommand.hasCommand("gksu"))) {
+							return new SudoGksudoAdministrator();
 						} else if (OSCommand.hasCommand("sudo")) {
 							return new SudoAskPassGuiAdministrator();
+						} else if (OSCommand.hasCommand("gksudo") || OSCommand.hasCommand("gksu")) {
+							/*
+							 * Last resort, used Gksud/Gksu. These are a last
+							 * resort because they do not support stdin
+							 */
+							return new GKAdministrator();
 						}
 					} else if (dt == Desktop.CONSOLE) {
 
@@ -393,6 +402,46 @@ public abstract class EffectiveUserFactory {
 
 	}
 
+	public static class SudoGksudoAdministrator extends AbstractProcessBuilderEffectiveUser implements EffectiveUser {
+
+		static File tempScript;
+		static {
+			// Create a temporary script to use to launch AskPass
+			try {
+				tempScript = File.createTempFile("sapa", ".sh");
+				tempScript.deleteOnExit();
+
+				OutputStream out = new FileOutputStream(tempScript);
+				PrintWriter pw = new PrintWriter(out);
+				try {
+					pw.println("#!/bin/bash");
+					pw.println("gksudo --description=\"" + getDefault().getAppName() + "\" --print-pass");
+					pw.flush();
+				} finally {
+					out.close();
+				}
+
+				tempScript.setExecutable(true);
+
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}
+
+		@Override
+		public void descend() {
+		}
+
+		@Override
+		public void elevate(ForkerBuilder builder, Process process, Command command) {
+			builder.command().add(0, "sudo");
+			builder.command().add(1, "-A");
+			builder.command().add(2, "-E");
+			builder.environment().put("SUDO_ASKPASS", tempScript.getAbsolutePath());
+		}
+
+	}
+
 	/**
 	 * Effective user implementation that raises privileges using sudo (or
 	 * 'su'). Generally you would only use this in console applications.
@@ -526,6 +575,10 @@ public abstract class EffectiveUserFactory {
 
 		@Override
 		public void elevate(ForkerBuilder builder, Process process, Command command) {
+			if (command.getIO() == IO.IO || command.getIO() == IO.INPUT) {
+				throw new RuntimeException(String.format("%s does not support stdin, so may not be used.", getClass()));
+			}
+
 			List<String> cmd = builder.command();
 
 			// Take existing command and turn it into one escaped command

@@ -570,7 +570,9 @@ public class Forker {
 	public static void main(String[] args) throws Exception {
 		
 		BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-		final Instance cookie = new Instance(reader.readLine());
+		String cookieText = reader.readLine();
+		System.out.println("REMOVEME >>" + cookieText);
+		final Instance cookie = new Instance(cookieText);
 		Cookie.get().set(cookie);
 		daemonLoaded = true;
 		daemonRunning = true;
