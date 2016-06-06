@@ -78,7 +78,6 @@ public class PTYExecutor implements CommandExecutor {
 				cmd.getArguments().remove(0);
 			}
 
-			System.err.println("REMOVEME " + cmd.getArguments());
 			ptyorig = PtyProcess.exec((String[]) cmd.getArguments().toArray(new String[0]), cmd.getEnvironment(),
 					cmd.getDirectory().getAbsolutePath(), euid);
 			final PtyProcess pty = ptyorig;

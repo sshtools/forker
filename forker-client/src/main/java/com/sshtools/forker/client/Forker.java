@@ -571,7 +571,6 @@ public class Forker {
 		
 		BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
 		String cookieText = reader.readLine();
-		System.out.println("REMOVEME >>" + cookieText);
 		final Instance cookie = new Instance(cookieText);
 		Cookie.get().set(cookie);
 		daemonLoaded = true;

@@ -1,4 +1,4 @@
-package com.sshtools.forker.wrapper;
+package com.sshtools.forker.wrapper.test;
 
 import java.io.File;
 import java.io.InputStream;

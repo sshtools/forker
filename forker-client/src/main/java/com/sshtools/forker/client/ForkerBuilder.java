@@ -16,6 +16,7 @@ import com.sshtools.forker.client.impl.POpenProcess;
 import com.sshtools.forker.client.impl.SystemProcess;
 import com.sshtools.forker.common.Command;
 import com.sshtools.forker.common.IO;
+import com.sshtools.forker.common.Priority;
 
 /**
  * A replacement for {@link ProcessBuilder} that will either use a 'system' call
@@ -34,6 +35,7 @@ public class ForkerBuilder {
 	private Command command = new Command();
 	private boolean background;
 	private EffectiveUser effectiveUser;
+	private Priority priority = Priority.NORMAL;
 
 	public ForkerBuilder(List<String> command) {
 		if (command == null)
@@ -58,6 +60,15 @@ public class ForkerBuilder {
 	public ForkerBuilder command(String... command) {
 		this.command.getArguments().clear();
 		this.command.getArguments().addAll(Arrays.asList(command));
+		return this;
+	}
+	
+	public Priority priority() {
+		return priority;
+	}
+	
+	public ForkerBuilder priority(Priority priority) {
+		this.priority = priority;
 		return this;
 	}
 

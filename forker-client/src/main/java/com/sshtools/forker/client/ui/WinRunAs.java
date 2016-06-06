@@ -137,9 +137,6 @@ public class WinRunAs extends JFrame {
 					 */
 					final PROCESS_INFORMATION pinfo = new PROCESS_INFORMATION();
 					
-					System.out.println("REMOVEME runas: " + domain + "/" + username + " pw: " + new String(password) +
-							" cmd: " + cmd + " line: " + bui.toString());
-
 					/* Start the process as the required user */
 					if (!(XAdvapi32.INSTANCE.CreateProcessWithLogonW(username, domain == null ? System.getenv("COMPUTERNAME") : domain, new String(password),
 							XAdvapi32.LOGON_WITH_PROFILE, cmd, bui.toString(),
