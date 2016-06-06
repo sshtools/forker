@@ -78,7 +78,7 @@ public abstract class AbstractOSProcess extends Process {
 			if (bui.length() > 0) {
 				bui.append(";");
 			}
-			for (String a : builder.command()) {
+			for (String a : builder.getAllArguments()) {
 				bui.append(" '");
 				bui.append(Util.escapeSingleQuotes(a));
 				bui.append("'");

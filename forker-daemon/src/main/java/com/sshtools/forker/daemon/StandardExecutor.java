@@ -29,7 +29,7 @@ public class StandardExecutor implements CommandExecutor {
 	@Override
 	public void handle(Forker forker, DataInputStream din, final DataOutputStream dout, Command cmd)
 			throws IOException {
-		ProcessBuilder builder = new ProcessBuilder(cmd.getArguments());
+		ProcessBuilder builder = new ProcessBuilder(cmd.getAllArguments());
 
 		// TODO way to control this
 		Map<String, String> builderEnv = builder.environment();

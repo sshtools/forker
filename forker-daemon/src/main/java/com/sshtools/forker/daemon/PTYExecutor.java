@@ -5,6 +5,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.List;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.SystemUtils;
@@ -72,13 +73,14 @@ public class PTYExecutor implements CommandExecutor {
 
 			PtyProcess ptyorig = null;
 			// If Windows, and we are starting a shell, strip this commands
-			if (Platform.isWindows() && cmd.getArguments().size() > 2 && cmd.getArguments().get(0).equals("start")
-					&& cmd.getArguments().get(1).equals("/c") && cmd.getArguments().get(2).equals("CMD.exe")) {
-				cmd.getArguments().remove(0);
-				cmd.getArguments().remove(0);
+			List<String> arguments = cmd.getAllArguments();
+			if (Platform.isWindows() && arguments.size() > 2 && arguments.get(0).equals("start")
+					&& arguments.get(1).equals("/c") && arguments.get(2).equals("CMD.exe")) {
+				arguments.remove(0);
+				arguments.remove(0);
 			}
 
-			ptyorig = PtyProcess.exec((String[]) cmd.getArguments().toArray(new String[0]), cmd.getEnvironment(),
+			ptyorig = PtyProcess.exec((String[]) arguments.toArray(new String[0]), cmd.getEnvironment(),
 					cmd.getDirectory().getAbsolutePath(), euid);
 			final PtyProcess pty = ptyorig;
 

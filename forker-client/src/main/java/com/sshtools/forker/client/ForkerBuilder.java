@@ -35,7 +35,6 @@ public class ForkerBuilder {
 	private Command command = new Command();
 	private boolean background;
 	private EffectiveUser effectiveUser;
-	private Priority priority = Priority.NORMAL;
 
 	public ForkerBuilder(List<String> command) {
 		if (command == null)
@@ -64,11 +63,11 @@ public class ForkerBuilder {
 	}
 	
 	public Priority priority() {
-		return priority;
+		return command.getPriority();
 	}
 	
 	public ForkerBuilder priority(Priority priority) {
-		this.priority = priority;
+		command.setPriority(priority);
 		return this;
 	}
 
@@ -177,6 +176,8 @@ public class ForkerBuilder {
 				throw new IOException("invalid null character in command");
 			}
 		}
+		
+		
 
 		switch (command.getIO()) {
 		case INPUT:
@@ -265,7 +266,7 @@ public class ForkerBuilder {
 			effectiveUser.elevate(this, null, command);
 		}
 		try {
-			ProcessBuilder pb = new ProcessBuilder(command.getArguments());
+			ProcessBuilder pb = new ProcessBuilder(command.getAllArguments());
 			if (command.isRedirectError()) {
 				pb.redirectErrorStream(true);
 			}
@@ -296,5 +297,13 @@ public class ForkerBuilder {
 	public String toString() {
 		return "ForkerBuilder [command=" + command + ", background=" + background + ", effectiveUser=" + effectiveUser
 				+ "]";
+	}
+
+	public List<String> getAllArguments() {
+		return command.getAllArguments();
+	}
+
+	public List<Integer> affinity() {
+		return command.getAffinity();
 	}
 }

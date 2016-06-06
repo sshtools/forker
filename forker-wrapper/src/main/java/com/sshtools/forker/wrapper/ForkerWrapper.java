@@ -47,21 +47,25 @@ import com.sshtools.forker.common.Cookie.Instance;
 import com.sshtools.forker.common.IO;
 import com.sshtools.forker.common.OS;
 import com.sshtools.forker.common.Priority;
+import com.sshtools.forker.common.Util;
 import com.sshtools.forker.daemon.CommandHandler;
 import com.sshtools.forker.daemon.Forker;
 import com.sshtools.forker.daemon.Forker.Client;
+import com.sshtools.forker.wrapper.JVM.Version;
 
 public class ForkerWrapper {
 
-	public final static String EXIT_WRAPPER = "exit-wrapper";
+	public final static String EXITED_WRAPPER = "exited-wrapper";
+	public final static String EXITING_WRAPPER = "exiting-wrapper";
 	public final static String STARTING_FORKER_DAEMON = "started-forker-daemon";
 	public final static String STARTED_FORKER_DAEMON = "started-forker-daemon";
 	public final static String STARTING_APPLICATION = "starting-application";
 	public final static String STARTED_APPLICATION = "started-application";
 	public final static String RESTARTING_APPLICATION = "restarting-application";
 	public final static String APPPLICATION_STOPPED = "application-stopped";
-	public final static String[] EVENT_NAMES = { STARTING_FORKER_DAEMON, STARTED_FORKER_DAEMON, STARTED_APPLICATION,
-			STARTING_APPLICATION, RESTARTING_APPLICATION, APPPLICATION_STOPPED };
+	public final static String[] EVENT_NAMES = { EXITED_WRAPPER, EXITING_WRAPPER, STARTING_FORKER_DAEMON,
+			STARTED_FORKER_DAEMON, STARTED_APPLICATION, STARTING_APPLICATION, RESTARTING_APPLICATION,
+			APPPLICATION_STOPPED };
 
 	public static class NameValuePair {
 		private String name;
@@ -127,7 +131,8 @@ public class ForkerWrapper {
 		return new File(context, p.getPath()).getCanonicalFile();
 	}
 
-	public void start() throws IOException, InterruptedException {
+	@SuppressWarnings("resource")
+	public int start() throws IOException, InterruptedException {
 
 		/*
 		 * Calculate CWD. All file paths from this point are calculated relative
@@ -142,10 +147,7 @@ public class ForkerWrapper {
 				throw new IOException(String.format("No such directory %s", cwd));
 		}
 
-		String javaExe = getOptionValue("java",
-				System.getProperty("java.home") + File.separator + "bin" + File.separator + "java");
-		if (SystemUtils.IS_OS_WINDOWS && !javaExe.endsWith(".exe"))
-			javaExe += ".exe";
+		String javaExe = getJVMPath();
 
 		String forkerClasspath = System.getProperty("java.class.path");
 		String wrapperClasspath = getOptionValue("classpath", forkerClasspath);
@@ -164,9 +166,9 @@ public class ForkerWrapper {
 
 		boolean daemonize = getSwitch("daemon", false);
 		String pidfile = getOptionValue("pidfile", null);
-		final int timeout = Integer.parseInt(getOptionValue("timeout", "60"));
 		final int exitWait = Integer.parseInt(getOptionValue("exit-wait", "10"));
-		daemonize(cwd, javaExe, forkerClasspath, daemonize, pidfile);
+		if (daemonize(cwd, javaExe, forkerClasspath, daemonize, pidfile))
+			return 0;
 
 		/*
 		 * Create a lock file if 'single instance' was specified
@@ -175,6 +177,9 @@ public class ForkerWrapper {
 		FileChannel lockChannel = null;
 		File lockFile = new File(new File(System.getProperty("java.io.tmpdir")),
 				"forker-wrapper-" + classname + ".lock");
+
+		addShutdownHook(useDaemon, exitWait);
+
 		try {
 			if (getSwitch("single-instance", false)) {
 				lockChannel = new RandomAccessFile(lockFile, "rw").getChannel();
@@ -189,10 +194,8 @@ public class ForkerWrapper {
 				}
 			}
 
-			addShutdownHook(useDaemon, exitWait);
-
-			if (useDaemon && timeout > 0) {
-				monitorWrappedApplication(timeout);
+			if (useDaemon) {
+				monitorWrappedApplication();
 			}
 
 			int retval = 2;
@@ -238,11 +241,16 @@ public class ForkerWrapper {
 				}
 
 				String priStr = getOptionValue("priority", null);
-				if(priStr != null) {
+				if (priStr != null) {
 					appBuilder.priority(Priority.valueOf(priStr));
 				}
 				appBuilder.io(IO.DEFAULT);
 				appBuilder.directory(cwd);
+
+				List<String> cpus = getOptionValues("cpu");
+				for (String cpu : cpus) {
+					appBuilder.affinity().add(Integer.parseInt(cpu));
+				}
 
 				if (getSwitch("administrator", false)) {
 					if (!OS.isAdministrator()) {
@@ -388,8 +396,7 @@ public class ForkerWrapper {
 			// 9);
 			// OSCommand.run("kill", "-9",
 			// String.valueOf(PtyHelpers.getInstance().getpid()));
-			event(EXIT_WRAPPER, String.valueOf(retval));
-			System.exit(retval);
+			return retval;
 		} finally {
 			if (lock != null) {
 				logger.fine(String.format("Release lock %s", lockFile));
@@ -533,8 +540,7 @@ public class ForkerWrapper {
 			System.exit(1);
 		}
 
-		wrapper.start();
-		System.exit(0);
+		System.exit(wrapper.start());
 	}
 
 	public void init(CommandLine cmd) {
@@ -543,13 +549,71 @@ public class ForkerWrapper {
 		logger.setLevel(Level.parse(levelName));
 	}
 
+	protected String getJVMPath() throws IOException {
+		String javaExe = getOptionValue("java",
+				System.getProperty("java.home") + File.separator + "bin" + File.separator + "java");
+		if (SystemUtils.IS_OS_WINDOWS && !javaExe.endsWith(".exe"))
+			javaExe += ".exe";
+
+		String minjava = getOptionValue("min-java", null);
+		String maxjava = getOptionValue("max-java", null);
+		if (StringUtils.isNotBlank(minjava) || StringUtils.isNotBlank(maxjava)) {
+			if (StringUtils.isBlank(minjava))
+				minjava = "0.0.0";
+			if (StringUtils.isBlank(maxjava))
+				maxjava = "9999.9999.9999";
+
+			Version minver = new Version(minjava);
+			Version maxver = new Version(maxjava);
+			JVM jvm = new JVM(javaExe);
+			if (jvm.getVersion().compareTo(minver) < 0 || jvm.getVersion().compareTo(maxver) > 0) {
+				logger.info(
+						String.format("Initially chosen JVM %s (%s) is not within the JVM version range of %s to %s",
+								javaExe, jvm.getVersion(), minver, maxver));
+				for (JVM altJvm : JVM.jvms()) {
+					if (altJvm.getVersion().compareTo(minver) >= 0 && altJvm.getVersion().compareTo(maxver) <= 0) {
+						javaExe = altJvm.getPath();
+						logger.info(String.format("Using alternative JVM %s which version %s", javaExe,
+								altJvm.getVersion()));
+						break;
+					}
+				}
+			} else {
+				logger.info(String.format("Initially chosen JVM %s (%s) is valid for the version range %s to %s",
+						javaExe, jvm.getVersion(), minver, maxver));
+			}
+		}
+		return javaExe;
+	}
+
 	protected void event(String name, String... args) throws IOException {
 		String eventHandler = getOptionValue("on-" + name, null);
-		logger.info(String.format("Event " + name + ": %s", (Object[])args));
+		logger.info(String.format("Event " + name + ": %s", (Object[]) args));
 		if (StringUtils.isNotBlank(eventHandler)) {
+			// Parse the event handler script
+			List<String> handlerArgs = Util.parseQuotedString(eventHandler);
+			for (int i = 0; i < handlerArgs.size(); i++) {
+				handlerArgs.set(i, handlerArgs.get(i).replace("%0", eventHandler));
+				for (int j = 0; j < args.length; j++)
+					handlerArgs.set(i, handlerArgs.get(i).replace("%" + (j + 1), args[j]));
+				handlerArgs.set(i, handlerArgs.get(i).replace("%%", "%"));
+			}
+
+			String cmd = handlerArgs.remove(0);
+
 			try {
-				Class<?> clazz = Class.forName(eventHandler);
-				Method method = clazz.getMethod("main", String[].class);
+				if (!cmd.contains("."))
+					throw new Exception("Not a class");
+
+				int idx = cmd.indexOf("#");
+				String methodName = "main";
+				if (idx != -1) {
+					methodName = cmd.substring(idx + 1);
+					cmd = cmd.substring(0, idx);
+				}
+
+				Class<?> clazz = Class.forName(cmd);
+				Method method = clazz.getMethod(methodName, String[].class);
 				try {
 					logger.info(String.format("Handling with Java class %s (%s)", eventHandler, Arrays.asList(args)));
 					method.invoke(null, new Object[] { args });
@@ -559,8 +623,8 @@ public class ForkerWrapper {
 			} catch (Exception cnfe) {
 				// Assume to be native command
 				List<String> allArgs = new ArrayList<>();
-				allArgs.add(eventHandler);
-				allArgs.addAll(Arrays.asList(args));
+				allArgs.add(cmd);
+				allArgs.addAll(handlerArgs);
 				try {
 					logger.info(String.format("Handling with command %s", allArgs.toString()));
 					OSCommand.run(allArgs);
@@ -653,6 +717,9 @@ public class ForkerWrapper {
 		options.addOption(new Option("b", "buffer-size", true,
 				"How big (in byte) to make the I/O buffer. By default this is 1 byte for immediate output."));
 
+		options.addOption(new Option("B", "cpu", true,
+				"Bind to a particular CPU, may be specified multiple times to bind to multiple CPUs."));
+
 		options.addOption(new Option("j", "java", true, "Alternative path to java runtime launcher."));
 
 		options.addOption(new Option("J", "jvmarg", true,
@@ -677,6 +744,14 @@ public class ForkerWrapper {
 
 		options.addOption(new Option("P", "priority", true,
 				"Scheduling priority, may be one of LOW, NORMAL, HIGH or REALTIME (where supported)."));
+
+		options.addOption(new Option("Q", "min-java", true,
+				"Minimum java version. If the selected JVM (default or otherwise) is lower than this, an "
+						+ "attempt will be made to locate a later version."));
+
+		options.addOption(new Option("q", "max-java", true,
+				"Maximum java version. If the selected JVM (default or otherwise) is lower than this, an "
+						+ "attempt will be made to locate an earlier version."));
 	}
 
 	protected void buildClasspath(File cwd, String forkerClasspath, String wrapperClasspath, final boolean nativeMain,
@@ -755,7 +830,7 @@ public class ForkerWrapper {
 		}.start();
 	}
 
-	protected void daemonize(File cwd, String javaExe, String forkerClasspath, boolean daemonize, String pidfile)
+	protected boolean daemonize(File cwd, String javaExe, String forkerClasspath, boolean daemonize, String pidfile)
 			throws IOException {
 		if (daemonize && getOptionValue("fallback-active", null) == null) {
 
@@ -778,7 +853,7 @@ public class ForkerWrapper {
 						FileUtils.writeLines(makeDirectoryForFile(relativize(cwd, pidfile)),
 								Arrays.asList(String.valueOf(pid)));
 					}
-					System.exit(0);
+					return true;
 				}
 			} else {
 				/*
@@ -812,7 +887,7 @@ public class ForkerWrapper {
 				fb.io(IO.OUTPUT);
 				fb.start();
 				logger.info("Exiting initial runtime");
-				System.exit(0);
+				return true;
 			}
 		} else {
 			if (pidfile != null) {
@@ -822,12 +897,17 @@ public class ForkerWrapper {
 						Arrays.asList(String.valueOf(pid)));
 			}
 		}
+		return false;
 	}
 
 	protected void addShutdownHook(final boolean useDaemon, final int exitWait) {
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			@Override
 			public void run() {
+				try {
+					event(EXITING_WRAPPER);
+				} catch (IOException e1) {
+				}
 				logger.info("In Shutdown Hook");
 				Process p = process;
 				Forker f = daemon;
@@ -874,6 +954,10 @@ public class ForkerWrapper {
 				try {
 					logger.info("Closing control connection");
 					p.waitFor();
+					try {
+						event(EXITED_WRAPPER);
+					} catch (IOException e1) {
+					}
 				} catch (InterruptedException e) {
 					p.destroy();
 				} finally {
@@ -885,40 +969,44 @@ public class ForkerWrapper {
 		});
 	}
 
-	protected void monitorWrappedApplication(final int timeout) {
-		new Thread() {
-			{
-				setName("ForkerWrapperMonitor");
-				setDaemon(true);
-			}
-
-			public void run() {
-				logger.info("Monitoring pings from wrapped application");
-				try {
-					while (true) {
-						if (process != null && daemon != null) {
-							WrapperHandler wrapper = daemon.getHandler(WrapperHandler.class);
-							if (wrapper.getLastPing() > 0
-									&& (wrapper.getLastPing() + timeout * 1000) <= System.currentTimeMillis()) {
-
-								logger.warning(String.format(
-										"Process has not sent a ping in %d seconds, attempting to terminate", timeout));
-								tempRestartOnExit = true;
-
-								/*
-								 * TODO may need to be more forceful than this,
-								 * e.g. OS kill
-								 */
-								process.destroy();
-							}
-						}
-						Thread.sleep(1000);
-					}
-				} catch (InterruptedException ie) {
-
+	protected void monitorWrappedApplication() {
+		final int timeout = Integer.parseInt(getOptionValue("timeout", "60"));
+		if (timeout > 0) {
+			new Thread() {
+				{
+					setName("ForkerWrapperMonitor");
+					setDaemon(true);
 				}
-			}
-		}.start();
+
+				public void run() {
+					logger.info("Monitoring pings from wrapped application");
+					try {
+						while (true) {
+							if (process != null && daemon != null) {
+								WrapperHandler wrapper = daemon.getHandler(WrapperHandler.class);
+								if (wrapper.getLastPing() > 0
+										&& (wrapper.getLastPing() + timeout * 1000) <= System.currentTimeMillis()) {
+
+									logger.warning(String.format(
+											"Process has not sent a ping in %d seconds, attempting to terminate",
+											timeout));
+									tempRestartOnExit = true;
+
+									/*
+									 * TODO may need to be more forceful than
+									 * this, e.g. OS kill
+									 */
+									process.destroy();
+								}
+							}
+							Thread.sleep(1000);
+						}
+					} catch (InterruptedException ie) {
+
+					}
+				}
+			}.start();
+		}
 	}
 
 	protected void appendPath(StringBuilder newClasspath, String el) {
