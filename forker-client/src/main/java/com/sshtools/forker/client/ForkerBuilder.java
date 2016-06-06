@@ -266,7 +266,8 @@ public class ForkerBuilder {
 			effectiveUser.elevate(this, null, command);
 		}
 		try {
-			ProcessBuilder pb = new ProcessBuilder(command.getAllArguments());
+			List<String> allArguments = command.getAllArguments();
+			ProcessBuilder pb = new ProcessBuilder(allArguments);
 			if (command.isRedirectError()) {
 				pb.redirectErrorStream(true);
 			}

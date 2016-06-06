@@ -157,27 +157,31 @@ public class Command {
 					break;
 				}
 			} else if (SystemUtils.IS_OS_WINDOWS) {
-				if (!a.get(0).equals("START")) {
-					a.add(0, "START");
+				if (a.size() < 3 || !a.get(0).equals("CMD.EXE") || !a.get(1).equals("/C") || !a.get(2).equals("START")) {
+					a.add(0, "CMD.EXE");
+					a.add(1, "/C");
+					a.add(2, "START");
 				}
-				a.add(1, "/WAIT");
-				a.add(2, "/B");
+				a.add(3, "/WAIT");
+				a.add(4, "/B");
 				switch (priority) {
 				case REALTIME:
-					a.add(3, "/REALTIME");
+					a.add(5, "/REALTIME");
 					break;
 				case HIGH:
-					a.add(3, "/HIGH");
+					a.add(5, "/HIGH");
 					break;
 				case NORMAL:
-					a.add(3, "/NORMAL");
+					a.add(5, "/NORMAL");
 					break;
 				case LOW:
-					a.add(3, "/LOW");
+					a.add(5, "/LOW");
 					break;
 				default:
 					break;
 				}
+				// http://stackoverflow.com/questions/154075/using-the-dos-start-command-with-parameters-passed-to-the-started-program
+				a.add(6, "\"Forker\"");
 			} else
 				throw new UnsupportedOperationException();
 		}
@@ -194,11 +198,13 @@ public class Command {
 					&& !SystemUtils.IS_OS_WINDOWS_98 && !SystemUtils.IS_OS_WINDOWS_ME && !SystemUtils.IS_OS_WINDOWS_NT
 					&& !SystemUtils.IS_OS_WINDOWS_VISTA) {
 				// Windows 7 and above
-				if (!a.get(0).equals("START")) {
-					a.add(0, "START");
+				if (a.size() < 3 || !a.get(0).equals("CMD.EXE") || !a.get(1).equals("/C") || !a.get(2).equals("START")) {
+					a.add(0, "CMD.EXE");
+					a.add(1, "/C");
+					a.add(2, "START");
 				}
-				a.add(1, "/AFFINITY");
-				a.add(2, String.format("0x%x", mask));
+				a.add(3, "/AFFINITY");
+				a.add(4, String.format("0x%x", mask));
 			} else
 				throw new UnsupportedOperationException();
 		}

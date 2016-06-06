@@ -588,7 +588,7 @@ public class ForkerWrapper {
 
 	protected void event(String name, String... args) throws IOException {
 		String eventHandler = getOptionValue("on-" + name, null);
-		logger.info(String.format("Event " + name + ": %s", (Object[]) args));
+		logger.info(String.format("Event " + name + ": %s", Arrays.asList(args)));
 		if (StringUtils.isNotBlank(eventHandler)) {
 			// Parse the event handler script
 			List<String> handlerArgs = Util.parseQuotedString(eventHandler);

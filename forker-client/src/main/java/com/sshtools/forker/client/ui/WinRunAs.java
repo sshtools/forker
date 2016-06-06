@@ -28,10 +28,14 @@ import com.sshtools.forker.common.Util;
 import com.sshtools.forker.common.XAdvapi32;
 import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.platform.win32.Kernel32Util;
+import com.sun.jna.platform.win32.Shell32;
+import com.sun.jna.platform.win32.Shell32Util;
 import com.sun.jna.platform.win32.WinBase;
 import com.sun.jna.platform.win32.WinBase.PROCESS_INFORMATION;
 import com.sun.jna.platform.win32.WinBase.SECURITY_ATTRIBUTES;
 import com.sun.jna.platform.win32.WinBase.STARTUPINFO;
+import com.sun.jna.platform.win32.WinDef.INT_PTR;
+import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.platform.win32.WinNT.HANDLEByReference;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
@@ -42,6 +46,15 @@ import com.sun.jna.ptr.PointerByReference;
 public class WinRunAs extends JFrame {
 
 	private static final long serialVersionUID = 1L;
+
+	public static int uac(String[] command) throws IOException {
+		//http://mark.koli.ch/uac-prompt-from-java-createprocess-error740-the-requested-operation-requires-elevation
+		List<String> args = new ArrayList<>(Arrays.asList(command));
+		String lpFile = args.remove(0);
+		INT_PTR child = Shell32.INSTANCE.ShellExecute(null, "runas", lpFile, getEncodedParameterString(args), null, 0);
+		return child.intValue();
+		
+	}
 
 	public static int runAs(String username, String domain, char[] password, String[] command) throws IOException {
 
@@ -79,19 +92,7 @@ public class WinRunAs extends JFrame {
 				/* Extract the command name, and remaining arguments */
 				List<String> cmdArgs = new ArrayList<String>(Arrays.asList(command));
 				String cmd = cmdArgs.remove(0);
-				StringBuilder bui = new StringBuilder();
-				for (int i = 0; i < cmdArgs.size(); i++) {
-					if (bui.length() > 0) {
-						bui.append(' ');
-					}
-					String src = cmdArgs.get(i);
-					boolean hasSpc = src.indexOf(' ') > -1;
-					if (i > 0 && hasSpc)
-						bui.append("'");
-					bui.append(Util.escapeSingleQuotes(src));
-					if (i > 0 && hasSpc)
-						bui.append("'");
-				}
+				String bui = getEncodedParameterString(cmdArgs);
 				final HANDLEByReference pipeStdinRead = new HANDLEByReference(Kernel32.INVALID_HANDLE_VALUE);
 				final HANDLEByReference pipeStdinWrite = new HANDLEByReference(Kernel32.INVALID_HANDLE_VALUE);
 				final HANDLEByReference pipeStdoutRead = new HANDLEByReference(Kernel32.INVALID_HANDLE_VALUE);
@@ -136,9 +137,10 @@ public class WinRunAs extends JFrame {
 					 * process
 					 */
 					final PROCESS_INFORMATION pinfo = new PROCESS_INFORMATION();
-					
+
 					/* Start the process as the required user */
-					if (!(XAdvapi32.INSTANCE.CreateProcessWithLogonW(username, domain == null ? System.getenv("COMPUTERNAME") : domain, new String(password),
+					if (!(XAdvapi32.INSTANCE.CreateProcessWithLogonW(username,
+							domain == null ? System.getenv("COMPUTERNAME") : domain, new String(password),
 							XAdvapi32.LOGON_WITH_PROFILE, cmd, bui.toString(),
 							XAdvapi32.CREATE_DEFAULT_ERROR_MODE | XAdvapi32.CREATE_UNICODE_ENVIRONMENT
 									| XAdvapi32.CREATE_NO_WINDOW,
@@ -242,6 +244,23 @@ public class WinRunAs extends JFrame {
 		}
 	}
 
+	private static String getEncodedParameterString(List<String> cmdArgs) {
+		StringBuilder bui = new StringBuilder();
+		for (int i = 0; i < cmdArgs.size(); i++) {
+			if (bui.length() > 0) {
+				bui.append(' ');
+			}
+			String src = cmdArgs.get(i);
+			boolean hasSpc = src.indexOf(' ') > -1;
+			if (i > 0 && hasSpc)
+				bui.append("'");
+			bui.append(Util.escapeSingleQuotes(src));
+			if (i > 0 && hasSpc)
+				bui.append("'");
+		}
+		return bui.toString();
+	}
+
 	private static void writePipe(HANDLEByReference pipe, InputStream in) throws IOException {
 		byte[] buf = new byte[1024];
 		int r = 0;
@@ -287,6 +306,7 @@ public class WinRunAs extends JFrame {
 	}
 
 	public static void main(String[] args) throws Exception {
+		boolean uac = "true".equals(System.getenv("W32RUNAS_UAC"));
 		String username = System.getenv("W32RUNAS_USERNAME");
 		String domain = System.getenv("W32RUNAS_DOMAIN");
 		char[] password = System.getenv("W32RUNAS_PASSWORD") == null ? null
@@ -301,7 +321,9 @@ public class WinRunAs extends JFrame {
 			command = args;
 		else {
 			for (int i = 0; i < eidx; i++) {
-				if (args[i].equals("--domain")) {
+				if (args[i].equals("--uac")) {
+					uac = true;
+				} else if (args[i].equals("--domain")) {
 					domain = args[++i];
 				} else if (args[i].equals("--username")) {
 					username = args[++i];
@@ -321,7 +343,10 @@ public class WinRunAs extends JFrame {
 			username = "Administrator";
 		}
 
-		if (password == null) {
+		if(uac) {
+			System.exit(uac(command));
+		}
+		else if (password == null) {
 
 			UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
 

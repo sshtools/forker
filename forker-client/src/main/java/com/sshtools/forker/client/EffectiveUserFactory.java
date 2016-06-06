@@ -164,6 +164,7 @@ public abstract class EffectiveUserFactory {
 					return new SudoAskPassGuiAdministrator();
 				}
 			} else if (SystemUtils.IS_OS_WINDOWS) {
+				// http://mark.koli.ch/uac-prompt-from-java-createprocess-error740-the-requested-operation-requires-elevation
 				if (fixedPassword != null) {
 					return new RunAs(OS.getAdministratorUsername(), fixedPassword.toCharArray());
 				} else {
@@ -521,6 +522,10 @@ public abstract class EffectiveUserFactory {
 		private Command command;
 		private char[] password;
 
+		public RunAs() {
+			this(null);
+		}
+
 		public RunAs(String username) {
 			this(username, null);
 		}
@@ -555,10 +560,14 @@ public abstract class EffectiveUserFactory {
 				cmd.add("-classpath");
 				cmd.add(Forker.getForkerClasspath());
 				cmd.add(WinRunAs.class.getName());
-				cmd.add("--username");
-				cmd.add(username);
-				if (password != null) {
-					command.getEnvironment().put("W32RUNAS_PASSWORD", new String(password));
+				if (username.equals(OS.getAdministratorUsername()) && command.getIO() == IO.SINK) {
+					cmd.add("--uac");
+				} else {
+					cmd.add("--username");
+					cmd.add(username);
+					if (password != null) {
+						command.getEnvironment().put("W32RUNAS_PASSWORD", new String(password));
+					}
 				}
 				cmd.add("--");
 				cmd.addAll(args);
