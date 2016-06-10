@@ -28,7 +28,21 @@
 				<directory>src/test/resources</directory>
 			</testResource>
 		</testResources>
+		<plugins>
 
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<configuration>
+					<archive>
+						<manifest>
+							<mainClass>com.sshtools.forker.wrapper.ForkerWrapper</mainClass>
+							<addClasspath>true</addClasspath>
+						</manifest>
+					</archive>
+				</configuration>
+			</plugin>
+		</plugins>
 	</build>
 
 	<dependencies>

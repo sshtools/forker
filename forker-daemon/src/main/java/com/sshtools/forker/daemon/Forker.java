@@ -32,7 +32,18 @@ import org.apache.commons.lang.SystemUtils;
 
 import com.sshtools.forker.common.Cookie;
 import com.sshtools.forker.common.Cookie.Instance;
+import com.sshtools.forker.common.States;
 
+/**
+ * The <i>Forker Daemon</i> itself. This is responsible for accepting requests
+ * from clients and executing processes on their behalf (in a separate runtime).
+ * <p>
+ * The daemon is secured using a {@link Cookie}, which may be used in a varierty
+ * of ways.
+ * <p>
+ * Further functionality may be added to the daemon using {@link Handler}
+ * implementations and {@link CommandExecutor} implementations.
+ */
 public class Forker {
 
 	// private int port = Defaults.PORT;
@@ -47,6 +58,9 @@ public class Forker {
 	private List<Client> clients = new ArrayList<>();
 	private Map<Integer, Handler> handlers = new HashMap<>();
 
+	/**
+	 * Constructor
+	 */
 	public Forker() {
 		clients = Collections.synchronizedList(clients);
 		for (Handler handler : ServiceLoader.load(Handler.class)) {
@@ -54,31 +68,70 @@ public class Forker {
 		}
 	}
 
+	/**
+	 * Get a {@link Handler} given it's class.
+	 * 
+	 * @param clazz
+	 *            handler class
+	 * @return handler
+	 */
 	@SuppressWarnings("unchecked")
-	public <T extends Handler> T getHandler(Class<T> handler) {
+	public <T extends Handler> T getHandler(Class<T> clazz) {
 		for (Handler h : handlers.values()) {
-			if (h.getClass().equals(handler))
+			if (h.getClass().equals(clazz))
 				return (T) h;
 		}
 		return null;
 	}
 
-	void setForked() {
+	/**
+	 * Indicate the JVM is is forked.
+	 */
+	public void setForked() {
 		forked = true;
 	}
 
+	/**
+	 * Get whether the daemon is running in isolated mode. When isolated, the
+	 * cookie is only known by the client and the forker daemon and is the
+	 * default and recommended mode.
+	 * 
+	 * @return isolated
+	 */
 	public boolean isIsolated() {
 		return isolated;
 	}
 
+	/**
+	 * Set whether the daemon is running in isolated mode. When isolated, the
+	 * cookie is only known by the client and the forker daemon and is the
+	 * default and recommended mode.
+	 * 
+	 * @param isolated
+	 *            isolated
+	 */
 	public void setIsolated(boolean isolated) {
 		this.isolated = isolated;
 	}
 
+	/**
+	 * Get a list of the currently connected clients.
+	 * 
+	 * @return clients
+	 */
 	public List<Client> getClients() {
 		return clients;
 	}
 
+	/**
+	 * Start an instance of the forker daemon using the provided cookie instance
+	 * to secure iit,
+	 * 
+	 * @param thisCookie
+	 *            cookie
+	 * @throws IOException
+	 *             on any error
+	 */
 	public void start(Instance thisCookie) throws IOException {
 		try {
 			while (true) {
@@ -95,6 +148,13 @@ public class Forker {
 		}
 	}
 
+	/**
+	 * Prepare the forker daemon for use, returning the cookie that should be
+	 * used for authentication.
+	 * 
+	 * @return cookie instance
+	 * @throws IOException on any error
+	 */
 	public Instance prepare() throws IOException {
 		/*
 		 * First look to see if there is an existing cookie, and if so, is the
@@ -129,6 +189,14 @@ public class Forker {
 		return thisCookie;
 	}
 
+	/**
+	 * Entry point.
+	 * 
+	 * @param args
+	 *            command line options
+	 * @throws Exception
+	 *             on any error
+	 */
 	public static void main(String[] args) throws Exception {
 		// BasicConfigurator.configure();
 		Forker f = new Forker();
@@ -179,7 +247,18 @@ public class Forker {
 		}
 	}
 
-	static void readStreamToOutput(final DataOutputStream dout, final InputStream stream, final int outStream) {
+	/**
+	 * Copy data from a raw input stream to a forker clients data stream.
+	 * 
+	 * @param dout
+	 *            data output stream
+	 * @param stream
+	 *            stream to read
+	 * @param outStream
+	 *            the ID of the stream (either {@link States#ERR} or
+	 *            {@link States#OUT}
+	 */
+	public static void readStreamToOutput(final DataOutputStream dout, final InputStream stream, final int outStream) {
 		// Capture stdout if not already doing so via
 		// ProcessBuilder
 		try {
@@ -197,6 +276,12 @@ public class Forker {
 		}
 	}
 
+	/**
+	 * Represents a single client connection. This maybe a control connection,
+	 * or a request to execute a command, or any other add-on supplied
+	 * operation.
+	 *
+	 */
 	public final static class Client implements Runnable {
 
 		private Socket s;
@@ -210,6 +295,11 @@ public class Forker {
 			this.cookie = cookie;
 		}
 
+		/**
+		 * Get the type of client.
+		 * 
+		 * @return client type
+		 */
 		public int getType() {
 			return type;
 		}
@@ -248,17 +338,33 @@ public class Forker {
 			}
 		}
 
+		/**
+		 * Close the client.
+		 * 
+		 * @throws IOException
+		 *             on any error
+		 */
 		public void close() throws IOException {
 			s.close();
 		}
 
 	}
 
+	/**
+	 * Shutdown the daemon, waiting for tasks to finish and exit the runtime.
+	 */
 	public void exit() {
 		shutdown(false);
 		System.exit(0);
 	}
 
+	/**
+	 * Shutdown the daemon, either waiting for tasks to finish or just shutting
+	 * down immediately.
+	 * 
+	 * @param now
+	 *            shutdown now
+	 */
 	public void shutdown(boolean now) {
 		for (Handler h : handlers.values())
 			h.stop();
@@ -272,6 +378,10 @@ public class Forker {
 		}
 	}
 
+	/**
+	 * Deactivate the daemon, preventing an new connections but don't actually
+	 * exit.
+	 */
 	public void deactivate() {
 		if (socket != null) {
 			try {

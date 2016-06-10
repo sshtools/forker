@@ -29,33 +29,55 @@ import com.sshtools.forker.common.XAdvapi32;
 import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.platform.win32.Kernel32Util;
 import com.sun.jna.platform.win32.Shell32;
-import com.sun.jna.platform.win32.Shell32Util;
 import com.sun.jna.platform.win32.WinBase;
 import com.sun.jna.platform.win32.WinBase.PROCESS_INFORMATION;
 import com.sun.jna.platform.win32.WinBase.SECURITY_ATTRIBUTES;
 import com.sun.jna.platform.win32.WinBase.STARTUPINFO;
 import com.sun.jna.platform.win32.WinDef.INT_PTR;
-import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.platform.win32.WinNT.HANDLEByReference;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
 
 /**
- * A helper application to launch a command as another user.
+ * A helper application to launch a command as another user on Windows
  */
 public class WinRunAs extends JFrame {
 
 	private static final long serialVersionUID = 1L;
 
+	/**
+	 * Launch a command using UAC. Note, this is VERY simplistic, and doesn't
+	 * support any I/O streams.
+	 * 
+	 * @param command command
+	 * @return return value
+	 * @throws IOException on any error
+	 */
 	public static int uac(String[] command) throws IOException {
-		//http://mark.koli.ch/uac-prompt-from-java-createprocess-error740-the-requested-operation-requires-elevation
+		// http://mark.koli.ch/uac-prompt-from-java-createprocess-error740-the-requested-operation-requires-elevation
 		List<String> args = new ArrayList<>(Arrays.asList(command));
 		String lpFile = args.remove(0);
 		INT_PTR child = Shell32.INSTANCE.ShellExecute(null, "runas", lpFile, getEncodedParameterString(args), null, 0);
 		return child.intValue();
-		
+
 	}
 
+	/**
+	 * Launch a command as a particular user.
+	 * 
+	 * @param username
+	 *            username
+	 * @param domain
+	 *            domain or null
+	 * @param password
+	 *            password
+	 * @param command
+	 *            command
+	 * @return return value
+	 * @throws IOException
+	 *             on any error
+	 * 
+	 */
 	public static int runAs(String username, String domain, char[] password, String[] command) throws IOException {
 
 		// http://www.rgagnon.com/javadetails/java-start-process-as-another-user-using-jna.html
@@ -305,6 +327,13 @@ public class WinRunAs extends JFrame {
 		throw new IOException(String.format("[%x] %s", err, txt));
 	}
 
+	/**
+	 * Entry point
+	 * 
+	 * @param args
+	 *            command line arguments
+	 * @throws Exception on any error
+	 */
 	public static void main(String[] args) throws Exception {
 		boolean uac = "true".equals(System.getenv("W32RUNAS_UAC"));
 		String username = System.getenv("W32RUNAS_USERNAME");
@@ -343,10 +372,9 @@ public class WinRunAs extends JFrame {
 			username = "Administrator";
 		}
 
-		if(uac) {
+		if (uac) {
 			System.exit(uac(command));
-		}
-		else if (password == null) {
+		} else if (password == null) {
 
 			UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
 

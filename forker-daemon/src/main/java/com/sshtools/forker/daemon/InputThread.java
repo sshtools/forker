@@ -5,18 +5,42 @@ import java.io.OutputStream;
 
 import com.sshtools.forker.common.States;
 
+/**
+ * Read commands from a forker client and act on them, such as sending stdin to
+ * the process, altering wiindow size and more.
+ *
+ */
 public abstract class InputThread extends Thread {
 	private final DataInputStream din;
 	private final OutputStream out;
 
+	/**
+	 * Constructor.
+	 * 
+	 * @param out
+	 *            process output stream
+	 * @param din
+	 *            client data input stream
+	 */
 	public InputThread(OutputStream out, DataInputStream din) {
 		this.out = out;
 		this.din = din;
 	}
 
-	abstract void kill();
+	/**
+	 * Kill the process
+	 */
+	public abstract void kill();
 
-	abstract void setWindowSize(int width, int height);
+	/**
+	 * Set the window size
+	 * 
+	 * @param width
+	 *            width
+	 * @param height
+	 *            height
+	 */
+	public abstract void setWindowSize(int width, int height);
 
 	public void run() {
 		try {

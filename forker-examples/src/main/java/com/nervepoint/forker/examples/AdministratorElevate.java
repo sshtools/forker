@@ -28,7 +28,7 @@ public class AdministratorElevate {
 		}
 
 		Process p = builder.start();
-		String string = IOUtils.toString(p.getInputStream());
-		System.out.println(string + " (" + p.waitFor() + ")");
+		IOUtils.copy(p.getInputStream(), System.out);
+		System.out.println(" (" + p.waitFor() + ")");
 	}
 }

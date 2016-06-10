@@ -8,8 +8,16 @@ import org.apache.commons.lang.SystemUtils;
 
 import com.sshtools.forker.client.OSCommand;
 
+/**
+ * Java Virtual Machine detection.
+ */
 public class JVM {
 
+	/**
+	 * Represents a java version consisting of 3 dotted decimals, followed by an
+	 * _ then the build number.
+	 *
+	 */
 	public static class Version implements Comparable<Version> {
 		private int[] elements;
 		private String versionString;
@@ -73,6 +81,12 @@ public class JVM {
 	private String path;
 	private Version version;
 
+	/**
+	 * Construct a new JVM object given the path to it's 'java' command. This
+	 * will be run to extract the version
+	 * 
+	 * @param path path to java executable
+	 */
 	public JVM(String path) throws IOException {
 		this.path = path;
 		for (String line : OSCommand.runCommandAndCaptureOutput(path, "-version")) {
@@ -86,10 +100,20 @@ public class JVM {
 		}
 	}
 
+	/**
+	 * Get the location of the 'java' command for this JVM.
+	 * 
+	 * @return path
+	 */
 	public String getPath() {
 		return path;
 	}
 
+	/**
+	 * Get the version of this java runtime.
+	 * 
+	 * @return version
+	 */
 	public Version getVersion() {
 		return version;
 	}
@@ -130,6 +154,12 @@ public class JVM {
 		return "JVM [path=" + path + ", version=" + version + "]";
 	}
 
+	/**
+	 * Get a list of all available JVMs. This list may be more or less complete
+	 * depending on the operating system.
+	 * 
+	 * @return list of available JVMs
+	 */
 	public static List<JVM> jvms() {
 		List<JVM> jvms = new ArrayList<>();
 		if (SystemUtils.IS_OS_LINUX) {

@@ -10,10 +10,11 @@ import org.apache.commons.io.IOUtils;
 
 import com.sshtools.forker.common.States;
 
+/**
+ * Handler that deals with requests for opening files for reading as the user
+ * the daemon is running as.
+ */
 public class OSInputStreamHandler implements Handler {
-
-	public OSInputStreamHandler() {
-	}
 
 	@Override
 	public int getType() {

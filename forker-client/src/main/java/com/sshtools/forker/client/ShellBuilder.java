@@ -19,37 +19,56 @@ public class ShellBuilder extends ForkerBuilder {
 	private boolean loginShell;
 	private File rcfile;
 
-	public ShellBuilder() {
-
-	}
-	
+	/**
+	 * Specify an 'rcfile' to run on every shell.
+	 * 
+	 * @param rcfile rc file
+	 * @return builder for chaining
+	 */
 	public ShellBuilder rcfile(File rcfile) {
 		this.rcfile = rcfile;
 		return this;
 	}
-	
+
+	/**
+	 * Get the 'rcfile' to run on every shell.
+	 * 
+	 * @return rcfile
+	 */
 	public File rcfile() {
 		return rcfile;
 	}
 
+	/**
+	 * Indicate the shell should be a login shell. This will affect the
+	 * environment and other attributes.
+	 * 
+	 * @param loginShell
+	 *            login shell
+	 * @return builder for chaining
+	 */
 	public ShellBuilder loginShell(boolean loginShell) {
 		this.loginShell = loginShell;
 		return this;
 	}
 
+	/**
+	 * Get if the shell should be a login shell. This will affect the
+	 * environment and other attributes.
+	 * 
+	 * @return login shell
+	 */
 	public boolean loginShell() {
 		return loginShell;
 	}
 
 	public Process start() throws IOException {
-		if (SystemUtils.IS_OS_LINUX || SystemUtils.IS_OS_UNIX
-				|| SystemUtils.IS_OS_MAC_OSX) {
+		if (SystemUtils.IS_OS_LINUX || SystemUtils.IS_OS_UNIX || SystemUtils.IS_OS_MAC_OSX) {
 			// This can make us unbuffered and give a much more useful
 			// terminal
 
 			// The shell, should be in /bin but just in case
-			String shLocation = findCommand("bash", "/usr/bin/bash",
-					"/bin/bash");
+			String shLocation = findCommand("bash", "/usr/bin/bash", "/bin/bash");
 			if (shLocation == null) {
 				// Sh
 				shLocation = findCommand("sh", "/usr/bin/sh", "/bin/sh");
@@ -63,27 +82,30 @@ public class ShellBuilder extends ForkerBuilder {
 						command().add(0, "--login");
 					}
 					command().add(0, shLocation);
-					if(rcfile != null) {
+					if (rcfile != null) {
 						environment().put("ENV", rcfile.getAbsolutePath());
 					}
 				}
 			} else {
 				// rcfile only works with non-login shell :(
-				if(rcfile != null) {
-					command().add(0,rcfile.getAbsolutePath());
-					command().add(0,"--rcfile");
+				if (rcfile != null) {
+					command().add(0, rcfile.getAbsolutePath());
+					command().add(0, "--rcfile");
 				}
 				if (loginShell) {
 					command().add(0, "--login");
 				}
-				
+
 				// Bash
 				command().add(0, shLocation);
 			}
 
 		} else if (SystemUtils.IS_OS_WINDOWS) {
-			/* Currently must be handled by forker daemon, this is a special signal to just start a WinPTY shell.
-			 * NOTE: If you change this, also change Forker.java so it handles this correct (in the case of IO.PTY)
+			/*
+			 * Currently must be handled by forker daemon, this is a special
+			 * signal to just start a WinPTY shell. NOTE: If you change this,
+			 * also change Forker.java so it handles this correct (in the case
+			 * of IO.PTY)
 			 */
 			command().add(0, "CMD.exe");
 			command().add(0, "/c");
@@ -92,10 +114,8 @@ public class ShellBuilder extends ForkerBuilder {
 		return super.start();
 	}
 
-	private String findCommand(String command, String... places)
-			throws IOException {
-		Collection<String> stdbuf = OSCommand.runCommandAndCaptureOutput(
-				"which", command);
+	private String findCommand(String command, String... places) throws IOException {
+		Collection<String> stdbuf = OSCommand.runCommandAndCaptureOutput("which", command);
 		if (stdbuf.isEmpty()) {
 			for (String place : places) {
 				File f = new File(place);

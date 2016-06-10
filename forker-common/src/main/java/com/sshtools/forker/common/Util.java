@@ -8,8 +8,20 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.SystemUtils;
 
+/**
+ * Other utilities.
+ */
 public class Util {
 
+	/**
+	 * Parse a space separated string into a list, treating portions quotes with
+	 * single quotes as a single element. Single quotes themselves and spaces
+	 * can be escaped with a backslash.
+	 * 
+	 * @param command
+	 *            command to parse
+	 * @return parsed command
+	 */
 	public static List<String> parseQuotedString(String command) {
 		List<String> args = new ArrayList<>();
 		boolean escaped = false;
@@ -40,14 +52,37 @@ public class Util {
 		return args;
 	}
 
+	/**
+	 * Escape single quotes by turning them into double single quotes.
+	 * 
+	 * @param src
+	 *            source string
+	 * @return escaped string
+	 */
 	public static String escapeSingleQuotes(String src) {
 		return src.replace("'", "''");
 	}
 
+	/**
+	 * Escape double quotes by turning them into double double quotes.
+	 * 
+	 * @param src
+	 *            source string
+	 * @return escaped string
+	 */
 	public static String escapeDoubleQuotes(String src) {
 		return src.replace("\"", "\"\"");
 	}
 
+	/**
+	 * Get a username given it's ID.
+	 * 
+	 * @param id
+	 *            ID
+	 * @return username
+	 * @throws IOException
+	 *             on any error
+	 */
 	public static String getUsernameForID(String id) throws IOException {
 		if (SystemUtils.IS_OS_LINUX) {
 			// TODO what about NIS etc?
@@ -63,6 +98,13 @@ public class Util {
 		return null;
 	}
 
+	/**
+	 * Quote and escape a list of command elements into a single string.
+	 * 
+	 * @param cmd
+	 *            command elements
+	 * @return quoted and escaped string
+	 */
 	public static StringBuilder getQuotedCommandString(List<String> cmd) {
 		// Take existing command and turn it into one escaped command
 		StringBuilder bui = new StringBuilder();
@@ -79,6 +121,15 @@ public class Util {
 		return bui;
 	}
 
+	/**
+	 * Get the ID for a user givens it's username.
+	 * 
+	 * @param username
+	 *            username
+	 * @return user ID
+	 * @throws IOException
+	 *             on any error
+	 */
 	public static String getIDForUsername(String username) throws IOException {
 		if (SystemUtils.IS_OS_LINUX) {
 			// TODO what about NIS etc?

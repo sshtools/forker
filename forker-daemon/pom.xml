@@ -35,6 +35,19 @@
 				<version>3.2.3</version>
 				<extensions>true</extensions>
 			</plugin>
+
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<configuration>
+					<archive>
+						<manifest>
+							<mainClass>com.sshtools.forker.daemon.Forker</mainClass>
+							<addClasspath>true</addClasspath>
+						</manifest>
+					</archive>
+				</configuration>
+			</plugin>
 		</plugins>
 
 	</build>
@@ -61,36 +74,12 @@
 			<version>4.7</version>
 			<scope>test</scope>
 		</dependency>
+		<!-- <dependency> <groupId>pty4j</groupId> <artifactId>pty4j-natives</artifactId> 
+			<version>0.5-SSHTOOLS-SNAPSHOT</version> <scope>compile</scope> <type>jar</type> 
+			</dependency> -->
 
-		<dependency>
-			<groupId>pty4j</groupId>
-			<artifactId>pty4j</artifactId>
-			<version>0.5-SSHTOOLS-SNAPSHOT</version>
-			<type>jar</type>
-			<scope>compile</scope>
-		</dependency>
-		<dependency>
-			<groupId>pty4j</groupId>
-			<artifactId>pty4j</artifactId>
-			<classifier>natives</classifier>
-			<version>0.5-SSHTOOLS-SNAPSHOT</version>
-			<type>jar</type>
-		</dependency>
-		<!-- <dependency>
-			<groupId>pty4j</groupId>
-			<artifactId>pty4j-natives</artifactId> 
-			<version>0.5-SSHTOOLS-SNAPSHOT</version>
-			<scope>compile</scope>
-			<type>jar</type>
-		</dependency> -->
-		<dependency>
-			<groupId>com.google.guava</groupId>
-			<artifactId>guava</artifactId>
-			<version>14.0.1</version>
-		</dependency>
-		
 	</dependencies>
-	
+
 	<repositories>
 		<repository>
 			<id>ext-snapshots-local</id>

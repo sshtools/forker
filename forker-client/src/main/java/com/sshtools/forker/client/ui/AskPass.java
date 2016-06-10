@@ -17,14 +17,23 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.UIManager;
-import javax.swing.UnsupportedLookAndFeelException;
 
+/**
+ * Simple Swing based helper application that asks for a password and prints it
+ * on stdout.
+ */
 public class AskPass extends JFrame {
 
 	private static final long serialVersionUID = 1L;
 
-	public static void main(String[] args) throws ClassNotFoundException, InstantiationException,
-			IllegalAccessException, UnsupportedLookAndFeelException {
+	/**
+	 * Entry point
+	 * 
+	 * @param args
+	 *            command line arguments
+	 * @throws Exception on any error
+	 */
+	public static void main(String[] args) throws Exception {
 		UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
 
 		// Title
@@ -58,18 +67,18 @@ public class AskPass extends JFrame {
 		JDialog dialog = opt.createDialog(title);
 
 		Icon icon = UIManager.getIcon("OptionPane.warningIcon");
-		if(icon == null) {
+		if (icon == null) {
 			icon = new Icon() {
-				
+
 				@Override
 				public void paintIcon(Component c, Graphics g, int x, int y) {
 				}
-				
+
 				@Override
 				public int getIconWidth() {
 					return 16;
 				}
-				
+
 				@Override
 				public int getIconHeight() {
 					return 16;

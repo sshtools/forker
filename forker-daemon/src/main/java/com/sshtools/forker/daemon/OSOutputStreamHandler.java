@@ -8,10 +8,11 @@ import java.io.IOException;
 
 import com.sshtools.forker.common.States;
 
+/**
+ * Handler that deals with requests for opening files for writing as the user
+ * the daemon is running as.
+ */
 public class OSOutputStreamHandler implements Handler {
-
-	public OSOutputStreamHandler() {
-	}
 
 	@Override
 	public int getType() {
@@ -36,7 +37,7 @@ public class OSOutputStreamHandler implements Handler {
 			}
 			fout.flush();
 			dos.writeInt(States.OK);
-			dos.flush();			
+			dos.flush();
 		} finally {
 			fout.close();
 		}

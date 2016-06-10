@@ -43,5 +43,15 @@
 			<artifactId>forker-daemon</artifactId>
 			<version>${project.version}</version>
 		</dependency>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>forker-pty</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>forker-wrapper</artifactId>
+			<version>${project.version}</version>
+		</dependency>
 	</dependencies>
 </project>

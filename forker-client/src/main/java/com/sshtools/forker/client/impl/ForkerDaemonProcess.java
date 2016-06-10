@@ -10,25 +10,43 @@ import java.io.PipedOutputStream;
 import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.Socket;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.sshtools.forker.client.Forker;
+import com.sshtools.forker.client.AbstractForkerProcess;
 import com.sshtools.forker.common.Command;
 import com.sshtools.forker.common.Cookie;
 import com.sshtools.forker.common.Cookie.Instance;
 import com.sshtools.forker.common.IO;
 import com.sshtools.forker.common.States;
 
-public class ForkerProcess extends Process {
+/**
+ * Uses <i>Forker Daemon</i> to actually run the process in a remote JVM
+ * (possibly as a different user). The {@link Command} will be serialised and
+ * sent to the daemon.
+ */
+public class ForkerDaemonProcess extends AbstractForkerProcess {
 
-	static {
-		Forker.loadDaemon();
-	}
-
+	/**
+	 * How output to stdin is flushed.
+	 */
 	public enum OutputFlushMode {
-		MANUAL, AUTO, LOCAL, BOTH
+		/**
+		 * Streams flush() method must be called manually
+		 */
+		MANUAL,
+		/**
+		 * Determined by {@link IO} mode.
+		 */
+		AUTO,
+		/**
+		 * Flushed to daemon on every write
+		 */
+		LOCAL,
+		/**
+		 * Flushed to daemon, then to process on every write
+		 */
+		BOTH
 	}
 
 	private DataOutputStream dout;
@@ -46,15 +64,39 @@ public class ForkerProcess extends Process {
 	private Command command;
 	private OutputFlushMode outputFlushMode = OutputFlushMode.AUTO;
 
+	/**
+	 * Listen to be implemented to be notified of pseudo terminal window size
+	 * changes
+	 *
+	 */
 	public interface Listener {
+		/**
+		 * Pseudo terminal window size has changed.
+		 * 
+		 * @param ptyWidth
+		 *            width
+		 * @param ptyHeight
+		 *            height
+		 */
 		void windowSizeChanged(int ptyWidth, int ptyHeight);
 	}
 
-	public ForkerProcess(Command command) {
+	/**
+	 * Command
+	 * 
+	 * @param command
+	 *            command
+	 */
+	public ForkerDaemonProcess(Command command) {
 		this.command = command;
 	}
 
-	public void start() throws NumberFormatException, UnknownHostException, IOException {
+	/**
+	 * Start the process.
+	 * 
+	 * @throws IOException on any error
+	 */
+	public void start() throws IOException {
 
 		Instance cookie = Cookie.get().load();
 		if (cookie == null) {
@@ -188,10 +230,24 @@ public class ForkerProcess extends Process {
 
 	}
 
+	/**
+	 * Add a listener to the list of those to be notified when events such as
+	 * window size changes occur.
+	 * 
+	 * @param listener
+	 *            listener
+	 */
 	public void addListener(Listener listener) {
 		listeners.add(listener);
 	}
 
+	/**
+	 * Remove a listener from the list of those to be notified when events such
+	 * as window size changes occur.
+	 * 
+	 * @param listener
+	 *            listener
+	 */
 	public void removeListener(Listener listener) {
 		listeners.remove(listener);
 	}
@@ -270,7 +326,7 @@ public class ForkerProcess extends Process {
 				private void maybeFlush() throws IOException {
 					switch (outputFlushMode) {
 					case AUTO:
-						if (command.getIO().equals(IO.PTY)) {
+						if (command.getIO().isAutoFlushStdIn()) {
 							flush();
 						}
 						break;
@@ -289,10 +345,21 @@ public class ForkerProcess extends Process {
 		return out;
 	}
 
+	/**
+	 * Get the current pseudo terminal width
+	 * 
+	 * @return pseudo terminal width
+	 */
 	public int getPtyWidth() {
 		return ptyWidth;
 	}
 
+	/**
+	 * Set the current pseudo terminal width
+	 * 
+	 * @param ptyWidth
+	 *            pseudo terminal width
+	 */
 	public void setPtyWidth(int ptyWidth) {
 		this.ptyWidth = ptyWidth;
 		synchronized (dout) {
@@ -307,10 +374,21 @@ public class ForkerProcess extends Process {
 		}
 	}
 
+	/**
+	 * Get the current pseudo terminal height
+	 * 
+	 * @return pseudo terminal height
+	 */
 	public int getPtyHeight() {
 		return ptyHeight;
 	}
 
+	/**
+	 * Set the current pseudo terminal height
+	 * 
+	 * @param ptyHeight
+	 *            pseudo terminal height
+	 */
 	public void setPtyHeight(int ptyHeight) {
 		this.ptyHeight = ptyHeight;
 		synchronized (dout) {
@@ -325,6 +403,14 @@ public class ForkerProcess extends Process {
 		}
 	}
 
+	/**
+	 * Set the current pseudo terminal size
+	 * 
+	 * @param ptyWidth
+	 *            pseudo terminal width
+	 * @param ptyHeight
+	 *            pseudo terminal height
+	 */
 	public void setPtySize(int ptyWidth, int ptyHeight) {
 		this.ptyWidth = ptyWidth;
 		this.ptyHeight = ptyHeight;

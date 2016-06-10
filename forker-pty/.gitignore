@@ -1,0 +1,8 @@
+/target/
+/.settings/
+*.classpath
+/bin/
+/linux/
+/logs/
+/tmp/
+*.project

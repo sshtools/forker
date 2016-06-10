@@ -6,8 +6,16 @@ import java.io.IOException;
 
 import com.sshtools.forker.common.States;
 
+/**
+ * Handler implementation that deals with the 'control connection'. This is used
+ * to ensure the daemon shuts down when the client application exits.
+ *
+ */
 public class ControlHandler implements Handler {
 
+	/**
+	 * Constructor
+	 */
 	public ControlHandler() {
 	}
 

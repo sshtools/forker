@@ -52,9 +52,10 @@ public class Forker {
 			 * Build up a cut down classpath with only the jars forker daemon
 			 * needs
 			 */
-			String forkerClasspath = (daemonClasspath == null ? System.getProperty("java.class.path", "") : daemonClasspath);
+			String forkerClasspath = (daemonClasspath == null ? System.getProperty("java.class.path", "")
+					: daemonClasspath);
 			String classpath = getForkerClasspath(forkerClasspath);
-			
+
 			ForkerBuilder fb = new ForkerBuilder(javaExe, "-Xmx" + System.getProperty("forker.daemon.maxMemory", "8m"),
 					"-Djava.library.path=" + System.getProperty("java.library.path", ""), "-classpath", classpath,
 					"com.sshtools.forker.daemon.Forker");
@@ -152,7 +153,7 @@ public class Forker {
 				errored = true;
 			}
 		}
-		
+
 	}
 
 	/*
@@ -163,8 +164,11 @@ public class Forker {
 	 * meta-data
 	 */
 	final static String[] FORKER_JARS = { "^jna-.*", "^commons-lang-.*", "^commons-io.*", "^jna-platform-.*",
-			"^purejavacomm-.*", "^guava-.*", "^log4j-.*", "^forker-common-.*", "^forker-client-.*", "^forker-daemon-.*", "^pty4j-.*" };
-	final static String[] FORKER_DIRS = { ".*[/\\\\]forker-client[/\\\\].*", ".*[/\\\\]forker-common[/\\\\].*", ".*[/\\\\]forker-daemon[/\\\\].*", ".*[/\\\\]pty4j[/\\\\].*" };
+			"^purejavacomm-.*", "^guava-.*", "^log4j-.*", "^forker-common-.*", "^forker-client-.*", "^forker-daemon-.*",
+			"^pty4j-.*", "^forker-wrapper-.*", "^forker-pty-.*" };
+	final static String[] FORKER_DIRS = { ".*[/\\\\]forker-client[/\\\\].*", ".*[/\\\\]forker-wrapper[/\\\\].*",
+			".*[/\\\\]forker-pty[/\\\\].*", ".*[/\\\\]forker-common[/\\\\].*", ".*[/\\\\]forker-daemon[/\\\\].*",
+			".*[/\\\\]pty4j[/\\\\].*" };
 
 	private final static Forker INSTANCE = new Forker();
 	private static boolean daemonLoaded;
@@ -173,18 +177,51 @@ public class Forker {
 	private static Socket daemonMaintenanceSocket;
 	private static String daemonClasspath;
 
+	/**
+	 * @return instance
+	 * @deprecated
+	 * @see OSCommand
+	 */
 	public static Forker get() {
 		return INSTANCE;
 	}
 
+	/**
+	 * @param io IO
+	 * @param command command
+	 * @return process process
+	 * @throws IOException on any error
+	 */
 	public Process exec(IO io, String command) throws IOException {
 		return exec(io, command, null, null);
 	}
 
+	/**
+	 * @param io IO
+	 * @param command command
+	 * @param envp environment
+	 * @return process
+	 * @throws IOException on any error
+	 * 
+	 * 
+	 * @deprecated
+	 * @see OSCommand
+	 */
 	public Process exec(IO io, String command, String[] envp) throws IOException {
 		return exec(io, command, envp, null);
 	}
 
+	/**
+	 * @param io IO
+	 * @param command command
+	 * @param envp environment
+	 * @param dir working directory
+	 * @return process
+	 * @throws IOException on any error
+	 * 
+	 * @deprecated
+	 * @see OSCommand
+	 */
 	public Process exec(IO io, String command, String[] envp, File dir) throws IOException {
 		if (command.length() == 0)
 			throw new IllegalArgumentException("Empty command");
@@ -196,14 +233,44 @@ public class Forker {
 		return exec(io, cmdarray, envp, dir);
 	}
 
+	/**
+	 * @param io IO
+	 * @param cmdarray command
+	 * @return process
+	 * @throws IOException on any error
+	 * 
+	 * @deprecated
+	 * @see OSCommand
+	 */
 	public Process exec(IO io, String... cmdarray) throws IOException {
 		return exec(io, cmdarray, null, null);
 	}
 
+	/**
+	 * @param io IO
+	 * @param cmdarray command
+	 * @param envp environment
+	 * @return process
+	 * @throws IOException on any error
+	 * 
+	 * @deprecated
+	 * @see OSCommand
+	 */
 	public Process exec(IO io, String[] cmdarray, String[] envp) throws IOException {
 		return exec(io, cmdarray, envp, null);
 	}
 
+	/**
+	 * @param io IO
+	 * @param cmdarray command
+	 * @param envp environment
+	 * @param dir working directory
+	 * @return process
+	 * @throws IOException on any error
+	 * 
+	 * @deprecated
+	 * @see OSCommand
+	 */
 	public Process exec(IO io, String[] cmdarray, String[] envp, File dir) throws IOException {
 		return new ForkerBuilder(cmdarray).io(io).environment(envp).directory(dir).start();
 	}
@@ -215,13 +282,23 @@ public class Forker {
 	 * dependencies.
 	 * 
 	 * This must be called before the daemon is loaded
+	 * 
+	 * @param cp classpath
 	 */
 	public static void setDaemonClasspath(String cp) {
 		if (isDaemonRunning())
 			throw new IllegalStateException("Daemon is already running.");
 		daemonClasspath = cp;
 	}
-	
+
+	/**
+	 * Get the classpath to be used to load the daemon. Attempts will be made to
+	 * determine this automatically, but this may not always work, for example
+	 * when running inside Maven the classpath must be built from the plugin
+	 * dependencies.
+	 * 
+	 * @return classpath
+	 */
 	public static String getDaemonClasspath() {
 		return daemonClasspath == null ? System.getProperty("java.class.path") : daemonClasspath;
 	}
@@ -241,7 +318,7 @@ public class Forker {
 	 * authentication. When <code>true</code>, the daemon started will be
 	 * isolated and only usable by this runtime.
 	 * 
-	 * @param asAdministrator
+	 * @param asAdministrator load daemon as administrator
 	 */
 	public static void loadDaemon(boolean asAdministrator) {
 		if (!daemonLoaded) {
@@ -261,6 +338,8 @@ public class Forker {
 	/**
 	 * Connect to the forker daemon running in unauthenticated mode on a known
 	 * port
+	 * 
+	 * @param port daemon port
 	 */
 	public static void connectUnauthenticatedDaemon(int port) {
 		connectDaemon(new Instance("NOAUTH", port));
@@ -270,6 +349,8 @@ public class Forker {
 	 * Connect to the forker daemon using a known cookie. This is useful for
 	 * debugging, as you can run a separate Forker daemon (as any user) and
 	 * connect to it.
+	 * 
+	 * @param cookie daemon cookiie
 	 */
 	public static void connectDaemon(Instance cookie) {
 		loadDaemon(cookie, null, true);
@@ -290,27 +371,26 @@ public class Forker {
 		loadDaemon(null, effectiveUser, effectiveUser != null);
 	}
 
-	
 	/**
-	 * Get a cut-down classpath that may be used to launch forker from the current classpath.
+	 * Get a cut-down classpath that may be used to launch forker from the
+	 * current classpath.
 	 *  
-	 * @param forkerClasspath
 	 * @return forker classpath
 	 */
 	public static String getForkerClasspath() {
 		return getForkerClasspath(getDaemonClasspath());
 	}
-	
+
 	/**
-	 * Get a cut-down classpath that may be used to launch forker given a complete classpath.
-	 *  
-	 * @param forkerClasspath
-	 * @return forker classpath
+	 * Get a cut-down classpath that may be used to launch forker given a
+	 * complete classpath.
+	 * 
+	 * @param forkerClasspath complete forker classpath
+	 * @return cut down forker classpath
 	 */
 	public static String getForkerClasspath(String forkerClasspath) {
 		StringBuilder cp = new StringBuilder();
-		for (String p : forkerClasspath
-				.split(File.pathSeparator)) {
+		for (String p : forkerClasspath.split(File.pathSeparator)) {
 			File f = new File(p);
 			if (f.isDirectory()) {
 				/*
@@ -435,6 +515,18 @@ public class Forker {
 		}
 	}
 
+	/**
+	 * Get a stream that may be used to read from a file accessible by the user
+	 * that is running the daemon. For example, if the daemon is running as
+	 * administrator, this includes files that are normally only accessible by
+	 * an administrative user.
+	 * 
+	 * @param file
+	 *            file
+	 * @return stream to read from
+	 * @throws IOException
+	 *             on any I/O error
+	 */
 	public static InputStream readFile(File file) throws IOException {
 		Cookie cookie = Cookie.get();
 		Instance instance = cookie.load();
@@ -466,6 +558,20 @@ public class Forker {
 		}
 	}
 
+	/**
+	 * Get a stream that may be used to write to a file accessible by the user
+	 * that is running the daemon. For example, if the daemon is running as
+	 * administrator, this includes files that are normally only accessible by
+	 * an administrative user.
+	 * 
+	 * @param file
+	 *            file
+	 * @param append
+	 *            open and append
+	 * @return stream to write to
+	 * @throws IOException
+	 *             on any I/O error
+	 */
 	public static OutputStream writeFile(File file, boolean append) throws IOException {
 
 		Cookie cookie = Cookie.get();
@@ -546,14 +652,31 @@ public class Forker {
 		}
 	}
 
+	/**
+	 * Get whether the daemon was load successfully and is now running as an
+	 * administrator.
+	 * 
+	 * @return daemon loaded and running as administrator
+	 */
 	public static boolean isDaemonRunningAsAdministrator() {
 		return daemonRunning && daemonAdministrator;
 	}
 
+	/**
+	 * Get whether the daemon was load successfully and is now running.
+	 * 
+	 * @return daemon loaded and running
+	 */
 	public static boolean isDaemonRunning() {
 		return daemonRunning;
 	}
 
+	/**
+	 * Get whether any attempt has been made to load the daemon (if it failed,
+	 * it won't be attempted again).
+	 * 
+	 * @return daemon load attempted
+	 */
 	public static boolean isDaemonLoaded() {
 		return daemonLoaded;
 	}
@@ -566,9 +689,12 @@ public class Forker {
 	 * the program arguments.
 	 * 
 	 * @param args
+	 *            command line arguments
+	 * @throws Exception
+	 *             on any error
 	 */
 	public static void main(String[] args) throws Exception {
-		
+
 		BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
 		String cookieText = reader.readLine();
 		final Instance cookie = new Instance(cookieText);

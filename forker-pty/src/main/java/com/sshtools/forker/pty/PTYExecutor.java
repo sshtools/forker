@@ -1,4 +1,4 @@
-package com.sshtools.forker.daemon;
+package com.sshtools.forker.pty;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -22,10 +22,34 @@ import com.pty4j.windows.WinPty;
 import com.pty4j.windows.WinPtyProcess;
 import com.sshtools.forker.common.Command;
 import com.sshtools.forker.common.IO;
+import com.sshtools.forker.common.IO.DefaultIO;
 import com.sshtools.forker.common.States;
+import com.sshtools.forker.daemon.CommandExecutor;
+import com.sshtools.forker.daemon.ExecuteCheckResult;
+import com.sshtools.forker.daemon.Forker;
+import com.sshtools.forker.daemon.InputThread;
+import com.sshtools.forker.daemon.OutputThread;
 import com.sun.jna.Platform;
 
+/**
+ * A {@link CommandExecutor} that can execute shells and other commands with a
+ * Pseudo Terminal, or PTY. This uses a modified version of the
+ * <a href="https://github.com/traff/pty4j">Pty4J</a> project available
+ * <a href="https://github.com/brett-smith/pty4j">here</a>.
+ * <p>
+ * You would not need to use this class directly, to create a PTY for your
+ * process, use ForkerBuilder with an I/O mode of {@link #PTY}.
+ *
+ */
 public class PTYExecutor implements CommandExecutor {
+
+	public final static class PTYIO extends DefaultIO {
+		public PTYIO() {
+			super("PTY", false, true, true, true);
+		}
+	}
+
+	public final static IO PTY = new PTYIO();
 
 	public PTYExecutor() throws ClassNotFoundException {
 		/*
@@ -55,7 +79,7 @@ public class PTYExecutor implements CommandExecutor {
 
 	@Override
 	public ExecuteCheckResult willHandle(Forker forker, Command command) {
-		return command.getIO() == IO.PTY ? ExecuteCheckResult.YES : ExecuteCheckResult.DONT_CARE;
+		return command.getIO().equals(PTY) ? ExecuteCheckResult.YES : ExecuteCheckResult.DONT_CARE;
 	}
 
 	@Override
@@ -108,12 +132,12 @@ public class PTYExecutor implements CommandExecutor {
 			InputThread inThread = new InputThread(out, din) {
 
 				@Override
-				void kill() {
+				public void kill() {
 					pty.destroy();
 				}
 
 				@Override
-				void setWindowSize(int width, int height) {
+				public void setWindowSize(int width, int height) {
 					pty.setWinSize(new WinSize(width, height));
 				}
 			};

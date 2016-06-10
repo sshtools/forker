@@ -4,6 +4,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,20 +17,23 @@ import com.sshtools.forker.common.OS;
 import com.sshtools.forker.common.States;
 import com.sshtools.forker.common.Util;
 
+/**
+ * {@link CommandExecutor} implementation that uses {@link ProcessBuilder} to
+ * actually execute the process.
+ *
+ */
 public class StandardExecutor implements CommandExecutor {
-
-	public StandardExecutor() {
-	}
 
 	@Override
 	public ExecuteCheckResult willHandle(Forker forker, Command command) {
-		return command.getIO() != IO.PTY ? ExecuteCheckResult.YES : ExecuteCheckResult.DONT_CARE;
+		return Arrays.asList(IO.SINK, IO.INPUT, IO.IO, IO.OUTPUT, IO.DAEMON, IO.DEFAULT).contains(command.getIO())
+				? ExecuteCheckResult.YES : ExecuteCheckResult.DONT_CARE;
 	}
 
 	@Override
 	public void handle(Forker forker, DataInputStream din, final DataOutputStream dout, Command cmd)
 			throws IOException {
-		ProcessBuilder builder = new ProcessBuilder(cmd.getAllArguments());
+		ProcessBuilder builder = new ProcessBuilder();
 
 		// TODO way to control this
 		Map<String, String> builderEnv = builder.environment();
@@ -77,7 +81,7 @@ public class StandardExecutor implements CommandExecutor {
 					}
 				}
 			}
-
+			builder.command(cmd.getAllArguments());
 			final Process process = builder.start();
 			dout.writeInt(States.OK);
 			if (!cmd.isRedirectError()) {
@@ -91,12 +95,12 @@ public class StandardExecutor implements CommandExecutor {
 			// Take any input coming the other way
 			final Thread input = new InputThread(process.getOutputStream(), din) {
 				@Override
-				void kill() {
+				public void kill() {
 					process.destroy();
 				}
 
 				@Override
-				void setWindowSize(int width, int height) {
+				public void setWindowSize(int width, int height) {
 				}
 			};
 			input.start();

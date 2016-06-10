@@ -10,6 +10,11 @@ import com.sshtools.forker.common.States;
 import com.sshtools.forker.daemon.Forker;
 import com.sshtools.forker.daemon.Handler;
 
+/**
+ * A {@link Handler} implementation that is installed in the <i>Forker Daemon</i>
+ * to process ping (and in the future, other) requests from the wrapped
+ * application.
+ */
 public class WrapperHandler implements Handler {
 
 	private long lastPing;
@@ -22,6 +27,11 @@ public class WrapperHandler implements Handler {
 		return 2;
 	}
 
+	/**
+	 * Get when the wrapped application last pinged the wrapper.
+	 * 
+	 * @return last ping
+	 */
 	public long getLastPing() {
 		return lastPing;
 	}
@@ -54,7 +64,7 @@ public class WrapperHandler implements Handler {
 
 	@Override
 	public void stop() {
-		lastPing = 0;		
+		lastPing = 0;
 	}
 
 }

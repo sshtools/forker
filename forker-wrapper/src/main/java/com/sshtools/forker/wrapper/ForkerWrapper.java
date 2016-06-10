@@ -39,10 +39,10 @@ import org.apache.commons.io.output.TeeOutputStream;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.SystemUtils;
 
-import com.pty4j.unix.PtyHelpers;
 import com.sshtools.forker.client.EffectiveUserFactory;
 import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.client.OSCommand;
+import com.sshtools.forker.common.CSystem;
 import com.sshtools.forker.common.Cookie.Instance;
 import com.sshtools.forker.common.IO;
 import com.sshtools.forker.common.OS;
@@ -53,6 +53,31 @@ import com.sshtools.forker.daemon.Forker;
 import com.sshtools.forker.daemon.Forker.Client;
 import com.sshtools.forker.wrapper.JVM.Version;
 
+/**
+ * <i>Forker Wrapper</i> can be used to wrap java applications in a manner
+ * similar to other Java projects such as JSW, YAJSW and more. It provides the
+ * following features :-
+ * <ul>
+ * <li>Multiple ways of configuration, including via command line options,
+ * system properties, configuration files and environment variables.</li>
+ * <li>JVM selection</li>
+ * <li>JVM timeout detection</li>
+ * <li>Run as administrator or another user</li>
+ * <li>Run in background</li>
+ * <li>Capture output to log</li>
+ * <li>Restart on certain exit codes</li>
+ * <li>Run scripts or Java classes on events</li>
+ * <li>Wrap native commands</li>
+ * <li>Embeddable or standalone use</li>
+ * <li>Single instance enforcement</li>
+ * <li>PID file writing</li>
+ * <li>Process priority and affinity</li>
+ * <li>Forker Daemon integration</li>
+ * <li>Wildcard classpaths</li>
+ * <li>.. and more</li>
+ * </ul>
+ *
+ */
 public class ForkerWrapper {
 
 	public final static String EXITED_WRAPPER = "exited-wrapper";
@@ -67,13 +92,13 @@ public class ForkerWrapper {
 			STARTED_FORKER_DAEMON, STARTED_APPLICATION, STARTING_APPLICATION, RESTARTING_APPLICATION,
 			APPPLICATION_STOPPED };
 
-	public static class NameValuePair {
-		private String name;
+	public static class KeyValuePair {
+		private String key;
 		private String value;
 		private boolean bool;
 
-		public NameValuePair(String line) {
-			name = line;
+		public KeyValuePair(String line) {
+			key = line;
 			int idx = line.indexOf('=');
 			int spcidx = line.indexOf(' ');
 			if (spcidx != -1 && (spcidx < idx || idx == -1)) {
@@ -81,14 +106,19 @@ public class ForkerWrapper {
 			}
 			if (idx != -1) {
 				value = line.substring(idx + 1);
-				name = line.substring(0, idx);
+				key = line.substring(0, idx);
 			} else {
 				bool = true;
 			}
 		}
 
+		public KeyValuePair(String key, String value) {
+			this.key = key;
+			this.value = value;
+		}
+
 		public String getName() {
-			return name;
+			return key;
 		}
 
 		public String getValue() {
@@ -98,25 +128,67 @@ public class ForkerWrapper {
 		public boolean isBool() {
 			return bool;
 		}
+
+		public void setValue(String value) {
+			this.value = value;
+		}
 	}
 
 	private String classname;
 	private String[] arguments;
 	private CommandLine cmd;
-	private List<NameValuePair> properties = new ArrayList<>();
+	private List<KeyValuePair> properties = new ArrayList<>();
 	private Forker daemon;
 	private Instance cookie;
 	private Process process;
 	private boolean tempRestartOnExit;
 	private String[] originalArgs;
 	private Logger logger = Logger.getLogger(ForkerWrapper.class.getSimpleName());
+	private boolean inited;
+	private PrintStream defaultOut = System.out;
+	private PrintStream defaultErr = System.err;
+	private InputStream defaultIn = System.in;
 
 	public String[] getArguments() {
 		return arguments;
 	}
 
-	public void setArguments(String[] arguments) {
+	public InputStream getDefaultIn() {
+		return defaultIn;
+	}
+
+	public void setDefaultIn(InputStream defaultIn) {
+		this.defaultIn = defaultIn;
+	}
+
+	public PrintStream getDefaultOut() {
+		return defaultOut;
+	}
+
+	public void setDefaultOut(PrintStream defaultOut) {
+		this.defaultOut = defaultOut;
+	}
+
+	public PrintStream getDefaultErr() {
+		return defaultErr;
+	}
+
+	public void setDefaultErr(PrintStream defaultErr) {
+		this.defaultErr = defaultErr;
+	}
+
+	public void setArguments(String... arguments) {
 		this.arguments = arguments;
+	}
+
+	public void setProperty(String key, Object value) {
+		for (KeyValuePair nvp : properties) {
+			if (nvp.getName().equals(key)) {
+				nvp.setValue(String.valueOf(value));
+				return;
+			}
+		}
+		properties.add(new KeyValuePair(key, String.valueOf(value)));
 	}
 
 	public String getClassname() {
@@ -131,8 +203,23 @@ public class ForkerWrapper {
 		return new File(context, p.getPath()).getCanonicalFile();
 	}
 
+	public void stop() throws InterruptedException {
+		stop(true);
+	}
+
+	public void stop(boolean wait) throws InterruptedException {
+		if (process != null) {
+			process.destroy();
+			if (wait) {
+				process.waitFor();
+			}
+		}
+	}
+
 	@SuppressWarnings("resource")
 	public int start() throws IOException, InterruptedException {
+		if (!inited)
+			init(null);
 
 		/*
 		 * Calculate CWD. All file paths from this point are calculated relative
@@ -169,6 +256,10 @@ public class ForkerWrapper {
 		final int exitWait = Integer.parseInt(getOptionValue("exit-wait", "10"));
 		if (daemonize(cwd, javaExe, forkerClasspath, daemonize, pidfile))
 			return 0;
+
+		if (!OS.setProcname(classname)) {
+			logger.warning(String.format("Failed to set process name to %s", classname));
+		}
 
 		/*
 		 * Create a lock file if 'single instance' was specified
@@ -231,13 +322,15 @@ public class ForkerWrapper {
 					appBuilder.command().add(com.sshtools.forker.client.Forker.class.getName());
 					appBuilder.command().add(String.valueOf(OS.isAdministrator()));
 					appBuilder.command().add(classname);
-					appBuilder.command().addAll(Arrays.asList(arguments));
+					if (arguments != null)
+						appBuilder.command().addAll(Arrays.asList(arguments));
 				} else {
 					/*
 					 * Otherwise we are just running the application directly
 					 */
 					appBuilder.command().add(classname);
-					appBuilder.command().addAll(Arrays.asList(arguments));
+					if (arguments != null)
+						appBuilder.command().addAll(Arrays.asList(arguments));
 				}
 
 				String priStr = getOptionValue("priority", null);
@@ -303,7 +396,7 @@ public class ForkerWrapper {
 					}
 				}
 
-				OutputStream stdout = quiet ? null : System.out;
+				OutputStream stdout = quiet ? null : defaultOut;
 				OutputStream out = null;
 				if (stdout != null) {
 					if (outlog != null) {
@@ -317,7 +410,7 @@ public class ForkerWrapper {
 					out = new SinkOutputStream();
 				}
 
-				OutputStream stderr = quiet ? null : System.err;
+				OutputStream stderr = quiet ? null : defaultErr;
 				OutputStream err = null;
 				if (stderr != null) {
 					if (errlog != null) {
@@ -337,7 +430,7 @@ public class ForkerWrapper {
 				Thread inThread = null;
 				try {
 					if (!daemonize) {
-						inThread = new Thread(copyRunnable(System.in, process.getOutputStream()), "StdIn");
+						inThread = new Thread(copyRunnable(defaultIn, process.getOutputStream()), "StdIn");
 						inThread.setDaemon(true);
 						inThread.start();
 					}
@@ -349,10 +442,10 @@ public class ForkerWrapper {
 						inThread.interrupt();
 					}
 					errThread.interrupt();
-					if (outlog != null && !outlog.equals(System.out)) {
+					if (outlog != null && !outlog.equals(defaultOut)) {
 						outlog.close();
 					}
-					if (errlog != null && errlog != outlog && !errlog.equals(System.err)) {
+					if (errlog != null && errlog != outlog && !errlog.equals(defaultErr)) {
 						errlog.close();
 					}
 					if (daemon != null) {
@@ -361,7 +454,9 @@ public class ForkerWrapper {
 				}
 
 				List<String> restartValues = Arrays.asList(getOptionValue("restart-on", "").split(","));
-				List<String> dontRestartValues = Arrays.asList(getOptionValue("dont-restart-on", "0,1,2").split(","));
+				List<String> dontRestartValues = new ArrayList<String>(
+						Arrays.asList(getOptionValue("dont-restart-on", "0,1,2").split(",")));
+				dontRestartValues.removeAll(restartValues);
 
 				String strret = String.valueOf(retval);
 
@@ -409,7 +504,7 @@ public class ForkerWrapper {
 
 	}
 
-	public List<NameValuePair> getProperties() {
+	public List<KeyValuePair> getProperties() {
 		return properties;
 	}
 
@@ -424,7 +519,7 @@ public class ForkerWrapper {
 			String line = null;
 			while ((line = fin.readLine()) != null) {
 				if (!line.trim().startsWith("#") && !line.trim().equals("")) {
-					properties.add(new NameValuePair(line));
+					properties.add(new KeyValuePair(line));
 				}
 			}
 		} finally {
@@ -544,9 +639,12 @@ public class ForkerWrapper {
 	}
 
 	public void init(CommandLine cmd) {
-		this.cmd = cmd;
-		String levelName = getOptionValue("level", "WARNING");
-		logger.setLevel(Level.parse(levelName));
+		if (!inited) {
+			this.cmd = cmd;
+			String levelName = getOptionValue("level", "WARNING");
+			logger.setLevel(Level.parse(levelName));
+			inited = true;
+		}
 	}
 
 	protected String getJVMPath() throws IOException {
@@ -847,7 +945,7 @@ public class ForkerWrapper {
 				 * files are deleted, but they are needed by the forked process.
 				 */
 				logger.info("Running in background using native fork");
-				int pid = PtyHelpers.getInstance().fork();
+				int pid = CSystem.INSTANCE.fork();
 				if (pid > 0) {
 					if (pidfile != null) {
 						FileUtils.writeLines(makeDirectoryForFile(relativize(cwd, pidfile)),
@@ -1016,7 +1114,7 @@ public class ForkerWrapper {
 	}
 
 	protected boolean getSwitch(String key, boolean defaultValue) {
-		if (cmd.hasOption(key))
+		if (cmd != null && cmd.hasOption(key))
 			return true;
 		if (isBool(key)) {
 			return true;
@@ -1025,7 +1123,7 @@ public class ForkerWrapper {
 	}
 
 	protected boolean isBool(String key) {
-		for (NameValuePair nvp : properties) {
+		for (KeyValuePair nvp : properties) {
 			if (nvp.getName().equals(key))
 				return nvp.isBool();
 		}
@@ -1033,7 +1131,7 @@ public class ForkerWrapper {
 	}
 
 	protected String getProperty(String key) {
-		for (NameValuePair nvp : properties) {
+		for (KeyValuePair nvp : properties) {
 			if (nvp.getName().equals(key))
 				return nvp.getValue();
 		}
@@ -1041,11 +1139,11 @@ public class ForkerWrapper {
 	}
 
 	protected List<String> getOptionValues(String key) {
-		String[] vals = cmd.getOptionValues(key);
+		String[] vals = cmd == null ? null : cmd.getOptionValues(key);
 		if (vals != null)
 			return Arrays.asList(vals);
 		List<String> valList = new ArrayList<>();
-		for (NameValuePair nvp : properties) {
+		for (KeyValuePair nvp : properties) {
 			if (nvp.getName().equals(key) && nvp.getValue() != null) {
 				valList.add(nvp.getValue());
 			}
@@ -1083,7 +1181,7 @@ public class ForkerWrapper {
 	}
 
 	protected String getOptionValue(String key, String defaultValue) {
-		String val = cmd.getOptionValue(key);
+		String val = cmd == null ? null : cmd.getOptionValue(key);
 		if (val == null) {
 			val = System.getProperty("forkerwrapper." + key.replace("-", "."));
 			if (val == null) {
