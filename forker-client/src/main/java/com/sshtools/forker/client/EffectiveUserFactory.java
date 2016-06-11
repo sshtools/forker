@@ -82,7 +82,8 @@ public abstract class EffectiveUserFactory {
 	 * Get an effective user that may be used to execute a process with
 	 * privileges of the provided username.
 	 * 
-	 * @param username username
+	 * @param username
+	 *            username
 	 * @return effective user for username
 	 */
 	public abstract EffectiveUser getUserForUsername(String username);
@@ -151,6 +152,34 @@ public abstract class EffectiveUserFactory {
 
 		@Override
 		public EffectiveUser administrator() {
+			/*
+			 * Wrap the effective user that tests at run time whether it's
+			 * actually needed. This is required be we do not know up front if
+			 * the process will be handled by the daemon
+			 */
+			final EffectiveUser user = createAdministrator();
+			return new EffectiveUser() {
+
+				@Override
+				public void elevate(ForkerBuilder builder, Process process, Command command) {
+					if ((Forker.isDaemonRunning() && !Forker.isDaemonRunningAsAdministrator()
+							&& process instanceof ForkerDaemonProcess)
+							|| (!OS.isAdministrator() && !(process instanceof ForkerDaemonProcess)))
+						user.elevate(builder, process, command);
+
+				}
+
+				@Override
+				public void descend(ForkerBuilder builder, Process process, Command command) {
+					if ((Forker.isDaemonRunning() && !Forker.isDaemonRunningAsAdministrator()
+							&& process instanceof ForkerDaemonProcess)
+							|| (!OS.isAdministrator() && !(process instanceof ForkerDaemonProcess)))
+						user.descend(builder, process, command);
+				}
+			};
+		}
+
+		protected EffectiveUser createAdministrator() {
 			String fixedPassword = getFixedPassword();
 			if (SystemUtils.IS_OS_LINUX) {
 				if (fixedPassword != null) {
@@ -909,6 +938,24 @@ public abstract class EffectiveUserFactory {
 			} catch (Exception e) {
 				throw new RuntimeException(e);
 			}
+		}
+
+	}
+
+	/**
+	 * Effective user that does nothing. May be used when a request has been
+	 * made to run as administrator, but the current process is already
+	 * administrator.
+	 *
+	 */
+	public class NullEffectiveUser implements EffectiveUser {
+
+		@Override
+		public void elevate(ForkerBuilder builder, Process process, Command command) {
+		}
+
+		@Override
+		public void descend(ForkerBuilder builder, Process process, Command command) {
 		}
 
 	}

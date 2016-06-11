@@ -17,15 +17,15 @@ public class OSCommandElevate {
 		 */
 		
 		// The shorthand version
-//		admin("ifconfig");
-//		
-//		// The longhand version
-//		elevate();
-//		try {
-//			run("ifconfig");
-//		} finally {
-//			restrict();
-//		}
+		admin("ifconfig");
+		
+		// The longhand version
+		elevate();
+		try {
+			run("ifconfig");
+		} finally {
+			restrict();
+		}
 
 		/**
 		 * Now run some admin commands with an elevated daemon running. Once the
