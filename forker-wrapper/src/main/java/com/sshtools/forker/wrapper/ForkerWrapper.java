@@ -12,6 +12,7 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
+import java.lang.management.ManagementFactory;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.nio.channels.FileChannel;
@@ -25,6 +26,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import javax.management.MXBean;
+import javax.management.ObjectName;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -78,7 +82,8 @@ import com.sshtools.forker.wrapper.JVM.Version;
  * </ul>
  *
  */
-public class ForkerWrapper {
+@MXBean
+public class ForkerWrapper implements ForkerWrapperMXBean {
 
 	public final static String EXITED_WRAPPER = "exited-wrapper";
 	public final static String EXITING_WRAPPER = "exiting-wrapper";
@@ -148,6 +153,8 @@ public class ForkerWrapper {
 	private PrintStream defaultOut = System.out;
 	private PrintStream defaultErr = System.err;
 	private InputStream defaultIn = System.in;
+	private boolean stopping = false;
+	private boolean preventRestart = false;
 
 	public String[] getArguments() {
 		return arguments;
@@ -156,7 +163,7 @@ public class ForkerWrapper {
 	public InputStream getDefaultIn() {
 		return defaultIn;
 	}
-
+	
 	public void setDefaultIn(InputStream defaultIn) {
 		this.defaultIn = defaultIn;
 	}
@@ -203,17 +210,20 @@ public class ForkerWrapper {
 		return new File(context, p.getPath()).getCanonicalFile();
 	}
 
+	public void restart() throws InterruptedException {
+		restart(true);
+	}
+
+	public void restart(boolean wait) throws InterruptedException {
+		stop(true, true);
+	}
+	
 	public void stop() throws InterruptedException {
 		stop(true);
 	}
 
 	public void stop(boolean wait) throws InterruptedException {
-		if (process != null) {
-			process.destroy();
-			if (wait) {
-				process.waitFor();
-			}
-		}
+		stop(wait, false);
 	}
 
 	@SuppressWarnings("resource")
@@ -260,6 +270,12 @@ public class ForkerWrapper {
 		if (!OS.setProcname(classname)) {
 			logger.warning(String.format("Failed to set process name to %s", classname));
 		}
+		
+		try {
+			ManagementFactory.getPlatformMBeanServer().registerMBean(this, new ObjectName("com.sshtools.forker.wrapper:type=Wrapper"));
+		} catch (Exception e) {
+			throw new IOException("Failed to register MBean.", e);
+		}
 
 		/*
 		 * Create a lock file if 'single instance' was specified
@@ -293,6 +309,7 @@ public class ForkerWrapper {
 			int times = 0;
 			while (true) {
 				times++;
+				stopping = false;
 				process = null;
 
 				boolean quiet = getSwitch("quiet", false);
@@ -434,7 +451,13 @@ public class ForkerWrapper {
 						inThread.setDaemon(true);
 						inThread.start();
 					}
-					copy(process.getInputStream(), out, newBuffer());
+					try {
+						copy(process.getInputStream(), out, newBuffer());
+					}
+					catch(IOException ioe) {
+						if(!stopping)
+							throw ioe;
+					}
 
 					retval = process.waitFor();
 				} finally {
@@ -462,7 +485,7 @@ public class ForkerWrapper {
 
 				event(APPPLICATION_STOPPED, strret, classname);
 
-				boolean restart = (((restartValues.size() == 1 && restartValues.get(0).equals(""))
+				boolean restart = !preventRestart && (((restartValues.size() == 1 && restartValues.get(0).equals(""))
 						|| restartValues.size() == 0 || restartValues.contains(strret))
 						&& !dontRestartValues.contains(strret));
 
@@ -500,6 +523,9 @@ public class ForkerWrapper {
 			if (lockChannel != null) {
 				lockChannel.close();
 			}
+			stopping = false;
+			preventRestart = false;
+			tempRestartOnExit = false;
 		}
 
 	}
@@ -644,6 +670,18 @@ public class ForkerWrapper {
 			String levelName = getOptionValue("level", "WARNING");
 			logger.setLevel(Level.parse(levelName));
 			inited = true;
+		}
+	}
+	
+	protected void stop(boolean wait, boolean restart) throws InterruptedException {
+		stopping = true;
+		preventRestart = !restart;
+		tempRestartOnExit = restart;
+		if (process != null) {
+			process.destroy();
+			if (wait) {
+				process.waitFor();
+			}
 		}
 	}
 
@@ -1079,7 +1117,7 @@ public class ForkerWrapper {
 				public void run() {
 					logger.info("Monitoring pings from wrapped application");
 					try {
-						while (true) {
+						while (!stopping) {
 							if (process != null && daemon != null) {
 								WrapperHandler wrapper = daemon.getHandler(WrapperHandler.class);
 								if (wrapper.getLastPing() > 0
