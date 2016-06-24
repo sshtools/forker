@@ -1,7 +1,11 @@
 package com.sshtools.forker.common;
 
+import java.util.Arrays;
+import java.util.List;
+
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
+import com.sun.jna.Structure;
 import com.sun.jna.platform.win32.Advapi32;
 import com.sun.jna.platform.win32.WinBase.PROCESS_INFORMATION;
 import com.sun.jna.platform.win32.WinBase.STARTUPINFO;
@@ -503,4 +507,28 @@ public interface XAdvapi32 extends Advapi32 {
 	boolean CreateProcessWithLogonW(String lpUsername, String lpDomain, String lpPassword, int dwLogonFlags,
 			String lpApplicationName, String lpCommandLine, int dwCreationFlags, Pointer lpEnvironment,
 			String lpCurrentDirectory, STARTUPINFO lpStartupInfo, PROCESS_INFORMATION lpProcessInfo);
+	
+	public boolean AllocateAndInitializeSid(
+            SID_IDENTIFIER_AUTHORITY pIdentifierAuthority,
+            byte bytSubAuthorityCount,
+            int    intSubAuthority0,
+            int    intSubAuthority1,
+            int    intSubAuthority2,
+            int    intSubAuthority3,
+            int    intSubAuthority4,
+            int    intSubAuthority5,
+            int    intSubAuthority6,
+            int    intSubAuthority7,
+            Pointer pSid
+    );
+	
+	public static class SID_IDENTIFIER_AUTHORITY extends Structure {
+        
+        public byte[] Value = new byte[6];
+
+		@Override
+		protected List<String> getFieldOrder() {
+			return Arrays.asList(new String[] { "Value" });
+		}
+    }
 }
