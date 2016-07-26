@@ -163,7 +163,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	public InputStream getDefaultIn() {
 		return defaultIn;
 	}
-	
+
 	public void setDefaultIn(InputStream defaultIn) {
 		this.defaultIn = defaultIn;
 	}
@@ -217,7 +217,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	public void restart(boolean wait) throws InterruptedException {
 		stop(true, true);
 	}
-	
+
 	public void stop() throws InterruptedException {
 		stop(true);
 	}
@@ -270,9 +270,10 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		if (!OS.setProcname(classname)) {
 			logger.warning(String.format("Failed to set process name to %s", classname));
 		}
-		
+
 		try {
-			ManagementFactory.getPlatformMBeanServer().registerMBean(this, new ObjectName("com.sshtools.forker.wrapper:type=Wrapper"));
+			ManagementFactory.getPlatformMBeanServer().registerMBean(this,
+					new ObjectName("com.sshtools.forker.wrapper:type=Wrapper"));
 		} catch (Exception e) {
 			throw new IOException("Failed to register MBean.", e);
 		}
@@ -399,17 +400,19 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 				OutputStream outlog = null;
 				OutputStream errlog = null;
+				
+				long logDelay = Long.parseLong(getOptionValue("log-write-delay", "50"));
 
 				if (StringUtils.isNotBlank(logpath)) {
 					logger.info(String.format("Writing stdout output to %s", logpath));
-					outlog = new FileOutputStream(makeDirectoryForFile(relativize(cwd, logpath)), !logoverwrite);
+					outlog = new LazyLogStream(logDelay, makeDirectoryForFile(relativize(cwd, logpath)), !logoverwrite);
 				}
 				if (errpath != null) {
 					if (Objects.equals(logpath, errpath))
 						errlog = outlog;
 					else {
 						logger.info(String.format("Writing stderr output to %s", logpath));
-						errlog = new FileOutputStream(makeDirectoryForFile(relativize(cwd, errpath)), !logoverwrite);
+						errlog = new LazyLogStream(logDelay, makeDirectoryForFile(relativize(cwd, errpath)), !logoverwrite);
 					}
 				}
 
@@ -453,9 +456,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					}
 					try {
 						copy(process.getInputStream(), out, newBuffer());
-					}
-					catch(IOException ioe) {
-						if(!stopping)
+					} catch (IOException ioe) {
+						if (!stopping)
 							throw ioe;
 					}
 
@@ -485,9 +487,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 				event(APPPLICATION_STOPPED, strret, classname);
 
-				boolean restart = !preventRestart && (((restartValues.size() == 1 && restartValues.get(0).equals(""))
-						|| restartValues.size() == 0 || restartValues.contains(strret))
-						&& !dontRestartValues.contains(strret));
+				boolean restart = !preventRestart
+						&& (((restartValues.size() == 1 && restartValues.get(0).equals("")) || restartValues.size() == 0
+								|| restartValues.contains(strret)) && !dontRestartValues.contains(strret));
 
 				if (tempRestartOnExit || restart) {
 					try {
@@ -672,7 +674,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			inited = true;
 		}
 	}
-	
+
 	protected void stop(boolean wait, boolean restart) throws InterruptedException {
 		stopping = true;
 		preventRestart = !restart;
@@ -836,6 +838,12 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		options.addOption(new Option("L", "level", true,
 				"Output level for information and debug output from wrapper itself (NOT the application). By default "
 						+ "this is WARNING, with other possible levels being FINE, FINER, FINEST, SEVERE, INFO, ALL."));
+
+		options.addOption(new Option("D", "log-write-delay", true,
+				"In order to be compatible with external log rotation, log files are closed as soon as they are "
+						+ "written to. You can delay the closing of the log file, so that any new log messages that are "
+						+ "written within this time will not need to open the file again. The time is in milliseconds "
+						+ "with a default of 50ms. A value of zero indicates to always immmediately reopen the log."));
 
 		options.addOption(new Option("e", "errors", true,
 				"Where to log stderr. If not specified, will be output on stderr of this process or to 'log' if specified."));
