@@ -23,7 +23,7 @@ public class Util {
 	 * @return parsed command
 	 */
 	public static List<String> parseQuotedString(String command) {
-		List<String> args = new ArrayList<>();
+		List<String> args = new ArrayList<String>();
 		boolean escaped = false;
 		boolean quoted = false;
 		StringBuilder word = new StringBuilder();

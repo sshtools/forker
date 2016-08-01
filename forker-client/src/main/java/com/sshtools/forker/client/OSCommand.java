@@ -158,7 +158,7 @@ public class OSCommand {
 	public static Map<String, String> environment() {
 		Map<String, String> env = environment.get();
 		if (env == null) {
-			env = new HashMap<>();
+			env = new HashMap<String, String>();
 			environment.set(env);
 		}
 		return env;

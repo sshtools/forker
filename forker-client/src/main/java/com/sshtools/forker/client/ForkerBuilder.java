@@ -47,7 +47,7 @@ public class ForkerBuilder {
 	private Command command = new Command();
 	private boolean background;
 	private EffectiveUser effectiveUser;
-	private List<ForkerProcessFactory> processFactories = new ArrayList<>();
+	private List<ForkerProcessFactory> processFactories = new ArrayList<ForkerProcessFactory>();
 
 	/**
 	 * Construct a new builder given a list of command arguments. The first

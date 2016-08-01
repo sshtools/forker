@@ -138,7 +138,7 @@ public class WrapperProcessFactory implements ForkerProcessFactory {
 	}
 
 	private boolean separateProcess;
-	private List<KeyValuePair> options = new ArrayList<>();
+	private List<KeyValuePair> options = new ArrayList<KeyValuePair>();
 
 	public WrapperProcessFactory() {
 	}

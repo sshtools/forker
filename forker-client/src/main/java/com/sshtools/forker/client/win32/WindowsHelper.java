@@ -15,9 +15,17 @@ import com.sun.jna.platform.win32.WinNT.TOKEN_PRIVILEGES;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
 
+/**
+ * TODO
+ */
 public class WindowsHelper {
 
 	
+	/**
+	 * TODO
+	 * 
+	 * @param args
+	 */
 	public static void main(String[] args) {
 		
 		
@@ -29,6 +37,14 @@ public class WindowsHelper {
 		}
 	}
 	
+	/**
+	 * TODO 
+	 * 
+	 * @param username
+	 * @param domain
+	 * @return handle
+	 * @throws IOException
+	 */
 	public static HANDLE createToken(String username, String domain) throws IOException {
 		
 		HANDLEByReference processToken = new HANDLEByReference();

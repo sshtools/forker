@@ -732,7 +732,7 @@ public abstract class EffectiveUserFactory {
 				setRemote = true;
 			} else {
 				List<String> cmd = builder.command();
-				original = new ArrayList<>(cmd);
+				original = new ArrayList<String>(cmd);
 				cmd.clear();
 				cmd.add(OS.getJavaPath());
 				cmd.add("-classpath");

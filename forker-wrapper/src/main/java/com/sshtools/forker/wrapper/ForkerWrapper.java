@@ -142,7 +142,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	private String classname;
 	private String[] arguments;
 	private CommandLine cmd;
-	private List<KeyValuePair> properties = new ArrayList<>();
+	private List<KeyValuePair> properties = new ArrayList<KeyValuePair>();
 	private Forker daemon;
 	private Instance cookie;
 	private Process process;
@@ -760,7 +760,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				}
 			} catch (Exception cnfe) {
 				// Assume to be native command
-				List<String> allArgs = new ArrayList<>();
+				List<String> allArgs = new ArrayList<String>();
 				allArgs.add(cmd);
 				allArgs.addAll(handlerArgs);
 				try {
@@ -1188,7 +1188,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		String[] vals = cmd == null ? null : cmd.getOptionValues(key);
 		if (vals != null)
 			return Arrays.asList(vals);
-		List<String> valList = new ArrayList<>();
+		List<String> valList = new ArrayList<String>();
 		for (KeyValuePair nvp : properties) {
 			if (nvp.getName().equals(key) && nvp.getValue() != null) {
 				valList.add(nvp.getValue());
@@ -1198,7 +1198,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		/*
 		 * System properties, e.g. forker.somevar.1=val, forker.somevar.2=val2
 		 */
-		List<String> varNames = new ArrayList<>();
+		List<String> varNames = new ArrayList<String>();
 		for (Map.Entry<Object, Object> en : System.getProperties().entrySet()) {
 			if (((String) en.getKey()).startsWith("forker." + (key.replace("-", ".")) + ".")) {
 				varNames.add((String) en.getKey());

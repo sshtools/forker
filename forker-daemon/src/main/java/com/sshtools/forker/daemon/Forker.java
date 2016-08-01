@@ -55,8 +55,8 @@ public class Forker {
 	private boolean forked;
 	private boolean isolated;
 	private boolean unauthenticated;
-	private List<Client> clients = new ArrayList<>();
-	private Map<Integer, Handler> handlers = new HashMap<>();
+	private List<Client> clients = new ArrayList<Client>();
+	private Map<Integer, Handler> handlers = new HashMap<Integer, Handler>();
 
 	/**
 	 * Constructor

@@ -161,7 +161,7 @@ public class JVM {
 	 * @return list of available JVMs
 	 */
 	public static List<JVM> jvms() {
-		List<JVM> jvms = new ArrayList<>();
+		List<JVM> jvms = new ArrayList<JVM>();
 		if (SystemUtils.IS_OS_LINUX) {
 			try {
 				for (String j : OSCommand.runCommandAndCaptureOutput("update-alternatives", "--list", "java")) {

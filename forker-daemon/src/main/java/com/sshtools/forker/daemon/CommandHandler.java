@@ -20,7 +20,7 @@ import com.sshtools.forker.common.States;
  */
 public class CommandHandler implements Handler {
 
-	private List<CommandExecutor> executors = new ArrayList<>();
+	private List<CommandExecutor> executors = new ArrayList<CommandExecutor>();
 
 	/**
 	 * Constructor

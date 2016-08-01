@@ -94,7 +94,7 @@ public interface IO {
 		private boolean autoFlushStdIn;
 		private boolean allowStdErrRedirect;
 
-		private static Map<String, IO> ios = new HashMap<>();
+		private static Map<String, IO> ios = new HashMap<String, IO>();
 		private static boolean iosLoaded;
 
 		/**

@@ -55,7 +55,7 @@ public class WinRunAs extends JFrame {
 	 */
 	public static int uac(String[] command) throws IOException {
 		// http://mark.koli.ch/uac-prompt-from-java-createprocess-error740-the-requested-operation-requires-elevation
-		List<String> args = new ArrayList<>(Arrays.asList(command));
+		List<String> args = new ArrayList<String>(Arrays.asList(command));
 		String lpFile = args.remove(0);
 		INT_PTR child = Shell32.INSTANCE.ShellExecute(null, "runas", lpFile, getEncodedParameterString(args), null, 0);
 		return child.intValue();
@@ -176,7 +176,7 @@ public class WinRunAs extends JFrame {
 						}
 					});
 
-					final List<Boolean> stop = new ArrayList<>();
+					final List<Boolean> stop = new ArrayList<Boolean>();
 
 					try {
 

@@ -25,7 +25,7 @@ public class Command {
 	private String runAs = "";
 	private IO io = IO.IO;
 	private Priority priority = null;
-	private List<Integer> affinity = new ArrayList<>();
+	private List<Integer> affinity = new ArrayList<Integer>();
 
 	/**
 	 * Constructor
@@ -247,7 +247,7 @@ public class Command {
 	 * @return all arguments
 	 */
 	public List<String> getAllArguments() {
-		List<String> a = new ArrayList<>(arguments);
+		List<String> a = new ArrayList<String>(arguments);
 		if (priority != null) {
 			if (SystemUtils.IS_OS_UNIX) {
 				a.add(0, "nice");
