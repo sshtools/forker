@@ -25,7 +25,7 @@ And your dependency configuration :-
 	<dependency>
 		<groupId>com.sshtools</groupId>
 		<artifactId>forker-wrapper</artifactId>
-		<version>1.2.SNAPSHOT</version>
+		<version>1.2</version>
 	</dependency>
 </dependencies>
 ```
