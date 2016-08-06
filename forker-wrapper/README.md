@@ -11,9 +11,9 @@ To include the Forker Wrapper in your project, you will currently need the follo
 ```xml
 <repositories>
 	<repository>
-		<id>opensource-snapshots</id>
-		<url>http://artifactory.javassh.com/opensource-snapshots</url>
-		<name>SSHTOOLS Hosted Open Source Snapshots</name>
+		<id>opensource-releases</id>
+		<url>http://artifactory.javassh.com/opensource-releases</url>
+		<name>SSHTOOLS Hosted Open Source Releases</name>
 	</repository>
 </repositories>
 ```
