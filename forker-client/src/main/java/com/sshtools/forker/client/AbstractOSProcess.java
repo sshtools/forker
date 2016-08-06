@@ -6,7 +6,12 @@ import java.util.Map;
 
 import org.apache.commons.lang.SystemUtils;
 
-public abstract class AbstractOSProcess extends Process {
+import com.sshtools.forker.common.Util;
+
+/**
+ * Abstract implementation for processes that use OS calls.
+ */
+public abstract class AbstractOSProcess extends AbstractForkerProcess {
 
 	protected String buildCommand(final ForkerBuilder builder) {
 		// This will run in a shell, so we need to escape the
@@ -17,12 +22,12 @@ public abstract class AbstractOSProcess extends Process {
 			if (builder.background()) {
 				bui.append("start /b");
 
-				if(builder.directory() != null) {
+				if (builder.directory() != null) {
 					bui.append(" /d\"");
 					bui.append(Util.escapeDoubleQuotes(builder.directory().getAbsolutePath()));
 					bui.append("\"");
 				}
-				
+
 				if (isLessThanWindows7()) {
 					// http://stackoverflow.com/questions/154075/using-the-dos-start-command-with-parameters-passed-to-the-started-program
 					// < Windows 7, if the first argument is quoted its the
@@ -30,13 +35,13 @@ public abstract class AbstractOSProcess extends Process {
 					bui.append(" \"\"");
 				}
 			} else {
-				bui.append("cmd /c");				
-				if(builder.directory() != null) {
+				bui.append("cmd /c");
+				if (builder.directory() != null) {
 					bui.append(" \"cd \"");
 					bui.append(Util.escapeDoubleQuotes(builder.directory().getAbsolutePath()));
 					bui.append("\" && ");
 				}
-				
+
 			}
 			for (int i = 0; i < builder.command().size(); i++) {
 				if (i == 0 && !builder.background()) {
@@ -48,14 +53,12 @@ public abstract class AbstractOSProcess extends Process {
 					bui.append("\"");
 				}
 			}
-			
-			if(!builder.background() && builder.directory() != null) {
-				bui.append("\"");				
+
+			if (!builder.background() && builder.directory() != null) {
+				bui.append("\"");
 			}
-		} else if (SystemUtils.IS_OS_MAC_OSX || SystemUtils.IS_OS_LINUX
-				|| SystemUtils.IS_OS_UNIX) {
-			for (Map.Entry<String, String> en : builder.environment()
-					.entrySet()) {
+		} else if (SystemUtils.IS_OS_MAC_OSX || SystemUtils.IS_OS_LINUX || SystemUtils.IS_OS_UNIX) {
+			for (Map.Entry<String, String> en : builder.environment().entrySet()) {
 				if (bui.length() > 0) {
 					bui.append(";");
 				}
@@ -76,7 +79,7 @@ public abstract class AbstractOSProcess extends Process {
 			if (bui.length() > 0) {
 				bui.append(";");
 			}
-			for (String a : builder.command()) {
+			for (String a : builder.getAllArguments()) {
 				bui.append(" '");
 				bui.append(Util.escapeSingleQuotes(a));
 				bui.append("'");
@@ -103,10 +106,8 @@ public abstract class AbstractOSProcess extends Process {
 	};
 
 	private boolean isLessThanWindows7() {
-		return SystemUtils.IS_OS_WINDOWS_95 || SystemUtils.IS_OS_WINDOWS_98
-				|| SystemUtils.IS_OS_WINDOWS_XP
-				|| SystemUtils.IS_OS_WINDOWS_2000
-				|| SystemUtils.IS_OS_WINDOWS_ME || SystemUtils.IS_OS_WINDOWS_NT;
+		return SystemUtils.IS_OS_WINDOWS_95 || SystemUtils.IS_OS_WINDOWS_98 || SystemUtils.IS_OS_WINDOWS_XP
+				|| SystemUtils.IS_OS_WINDOWS_2000 || SystemUtils.IS_OS_WINDOWS_ME || SystemUtils.IS_OS_WINDOWS_NT;
 	}
 
 	@Override

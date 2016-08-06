@@ -7,7 +7,7 @@
 	<parent>
 		<groupId>com.sshtools</groupId>
 		<artifactId>forker</artifactId>
-		<version>1.1</version>
+		<version>1.2</version>
 		<relativePath>..</relativePath>
 	</parent>
 
@@ -36,6 +36,21 @@
 		<dependency>
 			<groupId>${project.groupId}</groupId>
 			<artifactId>forker-client</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>forker-daemon</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>forker-pty</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>forker-wrapper</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 	</dependencies>

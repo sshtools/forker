@@ -1,33 +1,20 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-	
-	
+
+
 	<properties>
 		<maven.compiler.target>1.6</maven.compiler.target>
 		<maven.compiler.source>1.6</maven.compiler.source>
 	</properties>
-	
+
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.sshtools</groupId>
 	<artifactId>forker</artifactId>
-	<version>1.1</version>
+	<version>1.2</version>
 	<name>Forker</name>
-	<description>Forker is a set of utilities and helpers for launching processes in the most efficient way
-
-Used as a replacement to ProcessBuilder and Runtime.exec(), it uses a number of different techniques to reduce the memory impact of these operations, as well as a number of utilities for common process execution requirements, and facilities  to run processes in the background and with elevated privileges.
-
-Depending on whether input, output, or I/O is needed (which should be provided as hint to the API), popen, system or a standard process will be used.
-
-When both input and output to a process is required, and you want low fork costs, a separate optional daemon process may be used. The daemon waits for a command and set of arguments , and executes them. Because the virtual machine for the daemon is MUCH smaller, the impact of the fork is greatly lessened.  
-</description>
-	<url>http://www.nervepoint.com</url>
+	<description>Forker is a set of utilities and helpers for executing operating system commands.</description>
+	<url>http://www.sshtools.com</url>
 	<packaging>pom</packaging>
-
-	<parent>
-		<groupId>org.sonatype.oss</groupId>
-		<artifactId>oss-parent</artifactId>
-		<version>7</version>
-	</parent>
 
 	<licenses>
 		<license>
@@ -38,7 +25,7 @@ When both input and output to a process is required, and you want low fork costs
 	</licenses>
 	<scm>
 		<url>https://github.com/sshtools/forker</url>
-		<connection>https://github.com/sshtools/forker.git</connection>
+		<connection>scm:git:https://github.com/sshtools/forker.git</connection>
 	</scm>
 	<developers>
 		<developer>
@@ -47,15 +34,22 @@ When both input and output to a process is required, and you want low fork costs
 			<email>brett@nervepoint.com</email>
 		</developer>
 	</developers>
-	
+
 	<distributionManagement>
 		<snapshotRepository>
 			<uniqueVersion>true</uniqueVersion>
 			<id>opensource-snapshots</id>
-			<name>Nervepoint Host Opensource Snapshots</name>
+			<name>SSHTOOLS Opensource Snapshots</name>
 			<url>http://artifactory.javassh.com/opensource-snapshots</url>
 			<layout>default</layout>
 		</snapshotRepository>
+		<repository>
+			<uniqueVersion>true</uniqueVersion>
+			<id>opensource-releases</id>
+			<name>SSHTOOLS Opensource Releases</name>
+			<url>http://artifactory.javassh.com/opensource-releases</url>
+			<layout>default</layout>
+		</repository>
 	</distributionManagement>
 
 	<modules>
@@ -63,6 +57,9 @@ When both input and output to a process is required, and you want low fork costs
 		<module>forker-daemon</module>
 		<module>forker-client</module>
 		<module>forker-examples</module>
+		<module>forker-wrapper</module>
+		<module>forker-pty</module>
+		<module>forker-assembly</module>
 	</modules>
 
 	<dependencies>
@@ -73,12 +70,7 @@ When both input and output to a process is required, and you want low fork costs
 			<version>4.7</version>
 			<scope>test</scope>
 		</dependency>
-		<dependency>
-			<groupId>log4j</groupId>
-			<artifactId>log4j</artifactId>
-			<version>1.2.16</version>
-			<scope>test</scope>
-		</dependency>
+
 	</dependencies>
 
 	<profiles>
@@ -112,6 +104,68 @@ When both input and output to a process is required, and you want low fork costs
 	</profiles>
 
 	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<configuration>
+					<archive>
+						<manifest>
+							<addClasspath>true</addClasspath>
+						</manifest>
+					</archive>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<source>1.6</source>
+					<target>1.6</target>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-javadoc-plugin</artifactId>
+				<version>2.10.3</version>
+				<executions>
+					<execution>
+						<id>release</id>
+						<phase>package</phase>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-deploy-plugin</artifactId>
+				<version>2.8.2</version>
+				<executions>
+					<execution>
+						<id>default-deploy</id>
+						<phase>deploy</phase>
+						<goals>
+							<goal>deploy</goal>
+						</goals>
+						<configuration>
+							<skip>true</skip>
+						</configuration>
+					</execution>
+					<execution>
+						<id>release</id>
+						<phase>deploy</phase>
+						<goals>
+							<goal>deploy</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+
 		<pluginManagement>
 			<plugins>
 				<plugin>

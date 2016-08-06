@@ -5,7 +5,7 @@ import org.apache.commons.lang.SystemUtils;
 
 import com.sshtools.forker.client.EffectiveUserFactory;
 import com.sshtools.forker.client.ForkerBuilder;
-import com.sshtools.forker.client.ForkerBuilder.IO;
+import com.sshtools.forker.common.IO;
 
 public class RunAsUser {
 
@@ -15,7 +15,7 @@ public class RunAsUser {
 		String username = "testuser2";
 		
 		ForkerBuilder builder = new ForkerBuilder().effectiveUser(EffectiveUserFactory.getDefault().getUserForUsername(username)).
-				io(IO.IO);
+				io(IO.IO).redirectErrorStream(true);
 		
 		if(SystemUtils.IS_OS_LINUX) {
 			// The linux example tries to list the users home directory
@@ -26,7 +26,7 @@ public class RunAsUser {
 		}
 		
 		Process p = builder.start();
-		String string = IOUtils.toString(p.getInputStream());
-		System.out.println(string);
+		IOUtils.copy(p.getInputStream(), System.out);
+		System.out.println(" (" + p.waitFor() + ")");
 	}
 }

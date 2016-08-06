@@ -1,0 +1,4 @@
+com.sshtools.forker.daemon.CommandHandler
+com.sshtools.forker.daemon.ControlHandler
+com.sshtools.forker.daemon.OSInputStreamHandler
+com.sshtools.forker.daemon.OSOutputStreamHandler

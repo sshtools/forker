@@ -6,9 +6,15 @@ import java.io.OutputStream;
 
 import com.sshtools.forker.client.AbstractOSProcess;
 import com.sshtools.forker.client.ForkerBuilder;
-import com.sshtools.forker.client.ForkerBuilder.IO;
+import com.sshtools.forker.common.CSystem;
+import com.sshtools.forker.common.IO;
 import com.sun.jna.Memory;
 
+/**
+ * Use the C call <b>popen(cmd, mode)</b>. The advantage of this over
+ * {@link SystemProcess} is that I/O streams are supported, but <b>only in one
+ * direction at a time</b>. 
+ */
 public class POpenProcess extends AbstractOSProcess {
 
 	private CSystem.FILE fd;
@@ -17,17 +23,23 @@ public class POpenProcess extends AbstractOSProcess {
 	private InputStream in;
 	private OutputStream out;
 
+	/**
+	 * Constructor
+	 * 
+	 * @param builder
+	 *            builder
+	 * @throws IOException on any error
+	 */
 	public POpenProcess(final ForkerBuilder builder) throws IOException {
 		this.builder = builder;
-		if(builder.effectiveUser() == null)
+		if (builder.effectiveUser() == null)
 			doBuildCommand(builder);
 		else {
-			builder.effectiveUser().elevate(builder, this);
+			builder.effectiveUser().elevate(builder, this, null);
 			try {
 				doBuildCommand(builder);
-			}
-			finally {
-				builder.effectiveUser().descend();				
+			} finally {
+				builder.effectiveUser().descend(builder, this, null);
 			}
 		}
 		if (fd == null) {
@@ -62,8 +74,7 @@ public class POpenProcess extends AbstractOSProcess {
 				}
 
 				@Override
-				public void write(byte[] b, int off, int len)
-						throws IOException {
+				public void write(byte[] b, int off, int len) throws IOException {
 					if (closed) {
 						throw new IOException("Closed.");
 					}
@@ -178,7 +189,6 @@ public class POpenProcess extends AbstractOSProcess {
 	}
 
 	private void doBuildCommand(final ForkerBuilder builder) {
-		fd = CSystem.INSTANCE.popen(buildCommand(builder),
-				builder.io() == IO.INPUT ? "r" : "w");
+		fd = CSystem.INSTANCE.popen(buildCommand(builder), builder.io() == IO.INPUT ? "r" : "w");
 	}
 }
