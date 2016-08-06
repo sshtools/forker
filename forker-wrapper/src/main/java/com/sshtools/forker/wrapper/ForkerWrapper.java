@@ -628,7 +628,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 									+ "1. Command line options.\n" + "2. Configuration files (see -c and -C options)\n"
 									+ "3. Java system properties. The key of which is option name prefixed with   'forker.' and with - replaced with a dot (.)\n"
 									+ "4. Environment variables. The key of which is the option name prefixed with   'FORKER_' (in upper case) with - replaced with _\n\n",
-							opts, 2, 5, "\nProvided by SSHTools.", true);
+							opts, 2, 5, "\nProvided by SSHTOOLS Limited.", true);
 					System.exit(1);
 				} else {
 					Option opt = opts.getOption(optionName);

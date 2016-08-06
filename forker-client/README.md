@@ -15,7 +15,7 @@ To include the Forker utilities in your project, you will currently need the fol
 	<repository>
 		<id>opensource-snapshots</id>
 		<url>http://artifactory.javassh.com/opensource-snapshots</url>
-		<name>SSHTools Hosted Open Source Snapshots</name>
+		<name>SSHTOOLS Open Source Snapshots</name>
 	</repository>
 </repositories>
 ```

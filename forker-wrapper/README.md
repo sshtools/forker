@@ -13,7 +13,7 @@ To include the Forker Wrapper in your project, you will currently need the follo
 	<repository>
 		<id>opensource-snapshots</id>
 		<url>http://artifactory.javassh.com/opensource-snapshots</url>
-		<name>SSHTools Hosted Open Source Snapshots</name>
+		<name>SSHTOOLS Hosted Open Source Snapshots</name>
 	</repository>
 </repositories>
 ```
