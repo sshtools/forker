@@ -547,7 +547,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			String line = null;
 			while ((line = fin.readLine()) != null) {
 				if (!line.trim().startsWith("#") && !line.trim().equals("")) {
-					properties.add(new KeyValuePair(line));
+					properties.add(new KeyValuePair(ReplacementUtils.replaceSystemProperties(line)));
 				}
 			}
 		} finally {
@@ -555,6 +555,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
+	
 	public static String getAppName() {
 		String an = System.getenv("FORKER_APPNAME");
 		return an == null || an.length() == 0 ? ForkerWrapper.class.getName() : an;
