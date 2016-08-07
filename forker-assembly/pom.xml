@@ -81,7 +81,7 @@
 					<descriptors>
 						<descriptor>src/main/assembly/bin/bin.xml</descriptor>
 					</descriptors>
-					<finalName>forker</finalName>
+					<finalName>forker-${project.version}</finalName>
 				</configuration>
 				<executions>
 					<execution>
