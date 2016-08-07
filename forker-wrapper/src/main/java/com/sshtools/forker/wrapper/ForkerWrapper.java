@@ -564,7 +564,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return an == null || an.length() == 0 ? ForkerWrapper.class.getName() : an;
 	}
 
-	public static void main(String[] args) throws Exception {
+	public static void main(String[] args) {
 		ForkerWrapper wrapper = new ForkerWrapper();
 		wrapper.originalArgs = args;
 
@@ -660,14 +660,21 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			}
 
 			wrapper.process();
-		} catch (Exception e) {
+		} catch (Throwable e) {
 			System.err.println(String.format("%s: %s\n", wrapper.getClass().getName(), e.getMessage()));
 			formatter.printUsage(new PrintWriter(System.err, true), 80,
 					String.format("%s  <application.class.name> [<argument> [<argument> ..]]", getAppName()));
 			System.exit(1);
 		}
 
-		System.exit(wrapper.start());
+		try {
+			System.exit(wrapper.start());
+		} catch (Throwable e) {
+			System.err.println(String.format("%s: %s\n", wrapper.getClass().getName(), e.getMessage()));
+			formatter.printUsage(new PrintWriter(System.err, true), 80,
+					String.format("%s  <application.class.name> [<argument> [<argument> ..]]", getAppName()));
+			System.exit(1);
+		} 
 	}
 
 	public void init(CommandLine cmd) {
