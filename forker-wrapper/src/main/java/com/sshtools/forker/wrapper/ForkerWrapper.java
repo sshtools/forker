@@ -267,6 +267,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		if (daemonize(cwd, javaExe, forkerClasspath, daemonize, pidfile))
 			return 0;
 
+		/**
+		 * LDP: Does not work on OSX. Prevented setProcname from throwing an exception
+		 */
 		if (!OS.setProcname(classname)) {
 			logger.warning(String.format("Failed to set process name to %s", classname));
 		}

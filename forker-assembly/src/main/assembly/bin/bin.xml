@@ -24,6 +24,14 @@
 				<include>*.java</include>
 			</includes>
 		</fileSet>
+		
+		<fileSet>
+			<outputDirectory>forker-${project.version}</outputDirectory>
+			<directory>notes</directory>
+			<includes>
+				<include>*</include>
+			</includes>
+		</fileSet>
 	</fileSets>
 
 	<files>

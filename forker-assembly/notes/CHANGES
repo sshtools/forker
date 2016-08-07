@@ -1,0 +1,14 @@
+=================
+=  CHANGE LOG   =
+=================
+
+Forker 1.3 - TBC
+
+Bug Fixes
+	o setProcname a.k.a prctl is not available on OSX so don't try and call it.
+    o setProcname throws UnsupportedOperationException breaking cross-platform compatibility.
+
+=================
+=  HISTORY      =
+=================
+
