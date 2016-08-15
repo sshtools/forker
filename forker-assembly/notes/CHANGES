@@ -8,6 +8,7 @@ Bug Fixes
 	o setProcname a.k.a prctl is not available on OSX so don't try and call it.
     o setProcname throws UnsupportedOperationException breaking cross-platform compatibility.
     o ForkerWrapper main should capture any exception and log.
+    o Ensure all sockets are connected on 127.0.0.1 loopback as previous use of getLocalHost appears inconsistent and caused execution failures.
 
 =================
 =  HISTORY      =
