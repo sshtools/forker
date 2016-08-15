@@ -4,11 +4,13 @@ import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -176,6 +178,7 @@ public class Forker {
 	private static boolean daemonAdministrator;
 	private static Socket daemonMaintenanceSocket;
 	private static String daemonClasspath;
+	private static boolean wrapped;
 
 	/**
 	 * @return instance
@@ -682,6 +685,15 @@ public class Forker {
 	}
 
 	/**
+	 * Get whether the application is currently running via the wrapper.
+	 * 
+	 * @return wrapper
+	 */
+	public static boolean isWrapped() {
+		return wrapped;
+	}
+
+	/**
 	 * This is used when an application is launched from Forker Wrapper. The
 	 * daemon cookie is passed in as the first line of stdin. The first argument
 	 * is a boolean indicating if the daemon is running as an administrator, the
@@ -700,11 +712,24 @@ public class Forker {
 		final Instance cookie = new Instance(cookieText);
 		Cookie.get().set(cookie);
 		daemonLoaded = true;
+		wrapped = true;
 		daemonRunning = true;
 		List<String> argList = new ArrayList<String>(Arrays.asList(args));
 		daemonAdministrator = "true".equals(argList.remove(0));
 		String classname = argList.remove(0);
 		Class<?> clazz = Class.forName(classname);
+		
+		// Temporary DEUG code
+		try {
+		    FileWriter fw = new FileWriter(new File(new File(System.getProperty("java.io.tmpdir")), "forker-socket.tmp"));
+		    PrintWriter pw = new PrintWriter(fw);
+		    pw.println("WILL CONNECT TO " + InetAddress.getLocalHost() + ":"+ cookie.getPort());
+		    pw.close();
+		}
+		catch(Exception e) {
+		    
+		}
+		
 
 		final Socket daemonSocket = new Socket(InetAddress.getLocalHost(), cookie.getPort());
 

@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileOutputStream;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -15,6 +16,7 @@ import java.io.RandomAccessFile;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.net.InetAddress;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
@@ -268,7 +270,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			return 0;
 
 		/**
-		 * LDP: Does not work on OSX. Prevented setProcname from throwing an exception
+		 * LDP: Does not work on OSX. Prevented setProcname from throwing an
+		 * exception
 		 */
 		if (!OS.setProcname(classname)) {
 			logger.warning(String.format("Failed to set process name to %s", classname));
@@ -311,6 +314,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 			int retval = 2;
 			int times = 0;
+			int lastRetVal = -1;
 			while (true) {
 				times++;
 				stopping = false;
@@ -329,6 +333,13 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 				for (String val : jvmArgs) {
 					appBuilder.command().add(val);
+				}
+				
+				if(!getSwitch("no-info", false)) {
+					if(lastRetVal > -1) {
+						appBuilder.command().add(String.format("-Dforker.info.lastExitCode=%d", lastRetVal));
+					}
+					appBuilder.command().add(String.format("-Dforker.info.attempts=%d", times));
 				}
 
 				/*
@@ -387,7 +398,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 				logger.info(String.format("Starting process %s", appBuilder.command()));
 
-				event(STARTING_APPLICATION, String.valueOf(times), cwd.getAbsolutePath(), classname);
+				event(STARTING_APPLICATION, String.valueOf(times), cwd.getAbsolutePath(), classname,
+						String.valueOf(lastRetVal));
 				process = appBuilder.start();
 				event(STARTED_APPLICATION, classname);
 
@@ -403,7 +415,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 				OutputStream outlog = null;
 				OutputStream errlog = null;
-				
+
 				long logDelay = Long.parseLong(getOptionValue("log-write-delay", "50"));
 
 				if (StringUtils.isNotBlank(logpath)) {
@@ -415,7 +427,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 						errlog = outlog;
 					else {
 						logger.info(String.format("Writing stderr output to %s", logpath));
-						errlog = new LazyLogStream(logDelay, makeDirectoryForFile(relativize(cwd, errpath)), !logoverwrite);
+						errlog = new LazyLogStream(logDelay, makeDirectoryForFile(relativize(cwd, errpath)),
+								!logoverwrite);
 					}
 				}
 
@@ -503,6 +516,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 						event(RESTARTING_APPLICATION, classname, String.valueOf(waitSec));
 						logger.warning(String.format("Process exited with %d, attempting restart in %d seconds", retval,
 								waitSec));
+						lastRetVal = retval;
 						Thread.sleep(waitSec * 1000);
 					} catch (NumberFormatException nfe) {
 						event(RESTARTING_APPLICATION, classname, "0");
@@ -558,7 +572,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
-	
 	public static String getAppName() {
 		String an = System.getenv("FORKER_APPNAME");
 		return an == null || an.length() == 0 ? ForkerWrapper.class.getName() : an;
@@ -674,7 +687,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			formatter.printUsage(new PrintWriter(System.err, true), 80,
 					String.format("%s  <application.class.name> [<argument> [<argument> ..]]", getAppName()));
 			System.exit(1);
-		} 
+		}
 	}
 
 	public void init(CommandLine cmd) {
@@ -841,6 +854,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 						+ "means the forker daemon will not be used and so hang detection and some other "
 						+ "features will not be available."));
 
+		options.addOption(new Option("I", "no-info", false,
+				"Ordinary, forker will set some system properties in the wrapped application. These "
+						+ "communicate things such as the last exited code (forker.info.lastExitCode), number "
+						+ "of times start via (forker.info.attempts) and more. This option prevents those being set."));
+
 		options.addOption(new Option("o", "log-overwrite", false, "Overwriite logfiles instead of appending."));
 
 		options.addOption(new Option("l", "log", true,
@@ -971,6 +989,19 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		permi.setReject(getOptionValues("reject-execute"));
 
 		cookie = daemon.prepare();
+		
+		
+		// Temporary DEUG code
+        try {
+            FileWriter fw = new FileWriter(new File(new File(System.getProperty("java.io.tmpdir")), "forker-daemon.tmp"));
+            PrintWriter pw = new PrintWriter(fw);
+            pw.println("WILL LISTEN ON " + InetAddress.getLocalHost() + ":"+ cookie.getPort());
+            pw.close();
+        }
+        catch(Exception e) {
+        }
+		
+		
 		event(STARTING_FORKER_DAEMON, cookie.getCookie(), String.valueOf(cookie.getPort()));
 		new Thread() {
 
