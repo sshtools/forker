@@ -119,7 +119,7 @@ public class Cookie {
 		 */
 		public boolean isRunning() {
 			try {
-				final Socket s = new Socket(InetAddress.getLocalHost(), port);
+				final Socket s = new Socket("127.0.0.1", port);
 				try {
 					s.setSoTimeout(1000);
 					DataOutputStream dout = new DataOutputStream(s.getOutputStream());

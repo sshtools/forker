@@ -12,6 +12,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -483,7 +484,7 @@ public class Forker {
 							 */
 							daemonMaintenanceSocket = null;
 							try {
-								daemonMaintenanceSocket = new Socket(InetAddress.getLocalHost(), cookie.getPort());
+								daemonMaintenanceSocket = new Socket("127.0.0.1", cookie.getPort());
 								DataOutputStream dos = new DataOutputStream(daemonMaintenanceSocket.getOutputStream());
 								dos.writeUTF(cookie.getCookie());
 								dos.writeByte(1);
@@ -533,7 +534,7 @@ public class Forker {
 	public static InputStream readFile(File file) throws IOException {
 		Cookie cookie = Cookie.get();
 		Instance instance = cookie.load();
-		final Socket daemonSocket = new Socket(InetAddress.getLocalHost(), instance.getPort());
+		final Socket daemonSocket = new Socket("127.0.0.1", instance.getPort());
 		try {
 			DataOutputStream dos = new DataOutputStream(daemonSocket.getOutputStream());
 			dos.writeUTF(instance.getCookie());
@@ -579,7 +580,7 @@ public class Forker {
 
 		Cookie cookie = Cookie.get();
 		Instance instance = cookie.load();
-		final Socket daemonSocket = new Socket(InetAddress.getLocalHost(), instance.getPort());
+		final Socket daemonSocket = new Socket("127.0.0.1", instance.getPort());
 		try {
 			final DataOutputStream dos = new DataOutputStream(daemonSocket.getOutputStream());
 			dos.writeUTF(instance.getCookie());
@@ -710,7 +711,21 @@ public class Forker {
 		BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
 		String cookieText = reader.readLine();
 		final Instance cookie = new Instance(cookieText);
+		
 		Cookie.get().set(cookie);
+		
+		
+		// Temporary DEUG code
+				try {
+				    FileWriter fw = new FileWriter(new File(new File("/Users/lee/.hypersocket"), "forker-socket.tmp"));
+				    PrintWriter pw = new PrintWriter(fw);
+				    pw.println("WILL CONNECT TO " + cookie.getPort());
+				    pw.close();
+				}
+				catch(Exception e) {
+				    
+				}
+				
 		daemonLoaded = true;
 		wrapped = true;
 		daemonRunning = true;
@@ -719,20 +734,32 @@ public class Forker {
 		String classname = argList.remove(0);
 		Class<?> clazz = Class.forName(classname);
 		
-		// Temporary DEUG code
-		try {
-		    FileWriter fw = new FileWriter(new File(new File(System.getProperty("java.io.tmpdir")), "forker-socket.tmp"));
-		    PrintWriter pw = new PrintWriter(fw);
-		    pw.println("WILL CONNECT TO " + InetAddress.getLocalHost() + ":"+ cookie.getPort());
-		    pw.close();
-		}
-		catch(Exception e) {
-		    
-		}
+		
 		
 
-		final Socket daemonSocket = new Socket(InetAddress.getLocalHost(), cookie.getPort());
-
+		final Socket daemonSocket = new Socket();
+		long started = System.currentTimeMillis();
+		
+		while(true) {
+			try {
+				daemonSocket.connect(new InetSocketAddress("127.0.0.1", cookie.getPort()), 5000);
+			} catch (Exception e) {
+				if((System.currentTimeMillis() - started) > 30000) {
+					try {
+					    FileWriter fw = new FileWriter(new File(new File("/Users/lee/.hypersocket"), "forker-socket-error.tmp"));
+					    PrintWriter pw = new PrintWriter(fw);
+					    pw.println("Could not connect");
+					    pw.close();
+					}
+					catch(Exception e2) {
+					    
+					}
+					return;
+				}
+				continue;
+			}
+			break;
+		}
 		/*
 		 * Make a connection back to forker daemon and keep it open, waiting for
 		 * a reply that will never come. If the connection closes, forker

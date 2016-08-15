@@ -6,7 +6,6 @@ import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileOutputStream;
 import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -16,7 +15,6 @@ import java.io.RandomAccessFile;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.net.InetAddress;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
@@ -396,16 +394,17 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					startForkerDaemon();
 				}
 
-				logger.info(String.format("Starting process %s", appBuilder.command()));
-
 				event(STARTING_APPLICATION, String.valueOf(times), cwd.getAbsolutePath(), classname,
 						String.valueOf(lastRetVal));
+				
 				process = appBuilder.start();
+				
 				event(STARTED_APPLICATION, classname);
 
 				if (useDaemon) {
-					PrintWriter pw = new PrintWriter(process.getOutputStream(), true);
-					pw.println(cookie.toString());
+					process.getOutputStream().write(cookie.toString().getBytes("UTF-8"));
+					process.getOutputStream().write("\r\n".getBytes("UTF-8"));
+					process.getOutputStream().flush();
 				}
 
 				String logpath = getOptionValue("log", null);
@@ -478,6 +477,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					}
 
 					retval = process.waitFor();
+
 				} finally {
 					if (inThread != null) {
 						inThread.interrupt();
@@ -683,6 +683,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		try {
 			System.exit(wrapper.start());
 		} catch (Throwable e) {
+			e.printStackTrace();
 			System.err.println(String.format("%s: %s\n", wrapper.getClass().getName(), e.getMessage()));
 			formatter.printUsage(new PrintWriter(System.err, true), 80,
 					String.format("%s  <application.class.name> [<argument> [<argument> ..]]", getAppName()));
@@ -990,27 +991,15 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 		cookie = daemon.prepare();
 		
-		
-		// Temporary DEUG code
-        try {
-            FileWriter fw = new FileWriter(new File(new File(System.getProperty("java.io.tmpdir")), "forker-daemon.tmp"));
-            PrintWriter pw = new PrintWriter(fw);
-            pw.println("WILL LISTEN ON " + InetAddress.getLocalHost() + ":"+ cookie.getPort());
-            pw.close();
-        }
-        catch(Exception e) {
-        }
-		
-		
 		event(STARTING_FORKER_DAEMON, cookie.getCookie(), String.valueOf(cookie.getPort()));
 		new Thread() {
 
 			public void run() {
 				try {
-					logger.info(String.format("Starting forker daemon %s", cookie));
 					daemon.start(cookie);
 					event(STARTED_FORKER_DAEMON, cookie.getCookie(), String.valueOf(cookie.getPort()));
 				} catch (IOException e) {
+				
 				}
 			}
 		}.start();
