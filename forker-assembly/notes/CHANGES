@@ -2,6 +2,36 @@
 =  CHANGE LOG   =
 =================
 
+Forker 1.0 - Initial release
+
+Features
+    o 'Forker Daemon' to provide a small run-time environment for launching processes.
+    o Support for POpen and System process types.
+    o Process execution utilities.
+    o Rudimentary support for privilege escalation.
+    
+-----------------
+    
+Forker 1.1 - Privilege escalation
+
+Features
+    o Better support for privilege escalation using OS specific methods such as gksudo,
+      sudo. Privilege escalation front end for systems that don't expose one (OS X)
+    o Better PTY support using Pty4J.
+    o Expanded utilities.
+
+-----------------
+
+Forker 1.2 - Wrapper
+
+Features
+    o Introduction of Forker Wrapper, a replacement for other Java wrapper libraries.
+    o More secure Forker Daemon, allowing secured isolated instances.
+    o Now completely documented using JavaDoc. 
+    o Pluggable architecture
+     
+-----------------
+
 Forker 1.3 - TBC
 
 Bug Fixes
@@ -9,6 +39,8 @@ Bug Fixes
     o setProcname throws UnsupportedOperationException breaking cross-platform compatibility.
     o ForkerWrapper main should capture any exception and log.
     o Ensure all sockets are connected on 127.0.0.1 loopback as previous use of getLocalHost appears inconsistent and caused execution failures.
+    o Privilege escalation left 'sapaXXXXX.sh' scripts in /tmp everytime sudo/su/gksudo/gksu 
+      might be used until the JVM exits. These could fill /tmp entirely on long running systems.
 
 =================
 =  HISTORY      =

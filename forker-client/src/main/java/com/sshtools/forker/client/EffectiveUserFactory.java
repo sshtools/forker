@@ -400,6 +400,7 @@ public abstract class EffectiveUserFactory {
 	public static class SudoFixedPasswordUser extends AbstractProcessBuilderEffectiveUser implements EffectiveUser {
 
 		private String username;
+		private char[] password;
 
 		/**
 		 * Constructor for administrator (root) and a fixed password
@@ -420,9 +421,8 @@ public abstract class EffectiveUserFactory {
 		 *            fixed password
 		 */
 		public SudoFixedPasswordUser(String username, char[] password) {
-			// Create a temporary script to use to launch AskPass
-			createTempScript("echo '" + new String(password).replace("'", "\\'") + "'");
 			this.username = username;
+			this.password = password;
 		}
 
 		@Override
@@ -434,10 +434,12 @@ public abstract class EffectiveUserFactory {
 				builder.command().remove(0);
 			}
 			builder.environment().remove("SUDO_ASKPASS");
+			tempScript.delete();
 		}
 
 		@Override
 		public void elevate(ForkerBuilder builder, Process process, Command command) {
+			createTempScript("echo '" + new String(password).replace("'", "\\'") + "'");
 			builder.command().add(0, "sudo");
 			builder.command().add(1, "-A");
 			if (username != null) {
@@ -464,7 +466,6 @@ public abstract class EffectiveUserFactory {
 		 * Constructor for administrator (root)
 		 */
 		public SudoAskPassUser() {
-			createTempScript(javaAskPassScript(AskPassConsole.class));
 		}
 
 		/**
@@ -488,10 +489,12 @@ public abstract class EffectiveUserFactory {
 				builder.command().remove(0);
 			}
 			builder.environment().remove("SUDO_ASKPASS");
+			tempScript.delete();
 		}
 
 		@Override
 		public void elevate(ForkerBuilder builder, Process process, Command command) {
+			createTempScript(javaAskPassScript(AskPassConsole.class));
 			builder.command().add(0, "sudo");
 			builder.command().add(1, "-A");
 			builder.command().add(2, "-E");
@@ -517,7 +520,6 @@ public abstract class EffectiveUserFactory {
 		 * Constructor for administrator (root)
 		 */
 		public SudoAskPassGuiUser() {
-			createTempScript(javaAskPassScript(AskPass.class));
 		}
 
 		/**
@@ -541,10 +543,12 @@ public abstract class EffectiveUserFactory {
 				builder.command().remove(0);
 			}
 			builder.environment().remove("SUDO_ASKPASS");
+			tempScript.delete();
 		}
 
 		@Override
 		public void elevate(ForkerBuilder builder, Process process, Command command) {
+			createTempScript(javaAskPassScript(AskPass.class));
 			builder.command().add(0, "sudo");
 			builder.command().add(1, "-A");
 			builder.command().add(2, "-E");
@@ -572,7 +576,6 @@ public abstract class EffectiveUserFactory {
 		 * Constructor for administrator (root)
 		 */
 		public SudoGksudoUser() {
-			createTempScript(String.format("gksudo --description=\"%s\" --print-pass", getDefault().getAppName()));
 		}
 
 		/**
@@ -582,8 +585,6 @@ public abstract class EffectiveUserFactory {
 		 *            username
 		 */
 		public SudoGksudoUser(String username) {
-			createTempScript(String.format("gksudo -u '%s' --description=\"%s\" --print-pass", username,
-					getDefault().getAppName()));
 			this.username = username;
 		}
 
@@ -597,10 +598,12 @@ public abstract class EffectiveUserFactory {
 				builder.command().remove(0);
 			}
 			builder.environment().remove("SUDO_ASKPASS");
+			tempScript.delete();
 		}
 
 		@Override
 		public void elevate(ForkerBuilder builder, Process process, Command command) {
+			createTempScript(String.format("gksudo --description=\"%s\" --print-pass", getDefault().getAppName()));
 			builder.command().add(0, "sudo");
 			builder.command().add(1, "-A");
 			builder.command().add(2, "-E");
