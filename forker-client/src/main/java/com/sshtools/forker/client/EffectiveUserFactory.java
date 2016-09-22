@@ -314,6 +314,9 @@ public abstract class EffectiveUserFactory {
 				try {
 					pw.println("#!/bin/bash");
 					pw.println(script);
+					pw.println("ret=$?");
+					pw.println("rm -f '" + tempScript.getAbsolutePath() + "'");
+					pw.println("exit ${ret}");
 					pw.flush();
 				} finally {
 					out.close();
@@ -434,7 +437,6 @@ public abstract class EffectiveUserFactory {
 				builder.command().remove(0);
 			}
 			builder.environment().remove("SUDO_ASKPASS");
-			tempScript.delete();
 		}
 
 		@Override
@@ -489,7 +491,6 @@ public abstract class EffectiveUserFactory {
 				builder.command().remove(0);
 			}
 			builder.environment().remove("SUDO_ASKPASS");
-			tempScript.delete();
 		}
 
 		@Override
@@ -543,7 +544,6 @@ public abstract class EffectiveUserFactory {
 				builder.command().remove(0);
 			}
 			builder.environment().remove("SUDO_ASKPASS");
-			tempScript.delete();
 		}
 
 		@Override
@@ -598,7 +598,6 @@ public abstract class EffectiveUserFactory {
 				builder.command().remove(0);
 			}
 			builder.environment().remove("SUDO_ASKPASS");
-			tempScript.delete();
 		}
 
 		@Override
