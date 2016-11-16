@@ -211,6 +211,9 @@ public abstract class EffectiveUserFactory {
 								return new SUAdministrator();
 							}
 						}
+					} else {
+						// Unknown desktop
+						return new SudoAskPassGuiUser();
 					}
 				}
 			} else if (SystemUtils.IS_OS_MAC_OSX) {
@@ -227,11 +230,24 @@ public abstract class EffectiveUserFactory {
 					return new RunAsUser(OS.getAdministratorUsername());
 				}
 			}
-			throw new UnsupportedOperationException(System.getProperty("os.name")
-					+ " is currently unsupported. Will not be able to get administrative user. "
-					+ "To hard code an adminstrator password, set the system property forker.administrator.password. "
-					+ "This is unsafe, as the password will exist in a file for the life of the process. Do NOT use "
-					+ "this in a production environment.");
+			return new EffectiveUser() {
+				
+				@Override
+				public void elevate(ForkerBuilder builder, Process process, Command command) {
+					
+					throw new UnsupportedOperationException(System.getProperty("os.name")
+							+ " is currently unsupported. Will not be able to get administrative user. "
+							+ "To hard code an adminstrator password, set the system property forker.administrator.password. "
+							+ "This is unsafe, as the password will exist in a file for the life of the process. Do NOT use "
+							+ "this in a production environment.");
+				}
+				
+				@Override
+				public void descend(ForkerBuilder builder, Process process, Command command) {
+				}
+			};
+			
+
 		}
 
 		@Override

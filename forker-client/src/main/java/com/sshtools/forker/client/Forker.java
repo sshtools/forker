@@ -714,18 +714,6 @@ public class Forker {
 		
 		Cookie.get().set(cookie);
 		
-		
-		// Temporary DEUG code
-				try {
-				    FileWriter fw = new FileWriter(new File(new File("/Users/lee/.hypersocket"), "forker-socket.tmp"));
-				    PrintWriter pw = new PrintWriter(fw);
-				    pw.println("WILL CONNECT TO " + cookie.getPort());
-				    pw.close();
-				}
-				catch(Exception e) {
-				    
-				}
-				
 		daemonLoaded = true;
 		wrapped = true;
 		daemonRunning = true;
@@ -737,6 +725,7 @@ public class Forker {
 		
 		
 
+		@SuppressWarnings("resource")
 		final Socket daemonSocket = new Socket();
 		long started = System.currentTimeMillis();
 		
@@ -745,15 +734,6 @@ public class Forker {
 				daemonSocket.connect(new InetSocketAddress("127.0.0.1", cookie.getPort()), 5000);
 			} catch (Exception e) {
 				if((System.currentTimeMillis() - started) > 30000) {
-					try {
-					    FileWriter fw = new FileWriter(new File(new File("/Users/lee/.hypersocket"), "forker-socket-error.tmp"));
-					    PrintWriter pw = new PrintWriter(fw);
-					    pw.println("Could not connect");
-					    pw.close();
-					}
-					catch(Exception e2) {
-					    
-					}
 					return;
 				}
 				continue;
