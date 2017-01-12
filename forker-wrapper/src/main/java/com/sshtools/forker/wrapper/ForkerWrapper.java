@@ -369,6 +369,18 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				}
 				appBuilder.io(IO.DEFAULT);
 				appBuilder.directory(cwd);
+				
+				/* Environment variables */
+				for(String env : getOptionValues("setenv")) {
+					String key = env;
+					String value = "";
+					int idx = env.indexOf('=');
+					if(idx != -1) {
+						key = env.substring(0, idx);
+						value = env.substring(idx + 1);
+					}
+					appBuilder.environment().put(key, value);
+				}
 
 				List<String> cpus = getOptionValues("cpu");
 				for (String cpu : cpus) {
@@ -848,6 +860,10 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		options.addOption(new Option("S", "single-instance", false,
 				"Only allow one instance of the wrapped application to be active at any one time. "
 						+ "This is achieved through locked files."));
+
+		options.addOption(new Option("s", "setenv", false,
+				"Set an environment on the wrapped process. This is in the format NAME=VALUE. The option may be "
+				+ "specified multiple times to specify multiple environment variables."));
 
 		options.addOption(new Option("N", "native", false,
 				"This option signals that main is not a Java classname, it is instead the name . "

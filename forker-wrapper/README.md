@@ -141,6 +141,11 @@ usage: com.sshtools.forker.wrapper.ForkerWrapper [-a] [-A <arg>] [-b <arg>] [-c 
                                                the wrapper to attempt to restart
                                                it. By default,this is set to 0,
                                                1 and 2. See also 'restart-on'
+  -s,--setenv <arg>                            Set an environment on the wrapped
+                                               process. This is in the format 
+                                               NAME=VALUE. The option may be 
+				                               specified multiple times to specify
+				                               multiple environment variables.
   -t,--timeout <arg>                           How long to wait since the last
                                                'ping' from the launched
                                                application before considering
