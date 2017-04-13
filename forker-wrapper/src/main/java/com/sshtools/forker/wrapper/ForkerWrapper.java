@@ -136,6 +136,10 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			this.value = value;
 		}
 	}
+	
+	public enum ArgMode {
+		FORCE, APPEND, PREPEND, DEFAULT
+	}
 
 	private String classname;
 	private String[] arguments;
@@ -506,6 +510,10 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			tempRestartOnExit = false;
 		}
 	}
+	
+	public ArgMode getArgMode() {
+		return ArgMode.valueOf(getOptionValue("argmode", ArgMode.DEFAULT.name())); 
+	}
 
 	public List<KeyValuePair> getProperties() {
 		return properties;
@@ -581,10 +589,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			}
 			if (cmd.hasOption('h')) {
 				String optionName = cmd.getOptionValue('h');
+				
 				if (optionName == null) {
-					formatter.printHelp(new PrintWriter(System.err, true), 80, getAppName(),
+					formatter.printHelp(new PrintWriter(System.err, true), 132, getAppName(),
 							"     <application.class.name> [<argument> [<argument> ..]]\n\n"
-									+ "Forker Wrapper is used to launch Java applications, optionally changing"
+									+ "Forker Wrapper is used to launch Java applications, optionally changing "
 									+ "the user they are run as, providing automatic restarting, signal handling and "
 									+ "other facilities that will be useful running applications as a 'service'.\n\n"
 									+ "Configuration may be passed to Forker Wrapper in four different ways :-\n\n"
@@ -773,8 +782,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				"Set an environment on the wrapped process. This is in the format NAME=VALUE. The option may be "
 						+ "specified multiple times to specify multiple environment variables."));
 		options.addOption(new Option("N", "native", false,
-				"This option signals that main is not a Java classname, it is instead the name . "
-						+ "of a native command. This option is incompatible with 'classpath' and all "
+				"This option signals that main is not a Java classname, it is instead the name "
+						+ "of a native command. This option is incompatible with 'classpath' and also "
 						+ "means the forker daemon will not be used and so hang detection and some other "
 						+ "features will not be available."));
 		options.addOption(new Option("I", "no-info", false,
@@ -817,8 +826,13 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 						+ "becomes the first app argument."));
 		options.addOption(new Option("E", "exit-wait", true,
 				"How long to wait after attempting to stop a wrapped appllication before giving up and forcibly killing the applicaton."));
+		options.addOption(new Option("M", "argmode", true,
+				"Determines how apparg options are treated. May be one FORCE, APPEND, PREPEND or DEFAULT. FORCE "
+				+ "passed on only the appargs specified by configuration. APPEND will append all appargs to "
+				+ "any command line arguments, PREPEND will prepend them. Finally DEFAULT is the default behaviour "
+				+ "and any command line arguments will override all appargs."));
 		options.addOption(new Option("A", "apparg", true,
-				"Application arguments. These are overridden by any application arguments provided on the command line."));
+				"Application arguments. How these are treated depends on argmode, but by default the will be overridden by any command line arguments passed in."));
 		options.addOption(new Option("P", "priority", true,
 				"Scheduling priority, may be one of LOW, NORMAL, HIGH or REALTIME (where supported)."));
 		options.addOption(new Option("Q", "min-java", true,
@@ -1195,9 +1209,26 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			classname = args.remove(0);
 		} else
 			classname = main;
-		arguments = getOptionValues("apparg").toArray(new String[0]);
-		if (!args.isEmpty())
-			arguments = args.toArray(new String[0]);
+		
+		List<String> arguments = getOptionValues("apparg");
+		ArgMode argMode = getArgMode();
+		if(argMode != ArgMode.FORCE) {
+			if (!args.isEmpty()) {
+				switch(argMode) {
+				case APPEND:
+					arguments.addAll(0, args);
+					break;
+				case PREPEND:
+					arguments.addAll(args);
+					break;
+				default:
+					arguments = args;
+					break;
+				}
+			}
+		}
+		
+		this.arguments = arguments.toArray(new String[0]);
 	}
 
 	class SinkOutputStream extends OutputStream {
