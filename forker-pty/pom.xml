@@ -31,17 +31,17 @@
 		</dependency>
 
 		<dependency>
-			<groupId>pty4j</groupId>
+			<groupId>com.sshtools</groupId>
 			<artifactId>pty4j</artifactId>
-			<version>0.5-SSHTOOLS-SNAPSHOT</version>
+			<version>0.7.2-SSHTOOLS-SNAPSHOT</version>
 			<type>jar</type>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
-			<groupId>pty4j</groupId>
+			<groupId>com.sshtools</groupId>
 			<artifactId>pty4j</artifactId>
 			<classifier>natives</classifier>
-			<version>0.5-SSHTOOLS-SNAPSHOT</version>
+			<version>0.7.2-SSHTOOLS-SNAPSHOT</version>
 			<type>jar</type>
 		</dependency>
 		<dependency>
