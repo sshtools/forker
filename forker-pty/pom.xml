@@ -53,13 +53,12 @@
 
 	<repositories>
 		<repository>
-			<id>ext-snapshots-local</id>
-			<name>ext-snapshots-local</name>
-			<url>http://artifactory.javassh.com/ext-snapshots-local</url>
+			<id>sonatype-oss-snapshots</id>
 			<releases>
 				<enabled>false</enabled>
 			</releases>
-			<snapshots />
+			<snapshots/>
+			<url>http://oss.sonatype.org/content/repositories/snapshots/</url>
 		</repository>
 	</repositories>
 </project>
