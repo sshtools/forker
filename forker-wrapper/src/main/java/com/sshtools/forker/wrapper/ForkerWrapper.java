@@ -316,29 +316,27 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					appBuilder.command().add("-classpath");
 					appBuilder.command().add(classpath);
 				}
-
 				boolean hasBootCp = false;
 				for (String val : jvmArgs) {
-					if(val.startsWith("-Xbootclasspath"))
+					if (val.startsWith("-Xbootclasspath"))
 						hasBootCp = true;
 					appBuilder.command().add(val);
 				}
-
-				if(!hasBootCp) {
-					String bootcp= buildClasspath(cwd, null, bootClasspath, nativeMain, appBuilder);
+				if (!hasBootCp) {
+					String bootcp = buildClasspath(cwd, null, bootClasspath, nativeMain, appBuilder);
 					if (bootcp != null) {
-						/* Do our own processing of append/prepend as there are special JVM arguments
-						 * for it
+						/*
+						 * Do our own processing of append/prepend as there are
+						 * special JVM arguments for it
 						 */
-						if(bootClasspath.startsWith("+"))
+						if (bootClasspath.startsWith("+"))
 							appBuilder.command().add("-Xbootclasspath/a:" + bootcp);
-						else if(bootClasspath.startsWith("-"))
+						else if (bootClasspath.startsWith("-"))
 							appBuilder.command().add("-Xbootclasspath/p:" + bootcp);
 						else
 							appBuilder.command().add("-Xbootclasspath:" + bootcp);
 					}
 				}
-				
 				if (!getSwitch("no-info", false)) {
 					if (lastRetVal > -1) {
 						appBuilder.command().add(String.format("-Dforker.info.lastExitCode=%d", lastRetVal));
@@ -875,6 +873,17 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 	protected String buildClasspath(File cwd, String forkerClasspath, String classpath, final boolean nativeMain,
 			ForkerBuilder appBuilder) throws IOException {
+		boolean append = false;
+		boolean prepend = false;
+		if (classpath != null) {
+			if (classpath.startsWith("+")) {
+				classpath = classpath.substring(1);
+				append = true;
+			} else if (classpath.startsWith("-")) {
+				prepend = true;
+				classpath = classpath.substring(1);
+			}
+		}
 		if (!nativeMain && StringUtils.isNotBlank(classpath)) {
 			StringBuilder newClasspath = new StringBuilder();
 			for (String el : classpath.split(File.pathSeparator)) {
@@ -904,17 +913,14 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			}
 			if (StringUtils.isNotBlank(forkerClasspath)) {
 				String cp = newClasspath.toString();
-				if(cp.startsWith("+")) {
-					classpath = forkerClasspath + File.pathSeparator + cp.substring(1);
-				}
-				else if(cp.startsWith("-")) {
-					classpath = cp.substring(1) + File.pathSeparator + forkerClasspath;
-				}
-				else {
+				if (append) {
+					classpath = forkerClasspath + File.pathSeparator + cp;
+				} else if (prepend) {
+					classpath = cp + File.pathSeparator + forkerClasspath;
+				} else {
 					classpath = cp;
 				}
-			}
-			else
+			} else
 				classpath = newClasspath.toString();
 		}
 		return classpath;
