@@ -1,5 +1,4 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<artifactId>forker-pty</artifactId>
 	<name>Forker PTY</name>
@@ -7,7 +6,7 @@
 	<parent>
 		<groupId>com.sshtools</groupId>
 		<artifactId>forker</artifactId>
-		<version>1.2</version>
+		<version>1.3</version>
 		<relativePath>..</relativePath>
 	</parent>
 
@@ -31,17 +30,17 @@
 		</dependency>
 
 		<dependency>
-			<groupId>pty4j</groupId>
+			<groupId>com.sshtools</groupId>
 			<artifactId>pty4j</artifactId>
-			<version>0.5-SSHTOOLS-SNAPSHOT</version>
+			<version>0.7.2-SSHTOOLS-SNAPSHOT</version>
 			<type>jar</type>
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
-			<groupId>pty4j</groupId>
+			<groupId>com.sshtools</groupId>
 			<artifactId>pty4j</artifactId>
 			<classifier>natives</classifier>
-			<version>0.5-SSHTOOLS-SNAPSHOT</version>
+			<version>0.7.2-SSHTOOLS-SNAPSHOT</version>
 			<type>jar</type>
 		</dependency>
 		<dependency>
@@ -53,13 +52,12 @@
 
 	<repositories>
 		<repository>
-			<id>ext-snapshots-local</id>
-			<name>ext-snapshots-local</name>
-			<url>http://artifactory.javassh.com/ext-snapshots-local</url>
+			<id>sonatype-oss-snapshots</id>
 			<releases>
 				<enabled>false</enabled>
 			</releases>
 			<snapshots />
+			<url>http://oss.sonatype.org/content/repositories/snapshots/</url>
 		</repository>
 	</repositories>
 </project>

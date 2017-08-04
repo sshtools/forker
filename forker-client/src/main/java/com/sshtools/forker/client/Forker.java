@@ -4,12 +4,15 @@ import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -176,6 +179,7 @@ public class Forker {
 	private static boolean daemonAdministrator;
 	private static Socket daemonMaintenanceSocket;
 	private static String daemonClasspath;
+	private static boolean wrapped;
 
 	/**
 	 * @return instance
@@ -480,7 +484,7 @@ public class Forker {
 							 */
 							daemonMaintenanceSocket = null;
 							try {
-								daemonMaintenanceSocket = new Socket(InetAddress.getLocalHost(), cookie.getPort());
+								daemonMaintenanceSocket = new Socket("127.0.0.1", cookie.getPort());
 								DataOutputStream dos = new DataOutputStream(daemonMaintenanceSocket.getOutputStream());
 								dos.writeUTF(cookie.getCookie());
 								dos.writeByte(1);
@@ -530,7 +534,7 @@ public class Forker {
 	public static InputStream readFile(File file) throws IOException {
 		Cookie cookie = Cookie.get();
 		Instance instance = cookie.load();
-		final Socket daemonSocket = new Socket(InetAddress.getLocalHost(), instance.getPort());
+		final Socket daemonSocket = new Socket("127.0.0.1", instance.getPort());
 		try {
 			DataOutputStream dos = new DataOutputStream(daemonSocket.getOutputStream());
 			dos.writeUTF(instance.getCookie());
@@ -576,7 +580,7 @@ public class Forker {
 
 		Cookie cookie = Cookie.get();
 		Instance instance = cookie.load();
-		final Socket daemonSocket = new Socket(InetAddress.getLocalHost(), instance.getPort());
+		final Socket daemonSocket = new Socket("127.0.0.1", instance.getPort());
 		try {
 			final DataOutputStream dos = new DataOutputStream(daemonSocket.getOutputStream());
 			dos.writeUTF(instance.getCookie());
@@ -682,6 +686,15 @@ public class Forker {
 	}
 
 	/**
+	 * Get whether the application is currently running via the wrapper.
+	 * 
+	 * @return wrapper
+	 */
+	public static boolean isWrapped() {
+		return wrapped;
+	}
+
+	/**
 	 * This is used when an application is launched from Forker Wrapper. The
 	 * daemon cookie is passed in as the first line of stdin. The first argument
 	 * is a boolean indicating if the daemon is running as an administrator, the
@@ -698,16 +711,35 @@ public class Forker {
 		BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
 		String cookieText = reader.readLine();
 		final Instance cookie = new Instance(cookieText);
+		
 		Cookie.get().set(cookie);
+		
 		daemonLoaded = true;
+		wrapped = true;
 		daemonRunning = true;
 		List<String> argList = new ArrayList<String>(Arrays.asList(args));
 		daemonAdministrator = "true".equals(argList.remove(0));
 		String classname = argList.remove(0);
 		Class<?> clazz = Class.forName(classname);
+		
+		
+		
 
-		final Socket daemonSocket = new Socket(InetAddress.getLocalHost(), cookie.getPort());
-
+		@SuppressWarnings("resource")
+		final Socket daemonSocket = new Socket();
+		long started = System.currentTimeMillis();
+		
+		while(true) {
+			try {
+				daemonSocket.connect(new InetSocketAddress("127.0.0.1", cookie.getPort()), 5000);
+			} catch (Exception e) {
+				if((System.currentTimeMillis() - started) > 30000) {
+					return;
+				}
+				continue;
+			}
+			break;
+		}
 		/*
 		 * Make a connection back to forker daemon and keep it open, waiting for
 		 * a reply that will never come. If the connection closes, forker

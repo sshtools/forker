@@ -55,14 +55,13 @@ public class Forker {
 	private boolean forked;
 	private boolean isolated;
 	private boolean unauthenticated;
-	private List<Client> clients = new ArrayList<Client>();
+	private List<Client> clients = Collections.synchronizedList(new ArrayList<Client>());
 	private Map<Integer, Handler> handlers = new HashMap<Integer, Handler>();
 
 	/**
 	 * Constructor
 	 */
 	public Forker() {
-		clients = Collections.synchronizedList(clients);
 		for (Handler handler : ServiceLoader.load(Handler.class)) {
 			handlers.put(handler.getType(), handler);
 		}
@@ -133,6 +132,7 @@ public class Forker {
 	 *             on any error
 	 */
 	public void start(Instance thisCookie) throws IOException {
+		
 		try {
 			while (true) {
 				Socket c = socket.accept();
@@ -169,7 +169,7 @@ public class Forker {
 
 		socket = new ServerSocket();
 		socket.setReuseAddress(true);
-		socket.bind(new InetSocketAddress(InetAddress.getLocalHost(), port), backlog);
+		socket.bind(new InetSocketAddress("127.0.0.1", port), backlog);
 
 		return createCookie();
 	}

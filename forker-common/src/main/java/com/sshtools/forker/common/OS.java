@@ -296,13 +296,20 @@ public class OS {
 	 * @return success
 	 */
 	public static boolean setProcname(String procname) {
-		if (SystemUtils.IS_OS_UNIX) {
+		if (SystemUtils.IS_OS_UNIX && !SystemUtils.IS_OS_MAC_OSX) {
 			Memory name = new Memory(procname.length() + 1);
 			name.setString(0, procname);
 			return CSystem.INSTANCE.prctl(CSystem.PR_SET_NAME, name, new IntByReference(0).getPointer(),
 					new IntByReference(0).getPointer(), new IntByReference(0).getPointer()) == 0;
 		}
-		throw new UnsupportedOperationException();
+		/**
+		 * LDP: Why cause an error? Its just the process name? Throwing exception breaks cross-platform 
+		 * compatibility. The alternative would be to add a "isProcnameAvailable" type method to allow
+		 * wrapper to skip calling it.
+		 */
+		// 
+		//throw new UnsupportedOperationException();
+		return false;
 
 	}
 }

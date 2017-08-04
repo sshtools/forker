@@ -103,7 +103,7 @@ public class ForkerDaemonProcess extends AbstractForkerProcess {
 			throw new ConnectException("The forker daemon is not running.");
 		}
 
-		final Socket s = new Socket(InetAddress.getLocalHost(), cookie.getPort());
+		final Socket s = new Socket("127.0.0.1", cookie.getPort());
 		boolean ok = false;
 
 		try {

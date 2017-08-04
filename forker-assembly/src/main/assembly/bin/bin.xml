@@ -7,6 +7,7 @@
 		<format>zip</format>
 	</formats>
 	
+	
 	<includeBaseDirectory>false</includeBaseDirectory>
 	<fileSets>
 		<fileSet>
@@ -22,6 +23,14 @@
 			<directory>../forker-examples/src/main/java/</directory>
 			<includes>
 				<include>*.java</include>
+			</includes>
+		</fileSet>
+		
+		<fileSet>
+			<outputDirectory>forker-${project.version}</outputDirectory>
+			<directory>notes</directory>
+			<includes>
+				<include>*</include>
 			</includes>
 		</fileSet>
 	</fileSets>
