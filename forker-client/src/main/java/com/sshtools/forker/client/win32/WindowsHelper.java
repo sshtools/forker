@@ -48,8 +48,10 @@ public class WindowsHelper {
 	public static HANDLE createToken(String username, String domain) throws IOException {
 		
 		HANDLEByReference processToken = new HANDLEByReference();
+		@SuppressWarnings("unused")
 		HANDLE authenticatedToken = WinBase.INVALID_HANDLE_VALUE;
 		
+		@SuppressWarnings("unused")
 		PSID userSID;
 		
 		if(!XAdvapi32.INSTANCE.OpenProcessToken(

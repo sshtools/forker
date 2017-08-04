@@ -445,7 +445,7 @@ public class OSCommand {
 				}
 			} catch (InterruptedException e) {
 				LOG.log(Level.SEVERE, "Command interrupted.", e);
-				throw new IOException(e);
+				throw new IOException(e.getMessage(), e);
 			}
 			return lines;
 		} finally {
@@ -486,7 +486,7 @@ public class OSCommand {
 				return p.waitFor();
 			} catch (InterruptedException e) {
 				LOG.log(Level.SEVERE, "Command interrupted.", e);
-				throw new IOException(e);
+				throw new IOException(e.getMessage(), e);
 			}
 		} finally {
 			fos.close();
