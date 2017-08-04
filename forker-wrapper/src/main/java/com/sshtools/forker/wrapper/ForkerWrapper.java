@@ -136,7 +136,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			this.value = value;
 		}
 	}
-
+	
 	public enum ArgMode {
 		FORCE, APPEND, PREPEND, DEFAULT
 	}
@@ -246,7 +246,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		String javaExe = getJVMPath();
 		String forkerClasspath = System.getProperty("java.class.path");
 		String wrapperClasspath = getOptionValue("classpath", forkerClasspath);
-		String bootClasspath = getOptionValue("boot-classpath", null);
 		final boolean nativeMain = getSwitch("native", false);
 		final boolean useDaemon = !nativeMain && !getSwitch("no-forker-daemon", nativeMain);
 		List<String> jvmArgs = getOptionValues("jvmarg");
@@ -310,32 +309,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				ForkerBuilder appBuilder = new ForkerBuilder();
 				if (!nativeMain)
 					appBuilder.command().add(javaExe);
-				String classpath = buildClasspath(cwd, getSwitch("no-forker-classpath", false) ? null : forkerClasspath,
-						wrapperClasspath, nativeMain, appBuilder);
-				if (classpath != null) {
-					appBuilder.command().add("-classpath");
-					appBuilder.command().add(classpath);
-				}
-				boolean hasBootCp = false;
+				buildClasspath(cwd, forkerClasspath, wrapperClasspath, nativeMain, appBuilder);
 				for (String val : jvmArgs) {
-					if (val.startsWith("-Xbootclasspath"))
-						hasBootCp = true;
 					appBuilder.command().add(val);
-				}
-				if (!hasBootCp) {
-					String bootcp = buildClasspath(cwd, null, bootClasspath, nativeMain, appBuilder);
-					if (bootcp != null) {
-						/*
-						 * Do our own processing of append/prepend as there are
-						 * special JVM arguments for it
-						 */
-						if (bootClasspath.startsWith("+"))
-							appBuilder.command().add("-Xbootclasspath/a:" + bootcp);
-						else if (bootClasspath.startsWith("-"))
-							appBuilder.command().add("-Xbootclasspath/p:" + bootcp);
-						else
-							appBuilder.command().add("-Xbootclasspath:" + bootcp);
-					}
 				}
 				if (!getSwitch("no-info", false)) {
 					if (lastRetVal > -1) {
@@ -534,9 +510,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			tempRestartOnExit = false;
 		}
 	}
-
+	
 	public ArgMode getArgMode() {
-		return ArgMode.valueOf(getOptionValue("argmode", ArgMode.DEFAULT.name()));
+		return ArgMode.valueOf(getOptionValue("argmode", ArgMode.DEFAULT.name())); 
 	}
 
 	public List<KeyValuePair> getProperties() {
@@ -613,6 +589,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			}
 			if (cmd.hasOption('h')) {
 				String optionName = cmd.getOptionValue('h');
+				
 				if (optionName == null) {
 					formatter.printHelp(new PrintWriter(System.err, true), 132, getAppName(),
 							"     <application.class.name> [<argument> [<argument> ..]]\n\n"
@@ -827,12 +804,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		options.addOption(new Option("e", "errors", true,
 				"Where to log stderr. If not specified, will be output on stderr of this process or to 'log' if specified."));
 		options.addOption(new Option("cp", "classpath", true,
-				"The classpath to use to run the application. If not set, the current runtime classpath is used (the java.class.path system property). Prefix the "
-						+ "path with '+' to add it to the end of the existing classpath, or '-' to add it to the start."));
-		options.addOption(new Option("bcp", "boot-classpath", true,
-				"The boot classpath to use to run the application. If not set, the current runtime classpath is used (the java.class.path system property). Prefix the "
-						+ "path with '+' to add it to the end of the existing classpath, or '-' to add it to the start. Use of a jvmarg that starts with '-Xbootclasspath' will "
-						+ "override this setting."));
+				"The classpath to use to run the application. If not set, the current runtime classpath is used (the java.class.path system property)."));
 		options.addOption(new Option("u", "run-as", true, "The user to run the application as."));
 		options.addOption(new Option("a", "administrator", false, "Run as administrator."));
 		options.addOption(new Option("p", "pidfile", true, "A filename to write the process ID to. May be used "
@@ -856,9 +828,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				"How long to wait after attempting to stop a wrapped appllication before giving up and forcibly killing the applicaton."));
 		options.addOption(new Option("M", "argmode", true,
 				"Determines how apparg options are treated. May be one FORCE, APPEND, PREPEND or DEFAULT. FORCE "
-						+ "passed on only the appargs specified by configuration. APPEND will append all appargs to "
-						+ "any command line arguments, PREPEND will prepend them. Finally DEFAULT is the default behaviour "
-						+ "and any command line arguments will override all appargs."));
+				+ "passed on only the appargs specified by configuration. APPEND will append all appargs to "
+				+ "any command line arguments, PREPEND will prepend them. Finally DEFAULT is the default behaviour "
+				+ "and any command line arguments will override all appargs."));
 		options.addOption(new Option("A", "apparg", true,
 				"Application arguments. How these are treated depends on argmode, but by default the will be overridden by any command line arguments passed in."));
 		options.addOption(new Option("P", "priority", true,
@@ -871,19 +843,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 						+ "attempt will be made to locate an earlier version."));
 	}
 
-	protected String buildClasspath(File cwd, String forkerClasspath, String classpath, final boolean nativeMain,
+	protected void buildClasspath(File cwd, String forkerClasspath, String wrapperClasspath, final boolean nativeMain,
 			ForkerBuilder appBuilder) throws IOException {
-		boolean append = false;
-		boolean prepend = false;
-		if (classpath != null) {
-			if (classpath.startsWith("+")) {
-				classpath = classpath.substring(1);
-				append = true;
-			} else if (classpath.startsWith("-")) {
-				prepend = true;
-				classpath = classpath.substring(1);
-			}
-		}
+		String classpath = wrapperClasspath;
 		if (!nativeMain && StringUtils.isNotBlank(classpath)) {
 			StringBuilder newClasspath = new StringBuilder();
 			for (String el : classpath.split(File.pathSeparator)) {
@@ -911,19 +873,16 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					appendPath(newClasspath, el);
 				}
 			}
-			if (StringUtils.isNotBlank(forkerClasspath)) {
-				String cp = newClasspath.toString();
-				if (append) {
-					classpath = forkerClasspath + File.pathSeparator + cp;
-				} else if (prepend) {
-					classpath = cp + File.pathSeparator + forkerClasspath;
-				} else {
-					classpath = cp;
+			if (!getSwitch("no-forker-classpath", false)) {
+				for (String el : forkerClasspath.split(File.pathSeparator)) {
+					appendPath(newClasspath, el);
 				}
-			} else
-				classpath = newClasspath.toString();
+			}
+			if (newClasspath.length() > 0) {
+				appBuilder.command().add("-classpath");
+				appBuilder.command().add(newClasspath.toString());
+			}
 		}
-		return classpath;
 	}
 
 	protected void startForkerDaemon() throws IOException {
@@ -1250,11 +1209,12 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			classname = args.remove(0);
 		} else
 			classname = main;
+		
 		List<String> arguments = getOptionValues("apparg");
 		ArgMode argMode = getArgMode();
-		if (argMode != ArgMode.FORCE) {
+		if(argMode != ArgMode.FORCE) {
 			if (!args.isEmpty()) {
-				switch (argMode) {
+				switch(argMode) {
 				case APPEND:
 					arguments.addAll(0, args);
 					break;
@@ -1267,6 +1227,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				}
 			}
 		}
+		
 		this.arguments = arguments.toArray(new String[0]);
 	}
 
