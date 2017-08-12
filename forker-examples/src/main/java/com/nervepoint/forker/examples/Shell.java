@@ -5,7 +5,6 @@ import java.io.IOException;
 import org.apache.commons.io.IOUtils;
 
 import com.sshtools.forker.client.Forker;
-import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.client.ShellBuilder;
 import com.sshtools.forker.client.impl.ForkerDaemonProcess;
 import com.sshtools.forker.client.impl.ForkerDaemonProcess.Listener;

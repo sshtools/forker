@@ -5,13 +5,11 @@ import java.io.IOException;
 
 import org.apache.commons.io.IOUtils;
 
-import com.sshtools.forker.client.EffectiveUserFactory;
 import com.sshtools.forker.client.EffectiveUserFactory.DefaultEffectiveUserFactory;
-import com.sshtools.forker.common.OS;
 import com.sshtools.forker.client.Forker;
 import com.sshtools.forker.client.ForkerBuilder;
-import com.sshtools.forker.client.OSCommand;
 import com.sshtools.forker.client.ShellBuilder;
+import com.sshtools.forker.common.OS;
 import com.sshtools.forker.pty.PTYExecutor;
 
 /**

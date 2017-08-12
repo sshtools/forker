@@ -1,7 +1,11 @@
 package com.nervepoint.forker.examples;
 
+import static com.sshtools.forker.client.OSCommand.admin;
+import static com.sshtools.forker.client.OSCommand.elevate;
+import static com.sshtools.forker.client.OSCommand.restrict;
+import static com.sshtools.forker.client.OSCommand.run;
+
 import com.sshtools.forker.client.Forker;
-import static com.sshtools.forker.client.OSCommand.*;
 
 /**
  * Demonstrates using elevated commands
