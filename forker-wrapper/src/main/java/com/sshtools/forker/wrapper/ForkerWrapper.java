@@ -329,9 +329,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 							 * Do our own processing of append/prepend as there
 							 * are special JVM arguments for it
 							 */
-							if (bootClasspath.startsWith("+"))
+							if (bootClasspath != null && bootClasspath.startsWith("+"))
 								appBuilder.command().add("-Xbootclasspath/a:" + bootcp);
-							else if (bootClasspath.startsWith("-"))
+							else if (bootClasspath != null && bootClasspath.startsWith("-"))
 								appBuilder.command().add("-Xbootclasspath/p:" + bootcp);
 							else
 								appBuilder.command().add("-Xbootclasspath:" + bootcp);
