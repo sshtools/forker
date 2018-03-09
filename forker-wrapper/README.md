@@ -1,4 +1,4 @@
-# Forker Wrapper 
+# Forker Wrapper
 
 A 'wrapper' to execute services in Java. Similar to JSW (Java Service Wrapper) and YAJSW, Forker Wrapper can be used to launch processes in the background, track the process ID, capture output to log, automatically restart a hung or crashed JVM and more.
 
@@ -19,13 +19,13 @@ To include the Forker Wrapper in your project, you will currently need the follo
 ```
 
 And your dependency configuration :-
-    
+
 ```
 <dependencies>
 	<dependency>
 		<groupId>com.sshtools</groupId>
 		<artifactId>forker-wrapper</artifactId>
-		<version>1.2</version>
+		<version>1.4</version>
 	</dependency>
 </dependencies>
 ```
@@ -34,17 +34,17 @@ And your dependency configuration :-
 
 ## Quick Start
 
-_The following requires that you have all of the Forker jars and their dependencies in the current directory. See Building Forker Libraries in the main [README.md](../README.md)  
+_The following requires that you have all of the Forker jars and their dependencies in the current directory. See Building Forker Libraries in the main [README.md](../README.md)
 
 ```
-java -jar forker-wrapper.jar com.nervepoint.forker.examples apparg1 apparg2 apparg3 
+java -jar forker-wrapper.jar com.nervepoint.forker.examples apparg1 apparg2 apparg3
 ```
 
 ## Wrapper Configuration
 
-The wrapper itself can be configured in any one of four ways. All four methods provide all the same configuration options, they just allow different ways of setting. 
+The wrapper itself can be configured in any one of four ways. All four methods provide all the same configuration options, they just allow different ways of setting.
 
- 1. Command line options. To wrap your application, instead of supplying it's name as the classname when you invoke the java command, instead use **com.sshtools.forker.wrapper.ForkerWrapper**, then following this by any of the command line options. At least one option must provide the actual class name that contains the main method you wish to run.  
+ 1. Command line options. To wrap your application, instead of supplying it's name as the classname when you invoke the java command, instead use **com.sshtools.forker.wrapper.ForkerWrapper**, then following this by any of the command line options. At least one option must provide the actual class name that contains the main method you wish to run.
  1. Configuration files (see -c and -C command line options). You may supply (multiple) configuration files, each of which is a simple text file that contains one option, and optionally it's value, per line. By using -C, you can specify a configuration directory where all files in that directory will be loaded.
  1. Java system properties. The key of which is option name prefixed with forker.' and with - replaced with a dot (.)
  1. Environment variables. The key of which is the option name prefixed with
@@ -53,13 +53,13 @@ The wrapper itself can be configured in any one of four ways. All four methods p
 By using --help, the following will be displayed detailing all possible options.
 
 ```
-usage: com.sshtools.forker.wrapper.ForkerWrapper [-a] [-A <arg>] [-b <arg>] [-B <arg>] [-c <file>] [-C <directory>] [-cp <arg>] [-d]
-       [-D <arg>] [-e <arg>] [-E <fd>] [-F] [-h <option>] [-I] [-j <arg>] [-J <arg>] [-l <arg>] [-L <arg>] [-m <arg>] [-M <arg>]
-       [-n] [-N] [-o] [-O <fd>] [--on-application-stopped <command-or-classname>] [--on-exited-wrapper <command-or-classname>]
-       [--on-exiting-wrapper <command-or-classname>] [--on-restarting-application <command-or-classname>] [--on-started-application
-       <command-or-classname>] [--on-started-forker-daemon <command-or-classname>] [--on-starting-application
-       <command-or-classname>] [-p <arg>] [-P <arg>] [-q <arg>] [-Q <arg>] [-r <arg>] [-R <arg>] [-S] [-s] [-t <arg>] [-u <arg>] [-w
-       <arg>] [-W <arg>] [-x <arg>] [-X <arg>]
+usage: com.sshtools.forker.wrapper.ForkerWrapper [-a] [-A <arg>] [-b <arg>] [-B <arg>] [-bcp <arg>] [-c <file>] [-C <directory>]
+       [-cp <arg>] [-d] [-D <arg>] [-e <arg>] [-E <fd>] [-F] [-h <option>] [-I] [-j <arg>] [-J <arg>] [-l <arg>] [-L <arg>] [-m
+       <arg>] [-M <arg>] [-n] [-N] [-o] [-O <fd>] [--on-application-stopped <command-or-classname>] [--on-exited-wrapper
+       <command-or-classname>] [--on-exiting-wrapper <command-or-classname>] [--on-restarting-application <command-or-classname>]
+       [--on-started-application <command-or-classname>] [--on-started-forker-daemon <command-or-classname>]
+       [--on-starting-application <command-or-classname>] [-p <arg>] [-P <arg>] [-q <arg>] [-Q <arg>] [-r <arg>] [-R <arg>] [-S]
+       [-s] [-t <arg>] [-u <arg>] [-w <arg>] [-W <arg>] [-x <arg>] [-X <arg>]
      <application.class.name> [<argument> [<argument> ..]]
 
 Forker Wrapper is used to launch Java applications, optionally changing the user they are run as, providing automatic restarting,
@@ -79,6 +79,11 @@ Configuration may be passed to Forker Wrapper in four different ways :-
                                                             immediate output.
   -B,--cpu <arg>                                            Bind to a particular CPU, may be specified multiple times to bind to
                                                             multiple CPUs.
+  -bcp,--boot-classpath <arg>                               The boot classpath to use to run the application. If not set, the
+                                                            current runtime classpath is used (the java.class.path system property).
+                                                            Prefix the path with '+' to add it to the end of the existing classpath,
+                                                            or '-' to add it to the start. Use of a jvmarg that starts with
+                                                            '-Xbootclasspath' will override this setting.
   -c,--configuration <file>                                 A file to read configuration. The file should contain name=value pairs,
                                                             where name is the same name as used for command line arguments (see
                                                             --help for a list of these)
@@ -86,7 +91,9 @@ Configuration may be passed to Forker Wrapper in four different ways :-
                                                             name=value pairs, where name is the same name as used for command line
                                                             arguments (see --help for a list of these)
   -cp,--classpath <arg>                                     The classpath to use to run the application. If not set, the current
-                                                            runtime classpath is used (the java.class.path system property).
+                                                            runtime classpath is used (the java.class.path system property). Prefix
+                                                            the path with '+' to add it to the end of the existing classpath, or '-'
+                                                            to add it to the start.
   -d,--daemon                                               Fork the process and exit, leaving it running in the background.
   -D,--log-write-delay <arg>                                In order to be compatible with external log rotation, log files are
                                                             closed as soon as they are written to. You can delay the closing of the
@@ -198,5 +205,4 @@ Configuration may be passed to Forker Wrapper in four different ways :-
 
 Provided by SSHTOOLS Limited.
 
- 
 ```
