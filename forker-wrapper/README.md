@@ -58,8 +58,8 @@ usage: com.sshtools.forker.wrapper.ForkerWrapper [-a] [-A <arg>] [-b <arg>] [-B 
        <arg>] [-M <arg>] [-n] [-N] [-o] [-O <fd>] [--on-application-stopped <command-or-classname>] [--on-exited-wrapper
        <command-or-classname>] [--on-exiting-wrapper <command-or-classname>] [--on-restarting-application <command-or-classname>]
        [--on-started-application <command-or-classname>] [--on-started-forker-daemon <command-or-classname>]
-       [--on-starting-application <command-or-classname>] [-p <arg>] [-P <arg>] [-q <arg>] [-Q <arg>] [-r <arg>] [-R <arg>] [-S]
-       [-s] [-t <arg>] [-u <arg>] [-w <arg>] [-W <arg>] [-x <arg>] [-X <arg>]
+       [--on-starting-application <command-or-classname>] [-p <arg>] [-P <arg>] [-q] [-r <arg>] [-R <arg>] [-S] [-s] [-t <arg>] [-u
+       <arg>] [-w <arg>] [-W <arg>] [-x <arg>] [-X <arg>] [-Y <arg>] [-y <arg>] [-z] [-Z]
      <application.class.name> [<argument> [<argument> ..]]
 
 Forker Wrapper is used to launch Java applications, optionally changing the user they are run as, providing automatic restarting,
@@ -168,10 +168,7 @@ Configuration may be passed to Forker Wrapper in four different ways :-
                                                             application to obtain the PID to send signals to.
   -P,--priority <arg>                                       Scheduling priority, may be one of LOW, NORMAL, HIGH or REALTIME (where
                                                             supported).
-  -q,--max-java <arg>                                       Maximum java version. If the selected JVM (default or otherwise) is
-                                                            lower than this, an attempt will be made to locate an earlier version.
-  -Q,--min-java <arg>                                       Minimum java version. If the selected JVM (default or otherwise) is
-                                                            lower than this, an attempt will be made to locate a later version.
+  -q,--quiet                                                Do not output anything on stderr or stdout from the wrapped process.
   -r,--restart-on <arg>                                     Which exit values from the spawned process will cause the wrapper to
                                                             attempt to restart it. When not specified, all exit values will cause a
                                                             restart except those that are configure not to (see dont-restart-on).
@@ -202,7 +199,14 @@ Configuration may be passed to Forker Wrapper in four different ways :-
                                                             commands may be run. One or more of these options specifies the name of
                                                             the commands that may NOT be run. The value may be a regular expression,
                                                             see also 'allow-execute'
+  -Y,--min-java <arg>                                       Minimum java version. If the selected JVM (default or otherwise) is
+                                                            lower than this, an attempt will be made to locate a later version.
+  -y,--max-java <arg>                                       Maximum java version. If the selected JVM (default or otherwise) is
+                                                            lower than this, an attempt will be made to locate an earlier version.
+  -z,--quiet-stderr                                         Do not output anything on stderr from the wrapped process.
+  -Z,--quiet-stdout                                         Do not output anything on stdout from the wrapped process.
 
 Provided by SSHTOOLS Limited.
+
 
 ```

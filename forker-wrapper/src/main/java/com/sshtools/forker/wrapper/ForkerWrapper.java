@@ -305,6 +305,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				stopping = false;
 				process = null;
 				boolean quiet = getSwitch("quiet", false);
+				boolean quietStdErr = quiet || getSwitch("quiet-stderr", false);
+				boolean quietStdOut = quiet || getSwitch("quiet-stdout", false);
 				boolean logoverwrite = getSwitch("log-overwrite", false);
 				/* Build the command to launch the application itself */
 				ForkerBuilder appBuilder = new ForkerBuilder();
@@ -431,7 +433,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 						errlog = new LazyLogStream(logDelay, makeDirectoryForFile(relativize(cwd, errpath)), !logoverwrite);
 					}
 				}
-				OutputStream stdout = quiet ? null : defaultOut;
+				OutputStream stdout = quietStdOut ? null : defaultOut;
 				OutputStream out = null;
 				if (stdout != null) {
 					if (outlog != null) {
@@ -444,7 +446,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				if (out == null) {
 					out = new SinkOutputStream();
 				}
-				OutputStream stderr = quiet ? null : defaultErr;
+				OutputStream stderr = quietStdErr ? null : defaultErr;
 				OutputStream err = null;
 				if (stderr != null) {
 					if (errlog != null) {
@@ -799,6 +801,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		options.addOption(new Option("n", "no-forker-daemon", false,
 				"Do not enable the forker daemon. This will prevent the forked application from executing elevated commands via the daemon and will also disable JVM timeout detection."));
 		options.addOption(new Option("q", "quiet", false, "Do not output anything on stderr or stdout from the wrapped process."));
+		options.addOption(new Option("z", "quiet-stderr", false, "Do not output anything on stderr from the wrapped process."));
+		options.addOption(new Option("Z", "quiet-stdout", false, "Do not output anything on stdout from the wrapped process."));
 		options.addOption(new Option("S", "single-instance", false,
 				"Only allow one instance of the wrapped application to be active at any one time. "
 						+ "This is achieved through locked files."));
@@ -864,10 +868,10 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				"Application arguments. How these are treated depends on argmode, but by default the will be overridden by any command line arguments passed in."));
 		options.addOption(new Option("P", "priority", true,
 				"Scheduling priority, may be one of LOW, NORMAL, HIGH or REALTIME (where supported)."));
-		options.addOption(new Option("Q", "min-java", true,
+		options.addOption(new Option("Y", "min-java", true,
 				"Minimum java version. If the selected JVM (default or otherwise) is lower than this, an "
 						+ "attempt will be made to locate a later version."));
-		options.addOption(new Option("q", "max-java", true,
+		options.addOption(new Option("y", "max-java", true,
 				"Maximum java version. If the selected JVM (default or otherwise) is lower than this, an "
 						+ "attempt will be made to locate an earlier version."));
 	}
