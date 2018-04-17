@@ -326,7 +326,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					}
 					if (!hasBootCp) {
 						String bootcp = buildClasspath(cwd, null, bootClasspath);
-						if (bootcp != null) {
+						if (bootcp != null && !bootcp.equals("")) {
 							/*
 							 * Do our own processing of append/prepend as there
 							 * are special JVM arguments for it
