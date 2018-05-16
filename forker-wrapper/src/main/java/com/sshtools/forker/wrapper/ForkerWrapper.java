@@ -313,7 +313,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				if (!nativeMain) {
 					appBuilder.command().add(javaExe);
 					String classpath = buildClasspath(cwd, getSwitch("no-forker-classpath", false) ? null : forkerClasspath,
-							wrapperClasspath);
+							wrapperClasspath, true);
 					if (classpath != null) {
 						appBuilder.command().add("-classpath");
 						appBuilder.command().add(classpath);
@@ -325,7 +325,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 						appBuilder.command().add(val);
 					}
 					if (!hasBootCp) {
-						String bootcp = buildClasspath(cwd, null, bootClasspath);
+						String bootcp = buildClasspath(cwd, null, bootClasspath, false);
 						if (bootcp != null && !bootcp.equals("")) {
 							/*
 							 * Do our own processing of append/prepend as there
@@ -876,17 +876,23 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 						+ "attempt will be made to locate an earlier version."));
 	}
 
-	protected String buildClasspath(File cwd, String defaultClasspath, String classpath)
+	protected String buildClasspath(File cwd, String defaultClasspath, String classpath, boolean appendByDefault)
 			throws IOException {
-		boolean append = false;
+		boolean append = appendByDefault;
 		boolean prepend = false;
 		if (classpath != null) {
-			if (classpath.startsWith("+")) {
-				classpath = classpath.substring(1);
-				append = true;
-			} else if (classpath.startsWith("-")) {
+			if (classpath.startsWith("-")) {
 				prepend = true;
 				classpath = classpath.substring(1);
+			}
+			else if (classpath.startsWith("+")) {
+				classpath = classpath.substring(1);
+				append = true;
+			}
+			else if (classpath.startsWith("=")) {
+				classpath = classpath.substring(1);
+				append = false;
+				prepend = false;
 			}
 		}
 		StringBuilder newClasspath = new StringBuilder();
