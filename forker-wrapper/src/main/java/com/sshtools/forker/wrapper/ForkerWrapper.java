@@ -94,6 +94,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	public final static String APPPLICATION_STOPPED = "application-stopped";
 	public final static String[] EVENT_NAMES = { EXITED_WRAPPER, EXITING_WRAPPER, STARTING_FORKER_DAEMON, STARTED_FORKER_DAEMON,
 			STARTED_APPLICATION, STARTING_APPLICATION, RESTARTING_APPLICATION, APPPLICATION_STOPPED };
+	
+	private static final String CROSSPLATFORM_PATH_SEPARATOR = ";|:";
 
 	public static class KeyValuePair {
 		private String key;
@@ -898,7 +900,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		StringBuilder newClasspath = new StringBuilder();
 		
 		if (StringUtils.isNotBlank(classpath)) {
-			for (String el : classpath.split(File.pathSeparator)) {
+			for (String el : classpath.split(CROSSPLATFORM_PATH_SEPARATOR)) {
 				String basename = FilenameUtils.getName(el);
 				if (basename.contains("*") || basename.contains("?")) {
 					String dirname = FilenameUtils.getFullPathNoEndSeparator(el);
