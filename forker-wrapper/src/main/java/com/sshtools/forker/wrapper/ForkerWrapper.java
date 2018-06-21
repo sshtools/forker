@@ -94,7 +94,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	public final static String APPPLICATION_STOPPED = "application-stopped";
 	public final static String[] EVENT_NAMES = { EXITED_WRAPPER, EXITING_WRAPPER, STARTING_FORKER_DAEMON, STARTED_FORKER_DAEMON,
 			STARTED_APPLICATION, STARTING_APPLICATION, RESTARTING_APPLICATION, APPPLICATION_STOPPED };
-	
 	private static final String CROSSPLATFORM_PATH_SEPARATOR = ";|:";
 
 	public static class KeyValuePair {
@@ -627,7 +626,12 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 									+ "Configuration may be passed to Forker Wrapper in four different ways :-\n\n"
 									+ "1. Command line options.\n" + "2. Configuration files (see -c and -C options)\n"
 									+ "3. Java system properties. The key of which is option name prefixed with   'forker.' and with - replaced with a dot (.)\n"
-									+ "4. Environment variables. The key of which is the option name prefixed with   'FORKER_' (in upper case) with - replaced with _\n\n",
+									+ "4. Environment variables. The key of which is the option name prefixed with   'FORKER_' (in upper case) with - replaced with _\n\n" 
+									+ "You can also narrow any configuration key down to a specific platform by prefixing\n"
+									+ "it with one of 'windows', 'mac-osx', 'linux', 'unix' or 'other'. The exact format\n"
+									+ "will depend on whether you are using options, files, system properties or environment\n"
+									+ "variables. For example, to specify '-XstartOnFirstThread' as a JVM argument for\n"
+									+ "only Max OSX as an option, you would use '--mac-osx-jvmarg=\"-XstartOnFirstThread\".",
 							opts, 2, 5, "\nProvided by SSHTOOLS Limited.", true);
 					System.exit(1);
 				} else {
@@ -886,19 +890,16 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			if (classpath.startsWith("-")) {
 				prepend = true;
 				classpath = classpath.substring(1);
-			}
-			else if (classpath.startsWith("+")) {
+			} else if (classpath.startsWith("+")) {
 				classpath = classpath.substring(1);
 				append = true;
-			}
-			else if (classpath.startsWith("=")) {
+			} else if (classpath.startsWith("=")) {
 				classpath = classpath.substring(1);
 				append = false;
 				prepend = false;
 			}
 		}
 		StringBuilder newClasspath = new StringBuilder();
-		
 		if (StringUtils.isNotBlank(classpath)) {
 			for (String el : classpath.split(CROSSPLATFORM_PATH_SEPARATOR)) {
 				String basename = FilenameUtils.getName(el);
@@ -926,7 +927,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				}
 			}
 		}
-
 		if (StringUtils.isNotBlank(defaultClasspath)) {
 			String cp = newClasspath.toString();
 			if (append) {
@@ -938,7 +938,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			}
 		} else
 			classpath = newClasspath.toString();
-		
 		return classpath;
 	}
 
@@ -1209,16 +1208,40 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return valList;
 	}
 
+	protected String getOsPrefix() {
+		if (SystemUtils.IS_OS_WINDOWS)
+			return "windows";
+		else if (SystemUtils.IS_OS_MAC_OSX)
+			return "mac-osx";
+		else if (SystemUtils.IS_OS_LINUX)
+			return "linux";
+		else if (SystemUtils.IS_OS_UNIX)
+			return "unix";
+		else
+			return "other";
+	}
+
 	protected String getOptionValue(String key, String defaultValue) {
-		String val = cmd == null ? null : cmd.getOptionValue(key);
+		String os = getOsPrefix();
+		/* Look for OS specific options in preference */
+		String val = cmd == null ? null : cmd.getOptionValue(os + "-" + key);
+		if (val == null)
+			val = cmd == null ? null : cmd.getOptionValue(key);
 		if (val == null) {
-			val = System.getProperty("forkerwrapper." + key.replace("-", "."));
+			val = System.getProperty("forkerwrapper." + key.replace("-", "."),
+					System.getProperty("forkerwrapper." + (os + "." + key).replace("-", ".")));
 			if (val == null) {
-				val = System.getenv("FORKER_" + key.replace("-", "_").toUpperCase());
+				val = System.getenv("FORKER_" + ( os + "-" + key).replace("-", "_").toUpperCase());
 				if (val == null) {
-					val = getProperty(key);
-					if (val == null)
-						val = defaultValue;
+					val = System.getenv("FORKER_" + key.replace("-", "_").toUpperCase());
+					if (val == null) {
+						val = getProperty(os + "-" + key);
+						if (val == null) {
+							val = getProperty(key);
+							if (val == null)
+								val = defaultValue;
+						}
+					}
 				}
 			}
 		}

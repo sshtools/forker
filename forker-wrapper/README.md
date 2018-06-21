@@ -72,6 +72,12 @@ Configuration may be passed to Forker Wrapper in four different ways :-
 3. Java system properties. The key of which is option name prefixed with   'forker.' and with - replaced with a dot (.)
 4. Environment variables. The key of which is the option name prefixed with   'FORKER_' (in upper case) with - replaced with _
 
+You can also narrow any configuration key down to a specific platform by prefixing
+it with one of 'windows', 'mac-osx', 'linux', 'unix' or 'other'. The exact format
+will depend on whether you are using options, files, system properties or environment
+variables. For example, to specify '-XstartOnFirstThread' as a JVM argument for
+only Max OSX as an option, you would use '--mac-osx-jvmarg=\"-XstartOnFirstThread.
+
   -a,--administrator                                        Run as administrator.
   -A,--apparg <arg>                                         Application arguments. How these are treated depends on argmode, but by
                                                             default the will be overridden by any command line arguments passed in.
