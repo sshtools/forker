@@ -1169,12 +1169,14 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	}
 
 	protected List<String> getOptionValues(String key) {
+		String os = getOsPrefix();
+		
 		String[] vals = cmd == null ? null : cmd.getOptionValues(key);
 		if (vals != null)
 			return Arrays.asList(vals);
 		List<String> valList = new ArrayList<String>();
 		for (KeyValuePair nvp : properties) {
-			if (nvp.getName().equals(key) && nvp.getValue() != null) {
+			if ((nvp.getName().equals(key) || nvp.getName().equals(os + "-" + key)) && nvp.getValue() != null) {
 				valList.add(nvp.getValue());
 			}
 		}
@@ -1183,7 +1185,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		 */
 		List<String> varNames = new ArrayList<String>();
 		for (Map.Entry<Object, Object> en : System.getProperties().entrySet()) {
-			if (((String) en.getKey()).startsWith("forker." + (key.replace("-", ".")) + ".")) {
+			if (((String) en.getKey()).startsWith("forker." + (key.replace("-", ".")) + ".") || ((String) en.getKey()).startsWith("forker." + os.replace("-", ".") + "." + (key.replace("-", ".")) + ".")) {
 				varNames.add((String) en.getKey());
 			}
 		}
@@ -1197,7 +1199,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		 */
 		varNames.clear();
 		for (Map.Entry<String, String> en : System.getenv().entrySet()) {
-			if (en.getKey().startsWith("FORKER_" + (key.toUpperCase().replace("-", "_")) + "_")) {
+			if (en.getKey().startsWith("FORKER_" + (key.toUpperCase().replace("-", "_")) + "_") || en.getKey().startsWith("FORKER_" + ((os + "-" + key).toUpperCase().replace("-", "_")) + "_")) {
 				varNames.add(en.getKey());
 			}
 		}
