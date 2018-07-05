@@ -19,8 +19,8 @@ import java.util.logging.Logger;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.NullOutputStream;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.SystemUtils;
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.SystemUtils;
 
 import com.sshtools.forker.client.EffectiveUserFactory.SudoFixedPasswordUser;
 import com.sshtools.forker.common.IO;

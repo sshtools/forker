@@ -7,8 +7,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.SystemUtils;
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.SystemUtils;
 
 import com.pty4j.PtyProcess;
 import com.pty4j.WinSize;

@@ -4,7 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
 
-import org.apache.commons.lang3.SystemUtils;
+import org.apache.commons.lang.SystemUtils;
 
 /**
  * Extension to {@link ForkerBuilder} that with launch a shell appropriate for

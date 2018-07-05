@@ -3,8 +3,8 @@ package com.sshtools.forker.common;
 import java.io.File;
 import java.io.IOException;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.SystemUtils;
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.SystemUtils;
 
 import com.sshtools.forker.common.CSystem.Termios;
 import com.sun.jna.Memory;

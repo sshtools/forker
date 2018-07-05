@@ -4,7 +4,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Map;
 
-import org.apache.commons.lang3.SystemUtils;
+import org.apache.commons.lang.SystemUtils;
 
 import com.sshtools.forker.common.Util;
 
