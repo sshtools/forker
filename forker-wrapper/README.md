@@ -76,8 +76,7 @@ You can also narrow any configuration key down to a specific platform by prefixi
 it with one of 'windows', 'mac-osx', 'linux', 'unix' or 'other'. The exact format
 will depend on whether you are using options, files, system properties or environment
 variables. For example, to specify '-XstartOnFirstThread' as a JVM argument for
-only Max OSX as an option, you would use '--mac-osx-jvmarg=\"-XstartOnFirstThread.
-
+only Max OSX as an option, you would use '--mac-osx-jvmarg="-XstartOnFirstThread".
   -a,--administrator                                        Run as administrator.
   -A,--apparg <arg>                                         Application arguments. How these are treated depends on argmode, but by
                                                             default the will be overridden by any command line arguments passed in.
@@ -90,12 +89,17 @@ only Max OSX as an option, you would use '--mac-osx-jvmarg=\"-XstartOnFirstThrea
                                                             Prefix the path with '+' to add it to the end of the existing classpath,
                                                             or '-' to add it to the start. Use of a jvmarg that starts with
                                                             '-Xbootclasspath' will override this setting.
-  -c,--configuration <file>                                 A file to read configuration. The file should contain name=value pairs,
-                                                            where name is the same name as used for command line arguments (see
-                                                            --help for a list of these)
-  -C,--configuration-directory <directory>                  A directory to read configuration files from. Each file should contain
-                                                            name=value pairs, where name is the same name as used for command line
-                                                            arguments (see --help for a list of these)
+  -c,--configuration <file>                                 A file to read configuration. The can either be a JavaScript file that
+                                                            evaluates to an object containing keys and values of the configuration
+                                                            options (use arrays for multiple value commands), or it may be a simple
+                                                            text file that contains name=value pairs, where name is the same name as
+                                                            used for command line arguments (see --help for a list of these)
+  -C,--configuration-directory <directory>                  A directory to read configuration files from. Each file can either ba
+                                                            JavaScript file evaluates to an object containing keys and values of the
+                                                            configuration options (use arrays for multiple value commands), or it
+                                                            may be a simple text file that contains name=value pairs, where name is
+                                                            the same name as used for command line arguments (see --help for a list
+                                                            of these)
   -cp,--classpath <arg>                                     The classpath to use to run the application. If not set, the current
                                                             runtime classpath is used (the java.class.path system property). Prefix
                                                             the path with '+' to add it to the end of the existing classpath, or '-'
@@ -213,6 +217,5 @@ only Max OSX as an option, you would use '--mac-osx-jvmarg=\"-XstartOnFirstThrea
   -Z,--quiet-stdout                                         Do not output anything on stdout from the wrapped process.
 
 Provided by SSHTOOLS Limited.
-
 
 ```
