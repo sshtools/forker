@@ -37,6 +37,10 @@ public interface IO {
 	 */
 	public final static IO SINK = new DefaultIO("SINK", true, true, false, false);
 	/**
+	 * A mode indicating non-blocking I/O is required.
+	 */
+	public final static IO NON_BLOCKING = new DefaultIO("NON_BLOCKING", true, true, false, true);
+	/**
 	 * A mode indicating the daemon should be used.
 	 */
 	public final static IO DAEMON = new DefaultIO("DAEMON", true, true);

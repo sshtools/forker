@@ -12,6 +12,7 @@ import java.util.ServiceLoader;
 import com.sshtools.forker.client.impl.DefaultProcessFactory;
 import com.sshtools.forker.client.impl.ForkerDaemonProcessFactory;
 import com.sshtools.forker.client.impl.LocalProcessFactory;
+import com.sshtools.forker.client.impl.NonBlockingProcessFactory;
 import com.sshtools.forker.client.impl.POpenProcessFactory;
 import com.sshtools.forker.client.impl.SystemProcessFactory;
 import com.sshtools.forker.common.Command;
@@ -452,6 +453,7 @@ public class ForkerBuilder {
 		for (ForkerProcessFactory io : ServiceLoader.load(ForkerProcessFactory.class)) {
 			processFactories.add(io);
 		}
+		processFactories.add(new NonBlockingProcessFactory());
 		processFactories.add(new POpenProcessFactory());
 		processFactories.add(new SystemProcessFactory());
 		processFactories.add(new DefaultProcessFactory());

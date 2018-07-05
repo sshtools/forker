@@ -18,7 +18,16 @@ import org.apache.commons.lang.SystemUtils;
  *
  */
 public class Command {
-	private List<String> arguments = new ArrayList<String>();
+	private List<String> arguments = new ArrayList<String>() {
+
+		@Override
+		public boolean add(String e) {
+			if(e == null)
+				throw new NullPointerException();
+			return super.add(e);
+		}
+		
+	};
 	private boolean redirectError;
 	private File directory;
 	private Map<String, String> environment;

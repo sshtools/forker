@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
@@ -26,6 +27,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
 
 import org.apache.commons.lang.SystemUtils;
 
@@ -44,6 +46,7 @@ import com.sshtools.forker.common.States;
  * implementations and {@link CommandExecutor} implementations.
  */
 public class Forker {
+	private Logger logger = Logger.getLogger(Forker.class.getName());
 
 	// private int port = Defaults.PORT;
 	private int port = 0;
@@ -61,9 +64,17 @@ public class Forker {
 	 * Constructor
 	 */
 	public Forker() {
-		for (Handler handler : ServiceLoader.load(Handler.class)) {
-			handlers.put(handler.getType(), handler);
+		Iterator<Handler> srvs = ServiceLoader.load(Handler.class).iterator();
+		while(srvs.hasNext()) {
+			try {
+				Handler handler = srvs.next();
+				handlers.put(handler.getType(), handler);
+			} catch(Exception e) {
+				logger.warning(String.format("Failed to load I/O handler.", e));
+			}
 		}
+		if(handlers.isEmpty())
+			throw new IllegalStateException("No I/O handlers at all.");
 	}
 
 	/**
