@@ -5,7 +5,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
 
-import com.sshtools.forker.client.AbstractForkerProcess;
+import com.sshtools.forker.client.ForkerProcess;
 import com.sshtools.forker.client.EffectiveUser;
 import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.common.IO;
@@ -14,7 +14,7 @@ import com.sshtools.forker.common.IO;
  * This uses Java's {@link ProcessBuilder} to wrap a standard {@link Process}.
  *
  */
-public class LocalProcess extends AbstractForkerProcess {
+public class LocalProcess extends ForkerProcess {
 
 	private Process nativeProcess;
 

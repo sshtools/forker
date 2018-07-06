@@ -2,8 +2,8 @@
 
 
 	<properties>
-		<maven.compiler.target>1.6</maven.compiler.target>
-		<maven.compiler.source>1.6</maven.compiler.source>
+		<maven.compiler.target>1.7</maven.compiler.target>
+		<maven.compiler.source>1.7</maven.compiler.source>
 		<maven.checkstyle.plugin>2.17</maven.checkstyle.plugin>
 		<maven.cobertura.plugin>2.7</maven.cobertura.plugin>
 		<maven.doxia.module.markdown.version>1.7</maven.doxia.module.markdown.version>
@@ -153,6 +153,7 @@
 				</executions>
 				<configuration>
 					<encoding>UTF-8</encoding>
+					<excludePackageNames>**.impl.*</excludePackageNames>
 				</configuration>
 			</plugin>
 			<plugin>

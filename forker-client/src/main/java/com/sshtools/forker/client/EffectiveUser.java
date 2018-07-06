@@ -14,19 +14,6 @@ import com.sshtools.forker.common.Command;
  */
 public interface EffectiveUser {
 	/**
-	 * Alter the command and/or process such that it will be launched using the
-	 * user this object represents.
-	 * 
-	 * @param builder
-	 *            builder
-	 * @param process
-	 *            process
-	 * @param command
-	 *            command
-	 */
-	void elevate(ForkerBuilder builder, Process process, Command command);
-
-	/**
 	 * De-configure the command and/or process such that it will no longer be
 	 * run as an administrator or different, but will run as the current user.
 	 * 
@@ -38,4 +25,17 @@ public interface EffectiveUser {
 	 *            command
 	 */
 	void descend(ForkerBuilder builder, Process process, Command command);
+
+	/**
+	 * Alter the command and/or process such that it will be launched using the
+	 * user this object represents.
+	 * 
+	 * @param builder
+	 *            builder
+	 * @param process
+	 *            process
+	 * @param command
+	 *            command
+	 */
+	void elevate(ForkerBuilder builder, Process process, Command command);
 }

@@ -11,7 +11,27 @@ import com.sshtools.forker.common.Util;
 /**
  * Abstract implementation for processes that use OS calls.
  */
-public abstract class AbstractOSProcess extends AbstractForkerProcess {
+public abstract class AbstractOSProcess extends ForkerProcess {
+
+	@Override
+	public void destroy() {
+		throw new UnsupportedOperationException();
+	};
+
+	@Override
+	public InputStream getErrorStream() {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public InputStream getInputStream() {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public OutputStream getOutputStream() {
+		throw new UnsupportedOperationException();
+	}
 
 	protected String buildCommand(final ForkerBuilder builder) {
 		// This will run in a shell, so we need to escape the
@@ -103,31 +123,11 @@ public abstract class AbstractOSProcess extends AbstractForkerProcess {
 
 		final String string = bui.toString();
 		return string;
-	};
+	}
 
 	private boolean isLessThanWindows7() {
 		return SystemUtils.IS_OS_WINDOWS_95 || SystemUtils.IS_OS_WINDOWS_98 || SystemUtils.IS_OS_WINDOWS_XP
 				|| SystemUtils.IS_OS_WINDOWS_2000 || SystemUtils.IS_OS_WINDOWS_ME || SystemUtils.IS_OS_WINDOWS_NT;
-	}
-
-	@Override
-	public OutputStream getOutputStream() {
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public InputStream getInputStream() {
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public InputStream getErrorStream() {
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public void destroy() {
-		throw new UnsupportedOperationException();
 	}
 
 }

@@ -15,8 +15,9 @@ public interface ForkerProcessFactory {
 	 * should throw an exception.
 	 * 
 	 * @param builder builder
+	 * @param listener listener
 	 * @return process
 	 * @throws IOException on any error
 	 */
-	AbstractForkerProcess createProcess(ForkerBuilder builder) throws IOException;
+	ForkerProcess createProcess(ForkerBuilder builder, ForkerProcessListener listener) throws IOException;
 }

@@ -104,5 +104,33 @@ System.out.println(OSCommand.admiinCommandAndCaptureOutput("cat", "/etc/shadow")
 
 ### ForkerBuilder 
 
-The replacement to ProcessBuilder, ForkerBuilder uses different methods depending on the type of  I/O used, and also allows processes to be run as an administrator (or any other user). Depending on whether input, output, or I/O is needed (which should be provided as hint to the API), popen, system or a standard process will be used.
+The replacement to ProcessBuilder, ForkerBuilder uses different methods depending on the type of  I/O used, and also allows processes to be run as an administrator (or any other user). Depending on whether input, output, or I/O is needed (which should be provided as hint to the API), popen, system or a standard process will be used, as well as the ability to use non-blocking
+I/O.
 
+#### Running using non-blocking I/O
+
+One major feature of ForkerBuilder is the ability to use non-blocking I/O. Depending on how many processes you will be launching
+this can have major benefits, as it avoids the need to create one, two or even sometimes 3 threads that may be necessary
+for an ordinary ProcessBuilder process.
+
+
+```java
+ForkerBuilder builder = new ForkerBuilder().io(IO.NON_BLOCKING).redirectErrorStream(true);
+if (SystemUtils.IS_OS_UNIX) {
+	// The unix example tries to list the root directory
+	builder.command("ls", "-al", "/");
+} else {
+	builder.command("DIR", "C:\\");
+}
+Process process = builder.start(new DefaultNonBlockingProcessListener() {
+	@Override
+	public void onStdout(NonBlockingProcess process, ByteBuffer buffer, boolean closed) {
+		if (!closed) {
+			byte[] bytes = new byte[buffer.remaining()];
+			/* Consume bytes from buffer (so position is updated) */
+			buffer.get(bytes);
+			System.out.println(new String(bytes));
+		}
+	}
+});
+```

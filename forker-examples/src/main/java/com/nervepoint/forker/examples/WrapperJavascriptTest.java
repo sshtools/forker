@@ -5,7 +5,8 @@ import java.io.File;
 import com.sshtools.forker.wrapper.ForkerWrapper;
 
 /**
- * Shows you can embed {@link ForkerWrapper}.
+ * Shows you can embed {@link ForkerWrapper} and use a JavaScript
+ * configuration file to configure it.
  */
 public class WrapperJavascriptTest {
 

@@ -12,7 +12,8 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.sshtools.forker.client.AbstractForkerProcess;
+import com.sshtools.forker.client.ForkerProcess;
+import com.sshtools.forker.client.ForkerProcessListener;
 import com.sshtools.forker.common.Command;
 import com.sshtools.forker.common.Cookie;
 import com.sshtools.forker.common.Cookie.Instance;
@@ -24,7 +25,7 @@ import com.sshtools.forker.common.States;
  * (possibly as a different user). The {@link Command} will be serialised and
  * sent to the daemon.
  */
-public class ForkerDaemonProcess extends AbstractForkerProcess {
+public class ForkerDaemonProcess extends ForkerProcess {
 
 	/**
 	 * How output to stdin is flushed.
@@ -68,7 +69,7 @@ public class ForkerDaemonProcess extends AbstractForkerProcess {
 	 * changes
 	 *
 	 */
-	public interface Listener {
+	public interface Listener extends ForkerProcessListener {
 		/**
 		 * Pseudo terminal window size has changed.
 		 * 

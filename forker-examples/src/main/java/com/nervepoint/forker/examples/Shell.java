@@ -39,20 +39,14 @@ public class Shell {
 		/* Demonstrate we are actually in a different shell by setting PS1 */
 		shell.environment().put("MYENV", "An environment variable");
 		
-		/* Start the shell */
-		final Process p = shell.start();
-
-		/*
-		 * NOTE: The process will actually be an instance of ForkerDaemonProcess in
-		 * the case of PTY. You can cast this to add listeners for window size
-		 */
-		ForkerDaemonProcess fp = (ForkerDaemonProcess) p;
-		fp.addListener(new Listener() {
+		/* Start the shell, giving it a window size listener */
+		final Process p = shell.start(new Listener() {
 			@Override
 			public void windowSizeChanged(int ptyWidth, int ptyHeight) {
 				System.out.println("Window size changed to " + ptyWidth + " x " + ptyHeight);
 			}
 		});
+
 		
 		new Thread() {
 			public void run() {

@@ -4,7 +4,12 @@
 	<name>Forker Client</name>
 	<description>This is client side library for forker, and the one you most likely want to use in your own applications.
 
-It provides the ProcessBuilder replacement, ForkerBuilder, as well the helpers in OSCommand.</description>
+It provides the ProcessBuilder replacement, ForkerBuilder, as well the helpers in OSCommand. ForkerBuilder is 
+capable of launching processes using non-blocking I/O or attached to a PTY. It has many additional features
+not available in the standard process builder including permission elevation, daemonize, processor affinity 
+and more.
+
+Parts of the non-blocking API are based on NuProcess (https://github.com/brettwooldridge/NuProcess)</description>
 	<parent>
 		<groupId>com.sshtools</groupId>
 		<artifactId>forker</artifactId>

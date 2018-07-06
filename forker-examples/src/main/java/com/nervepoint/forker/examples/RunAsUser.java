@@ -3,18 +3,28 @@ package com.nervepoint.forker.examples;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.SystemUtils;
 
+import com.sshtools.forker.client.EffectiveUser;
 import com.sshtools.forker.client.EffectiveUserFactory;
 import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.common.IO;
 
+/**
+ * Demonstrates running a command as another user.
+ */
 public class RunAsUser {
 
 	public static void main(String[] args) throws Exception {
 
-		// Change this to another user on your system
-		String username = "testuser2";
+		/* Either supply a username on the command line when you run this class or 
+		 * change this username 'testuser2' to one that exists on your system.
+		 */
+		String username = args.length == 0 ? "testuser2" : args[0];
 		
-		ForkerBuilder builder = new ForkerBuilder().effectiveUser(EffectiveUserFactory.getDefault().getUserForUsername(username)).
+		/* Get the user object for this user */
+		EffectiveUser user = EffectiveUserFactory.getDefault().getUserForUsername(username);
+		
+		/* Create the builder */
+		ForkerBuilder builder = new ForkerBuilder().effectiveUser(user).
 				io(IO.IO).redirectErrorStream(true);
 		
 		if(SystemUtils.IS_OS_LINUX) {

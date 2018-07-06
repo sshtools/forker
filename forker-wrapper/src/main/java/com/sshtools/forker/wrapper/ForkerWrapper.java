@@ -353,7 +353,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 						throw new IllegalArgumentException(
 								"Must provide a 'main' property to specify the class that contains the main() method that is your applications entry point.");
 				}
-				if (!getSwitch("no-info", false)) {
+				if (!nativeMain && !getSwitch("no-info", false)) {
 					if (lastRetVal > -1) {
 						appBuilder.command().add(String.format("-Dforker.info.lastExitCode=%d", lastRetVal));
 					}
@@ -629,11 +629,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 						+ "it may be a simple text file that contains name=value pairs, where name is the same name as used for command line "
 						+ "arguments (see --help for a list of these)")
 				.longOpt("configuration").build());
-		opts.addOption(Option.builder("C").argName("directory").hasArg()
-				.desc("A directory to read configuration files from. Each file can either be a JavaScript file that evaluates to an object "  
-						+ "containing keys and values of the configuration options (use arrays for multiple value commands), or " 
+		opts.addOption(Option.builder("C").argName("directory").hasArg().desc(
+				"A directory to read configuration files from. Each file can either be a JavaScript file that evaluates to an object "
+						+ "containing keys and values of the configuration options (use arrays for multiple value commands), or "
 						+ "it may be a simple text file that contains name=value pairs, where name is the same name as used for command line "
-						+ "arguments (see --help for a list of these)") 
+						+ "arguments (see --help for a list of these)")
 				.longOpt("configuration-directory").build());
 		opts.addOption(Option.builder("h")
 				.desc("Show command line help. When the optional argument is supplied, help will "
@@ -671,8 +671,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 									+ "the user they are run as, providing automatic restarting, signal handling and "
 									+ "other facilities that will be useful running applications as a 'service'.\n\n"
 									+ "Configuration may be passed to Forker Wrapper in four different ways :-\n\n"
-									+ "1. Command line options.\n" 
-									+ "2. Configuration files (see -c and -C options)\n"
+									+ "1. Command line options.\n" + "2. Configuration files (see -c and -C options)\n"
 									+ "3. Java system properties. The key of which is option name prefixed with   'forker.' and with - replaced with a dot (.)\n"
 									+ "4. Environment variables. The key of which is the option name prefixed with   'FORKER_' (in upper case) with - replaced with _\n\n"
 									+ "You can also narrow any configuration key down to a specific platform by prefixing\n"
@@ -1125,7 +1124,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					}
 				} else {
 					/* Not using daemon, so just destroy process */
-					p.destroy();
+					if (p != null)
+						p.destroy();
 				}
 				final Thread current = Thread.currentThread();
 				Thread exitWaitThread = null;

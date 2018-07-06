@@ -28,10 +28,9 @@ public class WrappedProcessTest {
 			throw new UnsupportedOperationException("Add a command for your OS to test.");
 
 		// Get a handle on the process factory, allowing configuration of it
-		WrapperProcessFactory processFactory = fb.processFactory(WrapperProcessFactory.class);
+		WrapperProcessFactory processFactory = fb.configuration().processFactory(WrapperProcessFactory.class);
 
 		processFactory.addOption(new KeyValuePair("native", "true"));
-		processFactory.addOption(new KeyValuePair("help"));
 		processFactory.addOption(new KeyValuePair("level", "FINEST"));
 		processFactory.addOption(new KeyValuePair("restart-on", "0"));
 		processFactory.addOption(new KeyValuePair("restart-wait", "10"));

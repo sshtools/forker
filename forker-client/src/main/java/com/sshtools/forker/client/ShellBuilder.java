@@ -20,23 +20,13 @@ public class ShellBuilder extends ForkerBuilder {
 	private File rcfile;
 
 	/**
-	 * Specify an 'rcfile' to run on every shell.
+	 * Get if the shell should be a login shell. This will affect the
+	 * environment and other attributes.
 	 * 
-	 * @param rcfile rc file
-	 * @return builder for chaining
+	 * @return login shell
 	 */
-	public ShellBuilder rcfile(File rcfile) {
-		this.rcfile = rcfile;
-		return this;
-	}
-
-	/**
-	 * Get the 'rcfile' to run on every shell.
-	 * 
-	 * @return rcfile
-	 */
-	public File rcfile() {
-		return rcfile;
+	public boolean loginShell() {
+		return loginShell;
 	}
 
 	/**
@@ -53,16 +43,26 @@ public class ShellBuilder extends ForkerBuilder {
 	}
 
 	/**
-	 * Get if the shell should be a login shell. This will affect the
-	 * environment and other attributes.
+	 * Get the 'rcfile' to run on every shell.
 	 * 
-	 * @return login shell
+	 * @return rcfile
 	 */
-	public boolean loginShell() {
-		return loginShell;
+	public File rcfile() {
+		return rcfile;
 	}
 
-	public Process start() throws IOException {
+	/**
+	 * Specify an 'rcfile' to run on every shell.
+	 * 
+	 * @param rcfile rc file
+	 * @return builder for chaining
+	 */
+	public ShellBuilder rcfile(File rcfile) {
+		this.rcfile = rcfile;
+		return this;
+	}
+
+	public ForkerProcess start() throws IOException {
 		if (SystemUtils.IS_OS_LINUX || SystemUtils.IS_OS_UNIX || SystemUtils.IS_OS_MAC_OSX) {
 			// This can make us unbuffered and give a much more useful
 			// terminal

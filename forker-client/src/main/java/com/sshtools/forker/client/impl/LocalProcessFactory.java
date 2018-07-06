@@ -2,9 +2,10 @@ package com.sshtools.forker.client.impl;
 
 import java.io.IOException;
 
-import com.sshtools.forker.client.AbstractForkerProcess;
+import com.sshtools.forker.client.ForkerProcess;
 import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.client.ForkerProcessFactory;
+import com.sshtools.forker.client.ForkerProcessListener;
 
 /**
  * Creates {@link LocalProcess} as a fallback. Usually this factory comes last
@@ -13,7 +14,7 @@ import com.sshtools.forker.client.ForkerProcessFactory;
 public class LocalProcessFactory implements ForkerProcessFactory {
 
 	@Override
-	public AbstractForkerProcess createProcess(ForkerBuilder builder) throws IOException {
+	public ForkerProcess createProcess(ForkerBuilder builder, ForkerProcessListener listener) throws IOException {
 		// Finally always fallback to a standard local process
 		LocalProcess localProcess = new LocalProcess(builder);
 		return localProcess;

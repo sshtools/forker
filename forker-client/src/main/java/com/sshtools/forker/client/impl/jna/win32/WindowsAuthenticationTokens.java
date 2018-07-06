@@ -1,4 +1,4 @@
-package com.sshtools.forker.client.win32;
+package com.sshtools.forker.client.impl.jna.win32;
 
 import com.sun.jna.platform.win32.WinNT.HANDLE;
 
