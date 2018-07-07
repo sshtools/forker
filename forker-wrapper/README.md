@@ -2,7 +2,7 @@
 
 A 'wrapper' to execute services in Java. Similar to JSW (Java Service Wrapper) and YAJSW, Forker Wrapper can be used to launch processes in the background, track the process ID, capture output to log, automatically restart a hung or crashed JVM and more.
 
-## Adding Forker Client To Your Project
+## Adding Forker Wrapper To Your Project
 
 To include the Forker Wrapper in your project, you will currently need the following repository and modules :-
 
@@ -25,7 +25,7 @@ And your dependency configuration :-
 	<dependency>
 		<groupId>com.sshtools</groupId>
 		<artifactId>forker-wrapper</artifactId>
-		<version>1.4-SNAPSHOT</version>
+		<version>1.5-SNAPSHOT</version>
 	</dependency>
 </dependencies>
 ```
@@ -45,7 +45,7 @@ java -jar forker-wrapper.jar com.nervepoint.forker.examples apparg1 apparg2 appa
 The wrapper itself can be configured in any one of four ways. All four methods provide all the same configuration options, they just allow different ways of setting.
 
  1. Command line options. To wrap your application, instead of supplying it's name as the classname when you invoke the java command, instead use **com.sshtools.forker.wrapper.ForkerWrapper**, then following this by any of the command line options. At least one option must provide the actual class name that contains the main method you wish to run.
- 1. Configuration files (see -c and -C command line options). You may supply (multiple) configuration files, each of which is a simple text file that contains one option, and optionally it's value, per line. By using -C, you can specify a configuration directory where all files in that directory will be loaded.
+ 1. Configuration files (see -c and -C command line options). You may supply (multiple) configuration files, each of which is either a) a simple text file that contains one option, and optionally it's value, per line or b) A Javascript file ending in.js that is evaluated for a JS Object whose keys are option names and values are the option values. By using -C, you can specify a configuration directory where all files in that directory will be loaded.
  1. Java system properties. The key of which is option name prefixed with forker.' and with - replaced with a dot (.)
  1. Environment variables. The key of which is the option name prefixed with
 'FORKER_' (in upper case) with - replaced with _
