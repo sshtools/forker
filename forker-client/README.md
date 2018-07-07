@@ -59,8 +59,15 @@ if(OSCommand.runCommand("cp", "/tmp/file1", "/tmp/file") != 0) {
     System.err.println("File copy failed");
 }
 
-/* If you want to capture the output of a command .. */
+/* If you want to capture the output of a command (for short output) .. */
 for(String userline : OSCommand.runCommandAndCaptureOutput("cat", "/etc/passwd")) {
+    System.out.println(">>>> " + userline);  
+}
+
+/* If you want to capture the output of a command that is gong to output a lot,
+   you are better off using the 'iterate' varient. These look similar, but
+   the former is returning a List, the latter an Iterable. */
+for(String userline : OSCommand.runCommandAndIterateOutput("find", "/")) {
     System.out.println(">>>> " + userline);  
 }
 
@@ -93,13 +100,20 @@ finally {
     OSCommand.restrict();
 }
 
+/* If using Java8, you can use try-with-resource for a more compact form :- */
+try(OSCommand.elevated()) {
+    OSCommand.run("cp", "/tmp/file1", "/tmp/file2");
+    OSCommand.run("cp", "-R", "/tmp/dir1", "/tmp/dir2");
+    OSCommand.run("rm", "/tmp/file1");
+}
+
 /* Being prompted for the password every time a system command is need is probably 
    not what you want. You can use the Forker Daemon to help with this  .. */
    
 Forker.loadDaemon(true); // Will prompt for admin password
 OSCommand.run("id"); // Will run as normal user
 OSCommand.admin("id"); // Will run as admin without a prompt  
-System.out.println(OSCommand.admiinCommandAndCaptureOutput("cat", "/etc/shadow")); // Will run as admin without a prompt
+System.out.println(OSCommand.adminCommandAndCaptureOutput("cat", "/etc/shadow")); // Will run as admin without a prompt
 ```
 
 ### ForkerBuilder 
