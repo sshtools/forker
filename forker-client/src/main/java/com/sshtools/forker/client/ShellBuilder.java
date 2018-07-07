@@ -3,6 +3,7 @@ package com.sshtools.forker.client;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
+import java.util.List;
 
 import org.apache.commons.lang.SystemUtils;
 
@@ -18,6 +19,57 @@ public class ShellBuilder extends ForkerBuilder {
 
 	private boolean loginShell;
 	private File rcfile;
+
+	/**
+	 * Construct a new builder given a list of command arguments. The first
+	 * element is the location of the script, anything remaining is passed to this
+	 * script as arguments.  If no arguments are provided, the shell itself
+	 * will be executed.
+	 * 
+	 * @param configuration configuration
+	 * @param command command and command arguments
+	 */
+	public ShellBuilder(ForkerConfiguration configuration, List<String> command) {
+		super(configuration, command);
+	}
+
+
+	/**
+	 * Construct a new builder given an array (or varargs) of command arguments. The first
+	 * element is the location of the script, anything remaining is passed to this
+	 * script as arguments. If no arguments are provided, the shell itself
+	 * will be executed.
+	 * 
+	 * @param configuration configuration
+	 * @param command command and command arguments
+	 */
+	public ShellBuilder(ForkerConfiguration configuration, String... command) {
+		super(configuration, command);
+	}
+
+	/**
+	 * Construct a new builder given a list of command arguments. The first
+	 * element is the command to execute, anything remaining is passed to this
+	 * command as arguments. If no arguments are provided, the shell itself
+	 * will be executed.
+	 * 
+	 * @param command command and command arguments
+	 */
+	public ShellBuilder(List<String> command) {
+		super(command);
+	}
+
+	/**
+	 * Construct a new builder given an array of command arguments. The first
+	 * element is the command to execute, anything remaining is passed to this
+	 * command as arguments. If no arguments are provided, the shell itself
+	 * will be executed.
+	 * 
+	 * @param command command and command arguments
+	 */
+	public ShellBuilder(String... command) {
+		super(command);
+	}
 
 	/**
 	 * Get if the shell should be a login shell. This will affect the

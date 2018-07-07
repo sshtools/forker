@@ -1,23 +1,38 @@
-package com.nervepoint.forker.examples;
+# Forker PTY support
 
-import java.io.IOException;
+This module adds support for a new I/O mode, [PTYExecutor.PTY](src/main/java/com/sshtools/forker/pty/PTYExecutor.java).
+This mode will use [Forker Daemon](../forker-daemon/README.md) to maintain one or more pseudo terminals.
 
-import org.apache.commons.io.IOUtils;
+## Maven
 
-import com.sshtools.forker.client.Forker;
-import com.sshtools.forker.client.ShellBuilder;
-import com.sshtools.forker.client.impl.ForkerDaemonProcess.Listener;
-import com.sshtools.forker.common.Cookie.Instance;
-import com.sshtools.forker.common.OS;
-import com.sshtools.forker.pty.PTYExecutor;
+This module is not available on Maven Central due to it's dependencies. Instead it can be found at our own Artifactory server :-
 
-/**
- * This example shows how to create an interactive shell. 
- *
- */
-public class Shell {
 
-	public static void main(String[] args) throws Exception {
+```xml
+<repositories>
+	<repository>
+		<id>opensource-releases</id>
+		<url>http://artifactory.javassh.com/opensource-snapshots</url>
+		<name>SSHTOOLS Open Source Releases</name>
+	</repository>
+</repositories>
+```
+
+And your dependency configuration :-
+    
+```
+<dependencies>
+	<dependency>
+		<groupId>com.sshtools</groupId>
+		<artifactId>forker-pty</artifactId>
+		<version>1.5</version>
+	</dependency>
+</dependencies>
+```
+
+## Example
+
+```java
 		/*
 		 * This example reads from stdin (i.e. the console), so stdin needs to be unbuffered with
 		 * no local echoing at this end of the pipe, the following function
@@ -28,7 +43,7 @@ public class Shell {
 		/* PTY requires the daemon, so load it now (or connect to an existing one if you
 		 * have started it yourself). */
 		Forker.loadDaemon();
-//		Forker.connectDaemon(new Instance("NOAUTH:57872"));
+		// Forker.connectDaemon(new Instance("NOAUTH:57872"));
 		
 		/* ShellBuilder is a specialisation of ForkerBuilder */
 		ShellBuilder shell = new ShellBuilder();
@@ -37,7 +52,7 @@ public class Shell {
 		shell.redirectErrorStream(true);
 		
 		/* Demonstrate we are actually in a different shell by setting PS1 */
-		shell.environment().put("MYENV", "An environment variable");
+		shell.environment().put("PS1", ">>>");
 		
 		/* Start the shell, giving it a window size listener */
 		final Process p = shell.start(new Listener() {
@@ -67,5 +82,5 @@ public class Shell {
 		int ret = p.waitFor();
 		System.err.println("Exited with code: " + ret);
 		System.exit(ret);
-	}
-}
+```
+ 

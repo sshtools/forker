@@ -6,28 +6,16 @@ Forker Client provides a set of utilities, *OSCommand*, and the ProcessBuilder r
    
 ## Adding Forker Client To Your Project
 
-To include the Forker utilities in your project, you will currently need the following repository and modules :-
+To include the Forker utilities in your project, you will need the module :-
 
 ### Maven
 
-```xml
-<repositories>
-	<repository>
-		<id>opensource-snapshots</id>
-		<url>http://artifactory.javassh.com/opensource-snapshots</url>
-		<name>SSHTOOLS Open Source Snapshots</name>
-	</repository>
-</repositories>
-```
-
-And your dependency configuration :-
-    
 ```
 <dependencies>
 	<dependency>
 		<groupId>com.sshtools</groupId>
 		<artifactId>forker-client</artifactId>
-		<version>1.2.SNAPSHOT</version>
+		<version>1.5</version>
 	</dependency>
 </dependencies>
 ```
@@ -147,4 +135,86 @@ Process process = builder.start(new DefaultNonBlockingProcessListener() {
 		}
 	}
 });
+```
+
+The same listener can be used for getting notifications of process exit, errors, or stderr (if you 
+are not using *redirectErrorStream(true)*).
+
+```java
+
+// ....
+Process process = builder.start(new DefaultNonBlockingProcessListener() {
+	@Override
+	public void onError(Exception exception, NonBlockingProcess process, boolean existing) {
+		// Got an error on the handler thread
+	}
+
+	@Override
+	public void onExit(int exitCode, NonBlockingProcess process) {
+		// Process has exited
+	}
+
+	@Override
+	public void onStderr(NonBlockingProcess process, ByteBuffer buffer, boolean closed) {
+		// Have received some stderr. React in same way as you would for onStdout()
+	}
+});
+```
+
+Again, this listener can be used for dealing with *stdin* in a non-blocking fashion too. For this, 
+you override *onStdinReady*.
+
+```java
+
+// ....
+Process process = builder.start(new DefaultNonBlockingProcessListener() {
+	@Override
+	public boolean onStdinReady(NonBlockingProcess process, ByteBuffer buffer) {
+	
+		// Put data to write in the buffer, making sure you flip the buffer before exiting
+		
+		buffer.put("Data to send to stdin...".getBytes());
+		buffer.flip();
+		
+		/*
+		 * Return false to indicate there is no more to write. Return
+		 * true and this method will be called again when there is space
+		 * available (and so on until false is returned).
+		 */
+		return false;
+	}
+});
+```
+
+Then when you want some stdin to be written ..
+
+```java
+process.wantWrite();
+```
+
+You can also send data to a non-blocking processes stdin using either the standard *Process.getOutputStream()* 
+and write to that (you must *OutputStream.flush()* to flush the data to the process when doing it this way), or you can write directly using a *ByteBuffer* :-
+
+```java
+process.writeStdin(ByteBuffer.wrap("This is sent directly\n".getBytes()));
+```
+
+#### Running shells and scripts
+
+If you want to run a shell (useful with the PTY extension), or a shell script, you might want to use [ShellBuilder](src/main/java/com/sshtools/forker/client/ShellBuilder.java) instead. This will automatically wrap your shell script path with the appropriate commands to use the native shell (bash, CMD.exe or whatever).
+
+```java
+
+		/* ShellBuilder is a specialisation of ForkerBuilder. The script path does not
+		   need to be executable. */
+		   
+		ShellBuilder shell = new ShellBuilder("/home/myuser/ascript.sh");
+		shell.redirectErrorStream(true);
+		
+		/* Demonstrate we are actually in a different shell by setting PS1 */
+		shell.environment().put("MYENV", "An environment variable");
+		
+		/* Start the scription, giving it a window size listener */
+		process = shell.start();
+		
 ```

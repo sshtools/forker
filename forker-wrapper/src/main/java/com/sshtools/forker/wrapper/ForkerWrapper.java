@@ -1039,11 +1039,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				 * This doesn't yet work because of how JNA / Pty4J work with
 				 * their native library extraction. The forked VM will not
 				 * completely exit. It you use 'pstack' to show the native stack
-				 * of the process, it will that it is in a native call for a
+				 * of the process, it will show that it is in a native call for a
 				 * file that has been deleted (when the parent process exited).
 				 * Both of these libraries by default will extract the native
 				 * libraries to files, and mark them as to be deleted when JVM
-				 * exit. Because once forked, the original JVM does exit, these
+				 * exit. Because once forked, the original JVM doesn't exit, these
 				 * files are deleted, but they are needed by the forked process.
 				 */
 				logger.info("Running in background using native fork");
@@ -1071,7 +1071,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				fb.environment().put("FORKER_FALLBACK_ACTIVE", "true");
 				// Currently needs to be quiet :(
 				fb.environment().put("FORKER_QUIET", "true");
-				// Doesnt seemm to work
+				// Doesnt seem to work
 				// fb.environment().put("FORKER_FDOUT", "1");
 				// fb.environment().put("FORKER_FDERR", "2");
 				fb.command().add(ForkerWrapper.class.getName());
