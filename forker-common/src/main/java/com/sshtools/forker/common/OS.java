@@ -7,7 +7,6 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.SystemUtils;
 
 import com.sshtools.forker.common.CSystem.Termios;
-import com.sun.jna.Memory;
 import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.ptr.IntByReference;

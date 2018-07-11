@@ -30,6 +30,10 @@ And your dependency configuration :-
 </dependencies>
 ```
 
+## Usage
+
+Be aware that non-blocking I/O modes do not yet work with the PTY add on.
+
 ## Example
 
 ```java

@@ -508,6 +508,20 @@ public interface XAdvapi32 extends Advapi32 {
 			String lpApplicationName, String lpCommandLine, int dwCreationFlags, Pointer lpEnvironment,
 			String lpCurrentDirectory, STARTUPINFO lpStartupInfo, PROCESS_INFORMATION lpProcessInfo);
 	
+	/**
+	 * @param pIdentifierAuthority pIdentifierAuthority
+	 * @param bytSubAuthorityCount bytSubAuthorityCount
+	 * @param intSubAuthority0 intSubAuthority0
+	 * @param intSubAuthority1 intSubAuthority1
+	 * @param intSubAuthority2 intSubAuthority2
+	 * @param intSubAuthority3 intSubAuthority3
+	 * @param intSubAuthority4 intSubAuthority4
+	 * @param intSubAuthority5 intSubAuthority5
+	 * @param intSubAuthority6 intSubAuthority6
+	 * @param intSubAuthority7 intSubAuthority7
+	 * @param pSid pSid
+	 * @return status
+	 */
 	public boolean AllocateAndInitializeSid(
             SID_IDENTIFIER_AUTHORITY pIdentifierAuthority,
             byte bytSubAuthorityCount,
@@ -522,8 +536,12 @@ public interface XAdvapi32 extends Advapi32 {
             Pointer pSid
     );
 	
+	/**
+	 */
 	public static class SID_IDENTIFIER_AUTHORITY extends Structure {
         
+        /**
+         */
         public byte[] Value = new byte[6];
 
 		@Override

@@ -6,6 +6,7 @@ import com.sshtools.forker.client.ForkerProcess;
 import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.client.ForkerProcessFactory;
 import com.sshtools.forker.client.ForkerProcessListener;
+import com.sshtools.forker.client.NonBlockingProcessListener;
 import com.sshtools.forker.common.IO;
 
 /**
@@ -17,6 +18,9 @@ public class DefaultProcessFactory implements ForkerProcessFactory {
 	@Override
 	public ForkerProcess createProcess(ForkerBuilder builder, ForkerProcessListener listener) throws IOException {
 		if (builder.io() == IO.DEFAULT) {
+			if(listener instanceof NonBlockingProcessListener) {
+				throw new IllegalArgumentException(String.format("%s is not supported by %s, is your I/O mode set correctly (see %s.io(%s))", listener.getClass(), getClass(), ForkerBuilder.class, IO.class));
+			}
 			return new LocalProcess(builder);
 		}
 		return null;

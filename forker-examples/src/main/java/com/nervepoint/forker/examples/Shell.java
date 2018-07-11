@@ -7,7 +7,6 @@ import org.apache.commons.io.IOUtils;
 import com.sshtools.forker.client.Forker;
 import com.sshtools.forker.client.ShellBuilder;
 import com.sshtools.forker.client.impl.ForkerDaemonProcess.Listener;
-import com.sshtools.forker.common.Cookie.Instance;
 import com.sshtools.forker.common.OS;
 import com.sshtools.forker.pty.PTYExecutor;
 

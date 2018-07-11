@@ -14,10 +14,11 @@ import org.apache.commons.lang.SystemUtils;
 /**
  * This class carries all of the detail for the command to launch and may be
  * serialised and sent to the <i>Forker Daemon</i>, which will deserialise and
- * actually run iit.
+ * actually run it.
  *
  */
 public class Command {
+	@SuppressWarnings("serial")
 	private List<String> arguments = new ArrayList<String>() {
 
 		@Override

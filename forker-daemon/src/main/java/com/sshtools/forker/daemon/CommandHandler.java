@@ -12,10 +12,10 @@ import com.sshtools.forker.common.States;
 
 /**
  * Handler that deals with actually executing commands. This delegates the
- * actual execution to a {@link CommandExecutor}, implentations of which can be
- * registed using standard Java services, placing a file called
+ * actual execution to a {@link CommandExecutor}, implementations of which can be
+ * registered using standard Java services, placing a file called
  * <i>com.sshtools.forker.daemon.CommandExecutor</i>, containing the
- * classname(s) in the resource folder META-INF/serviices
+ * classname(s) in the resource folder META-INF/services
  *
  */
 public class CommandHandler implements Handler {
