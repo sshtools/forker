@@ -103,8 +103,8 @@ public abstract class ForkerProcess extends Process {
 	public static void readToStdin(InputStream in, ForkerProcess process, int bufferSize) throws IOException {
 		int r;
 		byte[] buf = new byte[bufferSize];
+		final OutputStream outputStream = process.getOutputStream();
 		while ((r = in.read(buf)) != -1) {
-			final OutputStream outputStream = process.getOutputStream();
 			outputStream.write(buf, 0, r);
 			outputStream.flush();
 		}
