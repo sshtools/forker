@@ -1,3 +1,18 @@
+/**
+ * Copyright © 2015 - 2018 SSHTOOLS Limited (support@sshtools.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.sshtools.forker.daemon;
 
 import java.io.DataInputStream;
@@ -8,7 +23,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -19,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
@@ -27,6 +42,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
 
 import org.apache.commons.lang.SystemUtils;
 
@@ -45,7 +61,7 @@ import com.sshtools.forker.common.States;
  * implementations and {@link CommandExecutor} implementations.
  */
 public class Forker {
-
+	private Logger logger = Logger.getLogger(Forker.class.getName());
 	// private int port = Defaults.PORT;
 	private int port = 0;
 	private int backlog = 10;
@@ -62,16 +78,24 @@ public class Forker {
 	 * Constructor
 	 */
 	public Forker() {
-		for (Handler handler : ServiceLoader.load(Handler.class)) {
-			handlers.put(handler.getType(), handler);
+		Iterator<Handler> srvs = ServiceLoader.load(Handler.class).iterator();
+		while (srvs.hasNext()) {
+			try {
+				Handler handler = srvs.next();
+				handlers.put(handler.getType(), handler);
+			} catch (Exception e) {
+				logger.warning(String.format("Failed to load I/O handler.", e));
+			}
 		}
+		if (handlers.isEmpty())
+			throw new IllegalStateException("No I/O handlers at all.");
 	}
 
 	/**
 	 * Get a {@link Handler} given it's class.
 	 * 
-	 * @param clazz
-	 *            handler class
+	 * @param clazz handler class
+	 * @param <T> type of handler
 	 * @return handler
 	 */
 	@SuppressWarnings("unchecked")
@@ -106,8 +130,7 @@ public class Forker {
 	 * cookie is only known by the client and the forker daemon and is the
 	 * default and recommended mode.
 	 * 
-	 * @param isolated
-	 *            isolated
+	 * @param isolated isolated
 	 */
 	public void setIsolated(boolean isolated) {
 		this.isolated = isolated;
@@ -126,13 +149,10 @@ public class Forker {
 	 * Start an instance of the forker daemon using the provided cookie instance
 	 * to secure iit,
 	 * 
-	 * @param thisCookie
-	 *            cookie
-	 * @throws IOException
-	 *             on any error
+	 * @param thisCookie cookie
+	 * @throws IOException on any error
 	 */
 	public void start(Instance thisCookie) throws IOException {
-		
 		try {
 			while (true) {
 				Socket c = socket.accept();
@@ -164,13 +184,10 @@ public class Forker {
 		if (cookie != null && cookie.isRunning()) {
 			throw new IOException("A Forker daemon is already on port " + cookie.getPort());
 		}
-
 		executor = Executors.newFixedThreadPool(threads);
-
 		socket = new ServerSocket();
 		socket.setReuseAddress(true);
 		socket.bind(new InetSocketAddress("127.0.0.1", port), backlog);
-
 		return createCookie();
 	}
 
@@ -192,10 +209,8 @@ public class Forker {
 	/**
 	 * Entry point.
 	 * 
-	 * @param args
-	 *            command line options
-	 * @throws Exception
-	 *             on any error
+	 * @param args command line options
+	 * @throws Exception on any error
 	 */
 	public static void main(String[] args) throws Exception {
 		// BasicConfigurator.configure();
@@ -222,7 +237,6 @@ public class Forker {
 		PrintWriter pw = new PrintWriter(new FileWriter(cookieFile), true);
 		try {
 			pw.println(cookie.toString());
-
 			/* Try to set permissions so only the current user can access it */
 			if (SystemUtils.IS_OS_UNIX) {
 				try {
@@ -250,12 +264,9 @@ public class Forker {
 	/**
 	 * Copy data from a raw input stream to a forker clients data stream.
 	 * 
-	 * @param dout
-	 *            data output stream
-	 * @param stream
-	 *            stream to read
-	 * @param outStream
-	 *            the ID of the stream (either {@link States#ERR} or
+	 * @param dout data output stream
+	 * @param stream stream to read
+	 * @param outStream the ID of the stream (either {@link States#ERR} or
 	 *            {@link States#OUT}
 	 */
 	public static void readStreamToOutput(final DataOutputStream dout, final InputStream stream, final int outStream) {
@@ -283,7 +294,6 @@ public class Forker {
 	 *
 	 */
 	public final static class Client implements Runnable {
-
 		private Socket s;
 		private Forker forker;
 		private Instance cookie;
@@ -306,23 +316,19 @@ public class Forker {
 
 		@Override
 		public void run() {
-
 			try {
 				final DataInputStream din = new DataInputStream(s.getInputStream());
 				String clientCookie = din.readUTF();
 				if (!forker.unauthenticated && !cookie.getCookie().equals(clientCookie)) {
-					System.out.println(
-							"[WARNING] Invalid cookie. (got " + clientCookie + ", expected " + cookie.getCookie());
+					System.out.println("[WARNING] Invalid cookie. (got " + clientCookie + ", expected " + cookie.getCookie());
 					throw new Exception("Invalid cookie. (got " + clientCookie + ", expected " + cookie.getCookie());
 				}
 				final DataOutputStream dout = new DataOutputStream(s.getOutputStream());
-
 				//
 				type = din.readByte();
 				Handler handler = forker.handlers.get(type);
 				if (handler == null)
 					throw new IOException("No handler for type " + type);
-
 				handler.handle(forker, din, dout);
 			} catch (EOFException eof) {
 				// Normal
@@ -341,13 +347,11 @@ public class Forker {
 		/**
 		 * Close the client.
 		 * 
-		 * @throws IOException
-		 *             on any error
+		 * @throws IOException on any error
 		 */
 		public void close() throws IOException {
 			s.close();
 		}
-
 	}
 
 	/**
@@ -362,8 +366,7 @@ public class Forker {
 	 * Shutdown the daemon, either waiting for tasks to finish or just shutting
 	 * down immediately.
 	 * 
-	 * @param now
-	 *            shutdown now
+	 * @param now shutdown now
 	 */
 	public void shutdown(boolean now) {
 		for (Handler h : handlers.values())
@@ -390,5 +393,4 @@ public class Forker {
 			}
 		}
 	}
-
 }

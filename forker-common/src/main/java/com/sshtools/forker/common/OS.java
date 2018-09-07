@@ -1,3 +1,18 @@
+/**
+ * Copyright © 2015 - 2018 SSHTOOLS Limited (support@sshtools.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.sshtools.forker.common;
 
 import java.io.File;
@@ -7,7 +22,6 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.SystemUtils;
 
 import com.sshtools.forker.common.CSystem.Termios;
-import com.sun.jna.Memory;
 import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.ptr.IntByReference;
@@ -296,12 +310,12 @@ public class OS {
 	 * @return success
 	 */
 	public static boolean setProcname(String procname) {
-		if (SystemUtils.IS_OS_UNIX && !SystemUtils.IS_OS_MAC_OSX) {
-			Memory name = new Memory(procname.length() + 1);
-			name.setString(0, procname);
-			return CSystem.INSTANCE.prctl(CSystem.PR_SET_NAME, name, new IntByReference(0).getPointer(),
-					new IntByReference(0).getPointer(), new IntByReference(0).getPointer()) == 0;
-		}
+//		if (SystemUtils.IS_OS_UNIX && !SystemUtils.IS_OS_MAC_OSX) {
+//			Memory name = new Memory(procname.length() + 1);
+//			name.setString(0, procname);
+//			return CSystem.INSTANCE.prctl(CSystem.PR_SET_NAME, name, new IntByReference(0).getPointer(),
+//					new IntByReference(0).getPointer(), new IntByReference(0).getPointer()) == 0;
+//		}
 		/**
 		 * LDP: Why cause an error? Its just the process name? Throwing exception breaks cross-platform 
 		 * compatibility. The alternative would be to add a "isProcnameAvailable" type method to allow

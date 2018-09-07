@@ -1,3 +1,18 @@
+/**
+ * Copyright © 2015 - 2018 SSHTOOLS Limited (support@sshtools.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.sshtools.forker.common;
 
 import java.io.DataInputStream;
@@ -14,11 +29,21 @@ import org.apache.commons.lang.SystemUtils;
 /**
  * This class carries all of the detail for the command to launch and may be
  * serialised and sent to the <i>Forker Daemon</i>, which will deserialise and
- * actually run iit.
+ * actually run it.
  *
  */
 public class Command {
-	private List<String> arguments = new ArrayList<String>();
+	@SuppressWarnings("serial")
+	private List<String> arguments = new ArrayList<String>() {
+
+		@Override
+		public boolean add(String e) {
+			if(e == null)
+				throw new NullPointerException();
+			return super.add(e);
+		}
+		
+	};
 	private boolean redirectError;
 	private File directory;
 	private Map<String, String> environment;

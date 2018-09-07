@@ -1,3 +1,18 @@
+/**
+ * Copyright © 2015 - 2018 SSHTOOLS Limited (support@sshtools.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.nervepoint.forker.examples;
 
 import java.io.IOException;
@@ -6,9 +21,7 @@ import org.apache.commons.io.IOUtils;
 
 import com.sshtools.forker.client.Forker;
 import com.sshtools.forker.client.ShellBuilder;
-import com.sshtools.forker.client.impl.ForkerDaemonProcess;
 import com.sshtools.forker.client.impl.ForkerDaemonProcess.Listener;
-import com.sshtools.forker.common.Cookie.Instance;
 import com.sshtools.forker.common.OS;
 import com.sshtools.forker.pty.PTYExecutor;
 
@@ -26,9 +39,10 @@ public class Shell {
 		 */
 		OS.unbufferedStdin();
 		
-		/* PTY requires the daemon, so load it now. */
-//		Forker.loadDaemon();
-		Forker.connectDaemon(new Instance("NOAUTH:57872"));
+		/* PTY requires the daemon, so load it now (or connect to an existing one if you
+		 * have started it yourself). */
+		Forker.loadDaemon();
+//		Forker.connectDaemon(new Instance("NOAUTH:57872"));
 		
 		/* ShellBuilder is a specialisation of ForkerBuilder */
 		ShellBuilder shell = new ShellBuilder();
@@ -39,20 +53,14 @@ public class Shell {
 		/* Demonstrate we are actually in a different shell by setting PS1 */
 		shell.environment().put("MYENV", "An environment variable");
 		
-		/* Start the shell */
-		final Process p = shell.start();
-
-		/*
-		 * NOTE: The process will actually be an instance of ForkerDaemonProcess in
-		 * the case of PTY. You can cast this to add listeners for window size
-		 */
-		ForkerDaemonProcess fp = (ForkerDaemonProcess) p;
-		fp.addListener(new Listener() {
+		/* Start the shell, giving it a window size listener */
+		final Process p = shell.start(new Listener() {
 			@Override
 			public void windowSizeChanged(int ptyWidth, int ptyHeight) {
 				System.out.println("Window size changed to " + ptyWidth + " x " + ptyHeight);
 			}
 		});
+
 		
 		new Thread() {
 			public void run() {

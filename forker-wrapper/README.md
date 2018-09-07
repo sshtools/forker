@@ -2,30 +2,16 @@
 
 A 'wrapper' to execute services in Java. Similar to JSW (Java Service Wrapper) and YAJSW, Forker Wrapper can be used to launch processes in the background, track the process ID, capture output to log, automatically restart a hung or crashed JVM and more.
 
-## Adding Forker Client To Your Project
-
-To include the Forker Wrapper in your project, you will currently need the following repository and modules :-
+## Adding Forker Wrapper To Your Project
 
 ### Maven
-
-```xml
-<repositories>
-	<repository>
-		<id>opensource-releases</id>
-		<url>http://artifactory.javassh.com/opensource-releases</url>
-		<name>SSHTOOLS Hosted Open Source Releases</name>
-	</repository>
-</repositories>
-```
-
-And your dependency configuration :-
 
 ```
 <dependencies>
 	<dependency>
 		<groupId>com.sshtools</groupId>
 		<artifactId>forker-wrapper</artifactId>
-		<version>1.4</version>
+		<version>1.5</version>
 	</dependency>
 </dependencies>
 ```
@@ -45,7 +31,7 @@ java -jar forker-wrapper.jar com.nervepoint.forker.examples apparg1 apparg2 appa
 The wrapper itself can be configured in any one of four ways. All four methods provide all the same configuration options, they just allow different ways of setting.
 
  1. Command line options. To wrap your application, instead of supplying it's name as the classname when you invoke the java command, instead use **com.sshtools.forker.wrapper.ForkerWrapper**, then following this by any of the command line options. At least one option must provide the actual class name that contains the main method you wish to run.
- 1. Configuration files (see -c and -C command line options). You may supply (multiple) configuration files, each of which is a simple text file that contains one option, and optionally it's value, per line. By using -C, you can specify a configuration directory where all files in that directory will be loaded.
+ 1. Configuration files (see -c and -C command line options). You may supply (multiple) configuration files, each of which is either a) a simple text file that contains one option, and optionally it's value, per line or b) A Javascript file ending in.js that is evaluated for a JS Object whose keys are option names and values are the option values. By using -C, you can specify a configuration directory where all files in that directory will be loaded.
  1. Java system properties. The key of which is option name prefixed with forker.' and with - replaced with a dot (.)
  1. Environment variables. The key of which is the option name prefixed with
 'FORKER_' (in upper case) with - replaced with _
@@ -58,8 +44,8 @@ usage: com.sshtools.forker.wrapper.ForkerWrapper [-a] [-A <arg>] [-b <arg>] [-B 
        <arg>] [-M <arg>] [-n] [-N] [-o] [-O <fd>] [--on-application-stopped <command-or-classname>] [--on-exited-wrapper
        <command-or-classname>] [--on-exiting-wrapper <command-or-classname>] [--on-restarting-application <command-or-classname>]
        [--on-started-application <command-or-classname>] [--on-started-forker-daemon <command-or-classname>]
-       [--on-starting-application <command-or-classname>] [-p <arg>] [-P <arg>] [-q <arg>] [-Q <arg>] [-r <arg>] [-R <arg>] [-S]
-       [-s] [-t <arg>] [-u <arg>] [-w <arg>] [-W <arg>] [-x <arg>] [-X <arg>]
+       [--on-starting-application <command-or-classname>] [-p <arg>] [-P <arg>] [-q] [-r <arg>] [-R <arg>] [-S] [-s] [-t <arg>] [-u
+       <arg>] [-w <arg>] [-W <arg>] [-x <arg>] [-X <arg>] [-Y <arg>] [-y <arg>] [-z] [-Z]
      <application.class.name> [<argument> [<argument> ..]]
 
 Forker Wrapper is used to launch Java applications, optionally changing the user they are run as, providing automatic restarting,
@@ -72,6 +58,11 @@ Configuration may be passed to Forker Wrapper in four different ways :-
 3. Java system properties. The key of which is option name prefixed with   'forker.' and with - replaced with a dot (.)
 4. Environment variables. The key of which is the option name prefixed with   'FORKER_' (in upper case) with - replaced with _
 
+You can also narrow any configuration key down to a specific platform by prefixing
+it with one of 'windows', 'mac-osx', 'linux', 'unix' or 'other'. The exact format
+will depend on whether you are using options, files, system properties or environment
+variables. For example, to specify '-XstartOnFirstThread' as a JVM argument for
+only Max OSX as an option, you would use '--mac-osx-jvmarg="-XstartOnFirstThread".
   -a,--administrator                                        Run as administrator.
   -A,--apparg <arg>                                         Application arguments. How these are treated depends on argmode, but by
                                                             default the will be overridden by any command line arguments passed in.
@@ -84,12 +75,17 @@ Configuration may be passed to Forker Wrapper in four different ways :-
                                                             Prefix the path with '+' to add it to the end of the existing classpath,
                                                             or '-' to add it to the start. Use of a jvmarg that starts with
                                                             '-Xbootclasspath' will override this setting.
-  -c,--configuration <file>                                 A file to read configuration. The file should contain name=value pairs,
-                                                            where name is the same name as used for command line arguments (see
-                                                            --help for a list of these)
-  -C,--configuration-directory <directory>                  A directory to read configuration files from. Each file should contain
-                                                            name=value pairs, where name is the same name as used for command line
-                                                            arguments (see --help for a list of these)
+  -c,--configuration <file>                                 A file to read configuration. The can either be a JavaScript file that
+                                                            evaluates to an object containing keys and values of the configuration
+                                                            options (use arrays for multiple value commands), or it may be a simple
+                                                            text file that contains name=value pairs, where name is the same name as
+                                                            used for command line arguments (see --help for a list of these)
+  -C,--configuration-directory <directory>                  A directory to read configuration files from. Each file can either ba
+                                                            JavaScript file evaluates to an object containing keys and values of the
+                                                            configuration options (use arrays for multiple value commands), or it
+                                                            may be a simple text file that contains name=value pairs, where name is
+                                                            the same name as used for command line arguments (see --help for a list
+                                                            of these)
   -cp,--classpath <arg>                                     The classpath to use to run the application. If not set, the current
                                                             runtime classpath is used (the java.class.path system property). Prefix
                                                             the path with '+' to add it to the end of the existing classpath, or '-'
@@ -168,10 +164,7 @@ Configuration may be passed to Forker Wrapper in four different ways :-
                                                             application to obtain the PID to send signals to.
   -P,--priority <arg>                                       Scheduling priority, may be one of LOW, NORMAL, HIGH or REALTIME (where
                                                             supported).
-  -q,--max-java <arg>                                       Maximum java version. If the selected JVM (default or otherwise) is
-                                                            lower than this, an attempt will be made to locate an earlier version.
-  -Q,--min-java <arg>                                       Minimum java version. If the selected JVM (default or otherwise) is
-                                                            lower than this, an attempt will be made to locate a later version.
+  -q,--quiet                                                Do not output anything on stderr or stdout from the wrapped process.
   -r,--restart-on <arg>                                     Which exit values from the spawned process will cause the wrapper to
                                                             attempt to restart it. When not specified, all exit values will cause a
                                                             restart except those that are configure not to (see dont-restart-on).
@@ -202,6 +195,12 @@ Configuration may be passed to Forker Wrapper in four different ways :-
                                                             commands may be run. One or more of these options specifies the name of
                                                             the commands that may NOT be run. The value may be a regular expression,
                                                             see also 'allow-execute'
+  -Y,--min-java <arg>                                       Minimum java version. If the selected JVM (default or otherwise) is
+                                                            lower than this, an attempt will be made to locate a later version.
+  -y,--max-java <arg>                                       Maximum java version. If the selected JVM (default or otherwise) is
+                                                            lower than this, an attempt will be made to locate an earlier version.
+  -z,--quiet-stderr                                         Do not output anything on stderr from the wrapped process.
+  -Z,--quiet-stdout                                         Do not output anything on stdout from the wrapped process.
 
 Provided by SSHTOOLS Limited.
 

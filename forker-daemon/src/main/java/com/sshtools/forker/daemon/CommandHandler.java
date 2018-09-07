@@ -1,3 +1,18 @@
+/**
+ * Copyright © 2015 - 2018 SSHTOOLS Limited (support@sshtools.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.sshtools.forker.daemon;
 
 import java.io.DataInputStream;
@@ -12,10 +27,10 @@ import com.sshtools.forker.common.States;
 
 /**
  * Handler that deals with actually executing commands. This delegates the
- * actual execution to a {@link CommandExecutor}, implentations of which can be
- * registed using standard Java services, placing a file called
+ * actual execution to a {@link CommandExecutor}, implementations of which can be
+ * registered using standard Java services, placing a file called
  * <i>com.sshtools.forker.daemon.CommandExecutor</i>, containing the
- * classname(s) in the resource folder META-INF/serviices
+ * classname(s) in the resource folder META-INF/services
  *
  */
 public class CommandHandler implements Handler {

@@ -1,3 +1,18 @@
+/**
+ * Copyright © 2015 - 2018 SSHTOOLS Limited (support@sshtools.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.sshtools.forker.common;
 
 import java.util.Arrays;
@@ -508,6 +523,20 @@ public interface XAdvapi32 extends Advapi32 {
 			String lpApplicationName, String lpCommandLine, int dwCreationFlags, Pointer lpEnvironment,
 			String lpCurrentDirectory, STARTUPINFO lpStartupInfo, PROCESS_INFORMATION lpProcessInfo);
 	
+	/**
+	 * @param pIdentifierAuthority pIdentifierAuthority
+	 * @param bytSubAuthorityCount bytSubAuthorityCount
+	 * @param intSubAuthority0 intSubAuthority0
+	 * @param intSubAuthority1 intSubAuthority1
+	 * @param intSubAuthority2 intSubAuthority2
+	 * @param intSubAuthority3 intSubAuthority3
+	 * @param intSubAuthority4 intSubAuthority4
+	 * @param intSubAuthority5 intSubAuthority5
+	 * @param intSubAuthority6 intSubAuthority6
+	 * @param intSubAuthority7 intSubAuthority7
+	 * @param pSid pSid
+	 * @return status
+	 */
 	public boolean AllocateAndInitializeSid(
             SID_IDENTIFIER_AUTHORITY pIdentifierAuthority,
             byte bytSubAuthorityCount,
@@ -522,8 +551,12 @@ public interface XAdvapi32 extends Advapi32 {
             Pointer pSid
     );
 	
+	/**
+	 */
 	public static class SID_IDENTIFIER_AUTHORITY extends Structure {
         
+        /**
+         */
         public byte[] Value = new byte[6];
 
 		@Override

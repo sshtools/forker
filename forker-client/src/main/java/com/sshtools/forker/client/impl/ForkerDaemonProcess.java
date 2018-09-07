@@ -1,3 +1,18 @@
+/**
+ * Copyright © 2015 - 2018 SSHTOOLS Limited (support@sshtools.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.sshtools.forker.client.impl;
 
 import java.io.DataInputStream;
@@ -8,12 +23,12 @@ import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.net.ConnectException;
-import java.net.InetAddress;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.sshtools.forker.client.AbstractForkerProcess;
+import com.sshtools.forker.client.ForkerProcess;
+import com.sshtools.forker.client.ForkerProcessListener;
 import com.sshtools.forker.common.Command;
 import com.sshtools.forker.common.Cookie;
 import com.sshtools.forker.common.Cookie.Instance;
@@ -25,7 +40,7 @@ import com.sshtools.forker.common.States;
  * (possibly as a different user). The {@link Command} will be serialised and
  * sent to the daemon.
  */
-public class ForkerDaemonProcess extends AbstractForkerProcess {
+public class ForkerDaemonProcess extends ForkerProcess {
 
 	/**
 	 * How output to stdin is flushed.
@@ -69,7 +84,7 @@ public class ForkerDaemonProcess extends AbstractForkerProcess {
 	 * changes
 	 *
 	 */
-	public interface Listener {
+	public interface Listener extends ForkerProcessListener {
 		/**
 		 * Pseudo terminal window size has changed.
 		 * 

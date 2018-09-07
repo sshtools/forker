@@ -1,3 +1,18 @@
+/**
+ * Copyright © 2015 - 2018 SSHTOOLS Limited (support@sshtools.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.sshtools.forker.client;
 
 import java.io.InputStream;
@@ -11,7 +26,27 @@ import com.sshtools.forker.common.Util;
 /**
  * Abstract implementation for processes that use OS calls.
  */
-public abstract class AbstractOSProcess extends AbstractForkerProcess {
+public abstract class AbstractOSProcess extends ForkerProcess {
+
+	@Override
+	public void destroy() {
+		throw new UnsupportedOperationException();
+	};
+
+	@Override
+	public InputStream getErrorStream() {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public InputStream getInputStream() {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public OutputStream getOutputStream() {
+		throw new UnsupportedOperationException();
+	}
 
 	protected String buildCommand(final ForkerBuilder builder) {
 		// This will run in a shell, so we need to escape the
@@ -103,31 +138,11 @@ public abstract class AbstractOSProcess extends AbstractForkerProcess {
 
 		final String string = bui.toString();
 		return string;
-	};
+	}
 
 	private boolean isLessThanWindows7() {
 		return SystemUtils.IS_OS_WINDOWS_95 || SystemUtils.IS_OS_WINDOWS_98 || SystemUtils.IS_OS_WINDOWS_XP
 				|| SystemUtils.IS_OS_WINDOWS_2000 || SystemUtils.IS_OS_WINDOWS_ME || SystemUtils.IS_OS_WINDOWS_NT;
-	}
-
-	@Override
-	public OutputStream getOutputStream() {
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public InputStream getInputStream() {
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public InputStream getErrorStream() {
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public void destroy() {
-		throw new UnsupportedOperationException();
 	}
 
 }
