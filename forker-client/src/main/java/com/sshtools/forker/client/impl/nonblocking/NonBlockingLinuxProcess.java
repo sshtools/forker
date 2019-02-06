@@ -64,7 +64,7 @@ public class NonBlockingLinuxProcess extends NonBlockingBasePosixProcess {
 			effectiveUser.elevate(builder, null, builder.getCommand());
 		}
 		try {
-			String[] cmdarray = builder.command().toArray(new String[0]);
+			String[] cmdarray = builder.getCommand().getArguments().toArray(new String[0]);
 			// See
 			// https://github.com/JetBrains/jdk8u_jdk/blob/master/src/solaris/classes/java/lang/ProcessImpl.java#L71-L83
 			byte[][] args = new byte[cmdarray.length - 1][];

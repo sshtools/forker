@@ -18,7 +18,7 @@ public class ForkerDaemonProcessFactory implements ForkerProcessFactory {
 
 	@Override
 	public ForkerProcess createProcess(ForkerBuilder builder, ForkerProcessListener listener) throws IOException {
-		if (builder.io() != IO.DEFAULT) {
+		if (builder.io() != IO.DEFAULT && !Boolean.getBoolean("forker.disableDaemon")) {
 			try {
 				EffectiveUser effectiveUser = builder.effectiveUser();
 				ForkerDaemonProcess forkerProcess = new ForkerDaemonProcess(builder.getCommand());

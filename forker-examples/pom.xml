@@ -37,11 +37,12 @@
 			<artifactId>forker-client</artifactId>
 			<version>${project.version}</version>
 		</dependency>
-		<dependency>
+		<!-- <dependency>
 			<groupId>${project.groupId}</groupId>
 			<artifactId>forker-daemon</artifactId>
 			<version>${project.version}</version>
-		</dependency>
+			<scope>provided</scope>
+		</dependency> -->
 		<dependency>
 			<groupId>${project.groupId}</groupId>
 			<artifactId>forker-pty</artifactId>

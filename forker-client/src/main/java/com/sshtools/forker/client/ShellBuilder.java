@@ -2,9 +2,12 @@ package com.sshtools.forker.client;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedList;
 import java.util.List;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.SystemUtils;
 
 /**
@@ -16,14 +19,14 @@ import org.apache.commons.lang.SystemUtils;
  * to <code>IO.PTY</code>
  */
 public class ShellBuilder extends ForkerBuilder {
-
 	private boolean loginShell;
 	private File rcfile;
+	private String shell;
 
 	/**
 	 * Construct a new builder given a list of command arguments. The first
-	 * element is the location of the script, anything remaining is passed to this
-	 * script as arguments.  If no arguments are provided, the shell itself
+	 * element is the location of the script, anything remaining is passed to
+	 * this script as arguments. If no arguments are provided, the shell itself
 	 * will be executed.
 	 * 
 	 * @param configuration configuration
@@ -33,12 +36,11 @@ public class ShellBuilder extends ForkerBuilder {
 		super(configuration, command);
 	}
 
-
 	/**
-	 * Construct a new builder given an array (or varargs) of command arguments. The first
-	 * element is the location of the script, anything remaining is passed to this
-	 * script as arguments. If no arguments are provided, the shell itself
-	 * will be executed.
+	 * Construct a new builder given an array (or varargs) of command arguments.
+	 * The first element is the location of the script, anything remaining is
+	 * passed to this script as arguments. If no arguments are provided, the
+	 * shell itself will be executed.
 	 * 
 	 * @param configuration configuration
 	 * @param command command and command arguments
@@ -50,8 +52,8 @@ public class ShellBuilder extends ForkerBuilder {
 	/**
 	 * Construct a new builder given a list of command arguments. The first
 	 * element is the command to execute, anything remaining is passed to this
-	 * command as arguments. If no arguments are provided, the shell itself
-	 * will be executed.
+	 * command as arguments. If no arguments are provided, the shell itself will
+	 * be executed.
 	 * 
 	 * @param command command and command arguments
 	 */
@@ -62,8 +64,8 @@ public class ShellBuilder extends ForkerBuilder {
 	/**
 	 * Construct a new builder given an array of command arguments. The first
 	 * element is the command to execute, anything remaining is passed to this
-	 * command as arguments. If no arguments are provided, the shell itself
-	 * will be executed.
+	 * command as arguments. If no arguments are provided, the shell itself will
+	 * be executed.
 	 * 
 	 * @param command command and command arguments
 	 */
@@ -72,8 +74,38 @@ public class ShellBuilder extends ForkerBuilder {
 	}
 
 	/**
+	 * Get the preferred shell name. This may either be <code>null</code>,
+	 * indicating there is no preferred shell, just use the auto-detected one.
+	 * It may be a simple name without any extension or any additional path
+	 * information such as 'bash' or 'pwsh'. Finally it may be a full qualified
+	 * path to the actual shell.
+	 * 
+	 * @return the shell name or path
+	 */
+	public String shell() {
+		return shell;
+	}
+
+	/**
+	 * Set the preferred shell name. This may either be <code>null</code>,
+	 * indicating there is no preferred shell, just use the auto-detected one.
+	 * It may be a simple name without any extension or any additional path
+	 * information such as 'bash' or 'pwsh'. Finally it may be a full qualified
+	 * path to the actual shell.
+	 * 
+	 * @param shell the shell name or path
+	 * @return building for chaining
+	 */
+	public ShellBuilder shell(String shell) {
+		this.shell = shell;
+		return this;
+	}
+
+	/**
 	 * Get if the shell should be a login shell. This will affect the
-	 * environment and other attributes.
+	 * environment and other attributes. Note, will only automatically
+	 * add the argument required for this if the {@link #shell()} is
+	 * <code>null</code>, i.e. automatic.
 	 * 
 	 * @return login shell
 	 */
@@ -83,10 +115,11 @@ public class ShellBuilder extends ForkerBuilder {
 
 	/**
 	 * Indicate the shell should be a login shell. This will affect the
-	 * environment and other attributes.
+	 * environment and other attributes. Note, will only automatically
+	 * add the argument required for this if the {@link #shell()} is
+	 * <code>null</code>, i.e. automatic.
 	 * 
-	 * @param loginShell
-	 *            login shell
+	 * @param loginShell login shell
 	 * @return builder for chaining
 	 */
 	public ShellBuilder loginShell(boolean loginShell) {
@@ -114,16 +147,41 @@ public class ShellBuilder extends ForkerBuilder {
 		return this;
 	}
 
-	public ForkerProcess start() throws IOException {
+	public ForkerProcess start(ForkerProcessListener listener) throws IOException {
+		String shLocation = null;
+		
+		if (StringUtils.isNotBlank(shell)) {
+			if (shell.contains("/") || shell.contains("\\")) {
+				/* Absolute path to shell */
+				if (new File(shell).exists())
+					shLocation = shell;
+				else
+					throw new IOException(String.format("Shell %s not found.", shell));
+			} else {
+				/* Shell command name */
+				shLocation = findCommand(shell);
+			}
+		}
+		
 		if (SystemUtils.IS_OS_LINUX || SystemUtils.IS_OS_UNIX || SystemUtils.IS_OS_MAC_OSX) {
-			// This can make us unbuffered and give a much more useful
-			// terminal
-
 			// The shell, should be in /bin but just in case
-			String shLocation = findCommand("bash", "/usr/bin/bash", "/bin/bash");
+			
+			if (shLocation == null) {
+				shLocation = findCommand("bash");
+				if(shLocation != null) {
+					// rcfile only works with non-login shell :(
+					if (rcfile != null) {
+						command().add(0, rcfile.getAbsolutePath());
+						command().add(0, "--rcfile");
+					}
+					if (loginShell) {
+						command().add(0, "--login");
+					}
+				}
+			}
 			if (shLocation == null) {
 				// Sh
-				shLocation = findCommand("sh", "/usr/bin/sh", "/bin/sh");
+				shLocation = findCommand("sh");
 				if (shLocation == null) {
 					// No shell, just execute as is
 					if (command().isEmpty()) {
@@ -139,43 +197,70 @@ public class ShellBuilder extends ForkerBuilder {
 					}
 				}
 			} else {
-				// rcfile only works with non-login shell :(
-				if (rcfile != null) {
-					command().add(0, rcfile.getAbsolutePath());
-					command().add(0, "--rcfile");
-				}
-				if (loginShell) {
-					command().add(0, "--login");
-				}
-
-				// Bash
+				// Everything else
 				command().add(0, shLocation);
 			}
-
 		} else if (SystemUtils.IS_OS_WINDOWS) {
-			/*
-			 * Currently must be handled by forker daemon, this is a special
-			 * signal to just start a WinPTY shell. NOTE: If you change this,
-			 * also change Forker.java so it handles this correct (in the case
-			 * of IO.PTY)
-			 */
-			command().add(0, "CMD.exe");
-			command().add(0, "/c");
-			command().add(0, "start");
+			if(shLocation == null) {
+				command().add(0, "CMD.exe");
+				command().add(0, "/c");
+				command().add(0, "start");
+			}
+			else
+				command().add(0, shLocation);
 		}
-		return super.start();
+		return super.start(listener);
 	}
 
-	private String findCommand(String command, String... places) throws IOException {
-		Collection<String> stdbuf = OSCommand.runCommandAndCaptureOutput("which", command);
-		if (stdbuf.isEmpty()) {
-			for (String place : places) {
-				File f = new File(place);
-				if (f.exists()) {
-					return f.getAbsolutePath();
-				}
+	private String findCommand(String command) throws IOException {
+		if(SystemUtils.IS_OS_UNIX) {
+			Collection<String> stdbuf = OSCommand.runCommandAndCaptureOutput("which", command);
+			if (!stdbuf.isEmpty()) {
+				return stdbuf.iterator().next();
 			}
 		}
-		return stdbuf.iterator().next();
+		
+		/* What path extensions might be used? */
+		List<String> exts = new LinkedList<>();
+		if(SystemUtils.IS_OS_WINDOWS) {
+			/* Do we have a PATHEXT? */
+			String pathExt = System.getenv("PATHEXT");
+			if(StringUtils.isBlank(pathExt)) {
+				/* Assume a default set */
+				pathExt = ".COM;.EXT;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.PSC1";
+			}
+			exts.addAll(Arrays.asList(pathExt.split(File.pathSeparator)));
+		}
+		
+		/* Do we have a PATH? */
+		String path = System.getenv("PATH");
+
+		/* No path, add some defaults */
+		// TODO probably need more OS's 
+		if(StringUtils.isBlank(path)) {
+			if(SystemUtils.IS_OS_UNIX)
+				path = "/bin:/usr/bin";
+			else if(SystemUtils.IS_OS_WINDOWS)
+				path = "C:\\Windows\\System32";
+		}
+		
+		if(StringUtils.isNotBlank(path)) {
+			for(String p : path.split(File.pathSeparator)) {
+				/* With a discovered extension? */
+				for(String pe : exts) {
+					File f = new File(p, command + pe);
+					if(f.exists())
+						return f.getAbsolutePath();
+				}
+				
+				/* As is? */
+				File f = new File(p, command);
+				if(f.exists())
+					return f.getAbsolutePath();
+			}
+		}
+		
+		/* Still not got it, just return exactly as was supplied */
+		return command;
 	}
 }
