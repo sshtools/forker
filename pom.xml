@@ -18,6 +18,7 @@
 		<maven.versions.plugin>2.3</maven.versions.plugin>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+	
 	</properties>
 
 	<modelVersion>4.0.0</modelVersion>
@@ -133,15 +134,15 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
 				<configuration>
-					<source>1.6</source>
-					<target>1.6</target>
+					<source>1.8</source>
+					<target>1.8</target>
 					<encoding>UTF-8</encoding>
 				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-javadoc-plugin</artifactId>
-				<version>2.10.3</version>
+				<version>3.0.1</version>
 				<executions>
 					<execution>
 						<id>release</id>
@@ -154,6 +155,11 @@
 				<configuration>
 					<encoding>UTF-8</encoding>
 					<excludePackageNames>**.impl.*</excludePackageNames>
+					<!-- https://stackoverflow.com/questions/49472783/maven-is-unable-to-find-javadoc-command -->
+	   				<javadocExecutable>${java.home}/bin/javadoc</javadocExecutable>
+	   				
+	   				<!-- https://bugs.openjdk.java.net/browse/JDK-8212233 -->
+	   				<source>8</source>
 				</configuration>
 			</plugin>
 			<plugin>

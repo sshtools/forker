@@ -150,7 +150,7 @@ public interface CSystem extends Library {
 	 * processes may only set the effective user ID to the real user ID, the
 	 * effective user ID or the saved set-user-ID.
 	 * 
-	 * @param uid
+	 * @param uid uid
 	 * @return On success, zero is returned. On error, -1 is returned, and errno
 	 *         is set appropriately.
 	 */
@@ -210,7 +210,7 @@ public interface CSystem extends Library {
 	 *            port mode
 	 * @param mode
 	 *            IO structure
-	 * @param termios
+	 * @param termios term IO structure
 	 * @return status
 	 */
 	int tcsetattr(int port, int mode, Termios termios);
