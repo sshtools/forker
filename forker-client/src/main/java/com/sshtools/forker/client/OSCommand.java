@@ -25,6 +25,7 @@ import org.apache.commons.lang.SystemUtils;
 
 import com.sshtools.forker.client.EffectiveUserFactory.SudoFixedPasswordUser;
 import com.sshtools.forker.common.IO;
+import com.sshtools.forker.common.OS;
 
 /**
  * Some helper methods for running commands and doing common things with minimal
@@ -478,6 +479,73 @@ public class OSCommand {
 	 */
 	public static Process doCommand(List<String> args, OutputStream out) throws IOException {
 		return doCommand((File) null, args, out);
+	}
+	
+	/**
+	 * Run this Java application as an administrator if not already
+	 * any administrator.
+	 * <p>
+	 * This is achieved by trying to reconstruct the java command
+	 * that was used to launch this application from system properties
+	 * and arguments.
+	 * <p>
+	 * NOTE: <strong>MUST</string> must called from the callers
+	 * main() method (as the stack is examined to determine the main
+	 * class to load). If you are calling from elsewhere, use the
+	 * alternative version of the method that takes a main classname argument. 
+	 * 
+	 * @param application arguments
+	 * @throws IOException on error
+	 */
+	public static boolean elevateApp(String[] args) throws IOException {
+		StackTraceElement[] els = Thread.currentThread().getStackTrace();
+		return elevateApp(args, els[2].getClassName());
+	}
+	
+	/**
+	 * Run this Java application as an administrator if not already
+	 * any administrator.
+	 * <p>
+	 * This is achieved by trying to reconstruct the java command
+	 * that was used to launch this application from system properties
+	 * and arguments.
+	 * <p>
+	 * This should be ideally called at the very start of the application.
+	 * If <code>true</code> is returned then the caller should immediately
+	 * System.exit() as an elevated copy should be starting. 
+	 * 
+	 * @param application arguments
+	 * @param mainClassname main class name
+	 * @throws IOException on error
+	 * 
+	 * @throws IOException 
+	 */
+	public static boolean elevateApp(String[] args, String mainClassName) throws IOException {
+		if(OS.isAdministrator())
+			return false;
+		else {
+			elevate();
+			try {
+				List<String> vargs = new ArrayList<String>();
+				vargs.add(OS.getJavaPath());
+				String cp = System.getProperty("java.class.path");
+				if(StringUtils.isNotBlank(cp)) {
+					vargs.add("-classpath");
+					vargs.add(cp);
+				}
+				for (String s : Arrays.asList("java.library.path", "jna.library.path")) {
+					if (System.getProperty(s) != null)
+						vargs.add("-D" + s + "=" + System.getProperty(s));
+				}
+				vargs.add(mainClassName);
+				vargs.addAll(Arrays.asList(args));
+				runCommand(vargs);
+				return true;
+			}
+			finally {
+				restrict();
+			}
+		}
 	}
 
 	/**

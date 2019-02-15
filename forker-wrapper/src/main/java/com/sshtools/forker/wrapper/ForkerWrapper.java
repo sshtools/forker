@@ -761,9 +761,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	}
 
 	protected String getJVMPath() throws IOException {
-		String javaExe = getOptionValue("java", System.getProperty("java.home") + File.separator + "bin" + File.separator + "java");
-		if (SystemUtils.IS_OS_WINDOWS && !javaExe.endsWith(".exe"))
-			javaExe += ".exe";
+		String javaExe = OS.getJavaPath();
 		String minjava = getOptionValue("min-java", null);
 		String maxjava = getOptionValue("max-java", null);
 		if (StringUtils.isNotBlank(minjava) || StringUtils.isNotBlank(maxjava)) {
