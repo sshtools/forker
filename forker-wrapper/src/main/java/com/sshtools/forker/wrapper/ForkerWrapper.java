@@ -276,7 +276,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		 * exception
 		 */
 		if (StringUtils.isNotBlank(classname) && !OS.setProcname(classname)) {
-			logger.warning(String.format("Failed to set process name to %s", classname));
+			logger.finest(String.format("Failed to set process name to %s", classname));
 		}
 		try {
 			ManagementFactory.getPlatformMBeanServer().registerMBean(this,

@@ -494,7 +494,8 @@ public class OSCommand {
 	 * class to load). If you are calling from elsewhere, use the
 	 * alternative version of the method that takes a main classname argument. 
 	 * 
-	 * @param application arguments
+	 * @param args application arguments
+	 * @return elevated app launched
 	 * @throws IOException on error
 	 */
 	public static boolean elevateApp(String[] args) throws IOException {
@@ -514,11 +515,10 @@ public class OSCommand {
 	 * If <code>true</code> is returned then the caller should immediately
 	 * System.exit() as an elevated copy should be starting. 
 	 * 
-	 * @param application arguments
-	 * @param mainClassname main class name
+	 * @param args application arguments
+	 * @param mainClassName main class name
+	 * @return elevated app launched
 	 * @throws IOException on error
-	 * 
-	 * @throws IOException 
 	 */
 	public static boolean elevateApp(String[] args, String mainClassName) throws IOException {
 		if(OS.isAdministrator())
