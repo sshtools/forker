@@ -1,4 +1,6 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<artifactId>forker-pty</artifactId>
 	<name>Forker PTY</name>
@@ -31,8 +33,9 @@
 		<dependency>
 			<groupId>org.jetbrains.pty4j</groupId>
 			<artifactId>pty4j</artifactId>
-			<version>0.8.6</version>
+			<version>0.9.5</version>
 		</dependency>
+
 		<dependency>
 			<groupId>com.google.guava</groupId>
 			<artifactId>guava</artifactId>
@@ -42,12 +45,12 @@
 
 	<repositories>
 		<repository>
-			<id>sonatype-oss-snapshots</id>
-			<releases>
+			<id>bintray-jetbrains</id>
+			<releases/>
+			<snapshots>
 				<enabled>false</enabled>
-			</releases>
-			<snapshots />
-			<url>http://oss.sonatype.org/content/repositories/snapshots/</url>
+			</snapshots>
+			<url>https://dl.bintray.com/jetbrains/pty4j//</url>
 		</repository>
 	</repositories>
 </project>
