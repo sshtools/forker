@@ -26,10 +26,10 @@ import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
-import com.sun.jna.Native;
-import com.sun.jna.ptr.IntByReference;
 import com.sshtools.forker.client.impl.jna.posix.LibC;
 import com.sshtools.forker.client.impl.jna.posix.LibEpoll;
+import com.sun.jna.Native;
+import com.sun.jna.ptr.IntByReference;
 
 /**
  * @author Brett Wooldridge

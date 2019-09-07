@@ -28,20 +28,10 @@
 			<artifactId>forker-daemon</artifactId>
 			<version>${project.version}</version>
 		</dependency>
-
 		<dependency>
-			<groupId>com.sshtools</groupId>
+			<groupId>org.jetbrains.pty4j</groupId>
 			<artifactId>pty4j</artifactId>
-			<version>0.7.2-SSHTOOLS</version>
-			<type>jar</type>
-			<scope>compile</scope>
-		</dependency>
-		<dependency>
-			<groupId>com.sshtools</groupId>
-			<artifactId>pty4j</artifactId>
-			<classifier>natives</classifier>
-			<version>0.7.2-SSHTOOLS</version>
-			<type>jar</type>
+			<version>0.8.6</version>
 		</dependency>
 		<dependency>
 			<groupId>com.google.guava</groupId>

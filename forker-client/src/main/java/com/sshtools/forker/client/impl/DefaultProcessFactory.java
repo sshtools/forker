@@ -2,8 +2,8 @@ package com.sshtools.forker.client.impl;
 
 import java.io.IOException;
 
-import com.sshtools.forker.client.ForkerProcess;
 import com.sshtools.forker.client.ForkerBuilder;
+import com.sshtools.forker.client.ForkerProcess;
 import com.sshtools.forker.client.ForkerProcessFactory;
 import com.sshtools.forker.client.ForkerProcessListener;
 import com.sshtools.forker.client.NonBlockingProcessListener;

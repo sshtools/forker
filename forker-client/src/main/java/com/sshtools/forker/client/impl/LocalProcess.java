@@ -5,9 +5,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
 
-import com.sshtools.forker.client.ForkerProcess;
 import com.sshtools.forker.client.EffectiveUser;
 import com.sshtools.forker.client.ForkerBuilder;
+import com.sshtools.forker.client.ForkerProcess;
 import com.sshtools.forker.common.IO;
 
 /**

@@ -3,7 +3,7 @@ package com.sshtools.forker.client;
 import java.io.IOException;
 import java.util.List;
 
-import org.apache.commons.lang.SystemUtils;
+import org.apache.commons.lang3.SystemUtils;
 
 import com.sshtools.forker.common.IO;
 
