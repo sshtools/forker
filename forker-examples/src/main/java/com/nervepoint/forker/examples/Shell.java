@@ -8,6 +8,7 @@ import com.sshtools.forker.client.Forker;
 import com.sshtools.forker.client.ShellBuilder;
 import com.sshtools.forker.client.impl.ForkerDaemonProcess.Listener;
 import com.sshtools.forker.common.OS;
+import com.sshtools.forker.pty.PTYExecutor;
 
 /**
  * This example shows how to create an interactive shell. 
@@ -30,10 +31,7 @@ public class Shell {
 		
 		/* ShellBuilder is a specialisation of ForkerBuilder */
 		ShellBuilder shell = new ShellBuilder();
-		shell.shell("pwsh");
-		//shell.loginShell(true);
-//		shell.io(PTYExecutor.PTY);
-		shell.redirectErrorStream(true);
+		shell.io(PTYExecutor.PTY);
 		
 		/* Demonstrate we are actually in a different shell by setting PS1 */
 		shell.environment().put("MYENV", "An environment variable");

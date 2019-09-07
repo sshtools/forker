@@ -134,7 +134,7 @@ public class Forker {
 
 	/**
 	 * Start an instance of the forker daemon using the provided cookie instance
-	 * to secure iit,
+	 * to secure it,
 	 * 
 	 * @param thisCookie
 	 *            cookie

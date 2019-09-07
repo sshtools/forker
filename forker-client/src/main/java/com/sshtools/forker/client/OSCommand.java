@@ -54,6 +54,42 @@ public class OSCommand {
 	private static char[] sudoPassword = null;
 
 	/**
+	 * A very simplistic mechanism for restarting an application as an
+	 * administrator (on supported platforms).
+	 * <p>
+	 * If it works for you now, it may not work in the future. It may help you
+	 * find a more robust solution for your application.
+	 * 
+	 * @param vmCentreClass main class, this will be what is launched and should
+	 *            contain a main(String[]) method
+	 * @param args original command line arguments to pass back on the
+	 *            re-launched application.
+	 * @throws IOException
+	 */
+	public static void restartAsAdministrator(Class<?> vmCentreClass, String[] args) {
+		if(System.getProperty("forker.restartingAsAdministrator") != null)
+			return;
+		
+		List<String> aargs = new ArrayList<>();
+		String forkerClasspath = System.getProperty("java.class.path");
+		aargs.add(OS.getJavaPath());
+		aargs.add("-classpath");
+		aargs.add(forkerClasspath);
+		for (String s : Arrays.asList("java.library.path", "jna.library.path")) {
+			if (System.getProperty(s) != null)
+				aargs.add("-D" + s + "=" + System.getProperty(s));
+		}
+		aargs.add("-Dforker.restartingAsAdministrator=true");
+		aargs.add(vmCentreClass.getName());
+		try {
+			OSCommand.admin(aargs);
+		} catch (IOException e) {
+			throw new IllegalStateException("Failed to restart as administrator", e);
+		}
+		System.exit(0);
+	}
+
+	/**
 	 * Run a command as an administrator with the working directory set to a
 	 * particular location. I/O will be redirected to the standard streams, and
 	 * an exception will be thrown if the exit code is anything other than zero.
@@ -230,7 +266,8 @@ public class OSCommand {
 	/**
 	 * Run a command as an administrator with a particular working directory and
 	 * capture all of the output to a list of strings. An exception will be
-	 * thrown if the exit code is anything other than zero.Note, if there is a lot of output, you might want to use
+	 * thrown if the exit code is anything other than zero.Note, if there is a
+	 * lot of output, you might want to use
 	 * {@link #adminCommandAndIterateOutput(String...)} instead.
 	 * 
 	 * @param cwd working directory
@@ -246,12 +283,13 @@ public class OSCommand {
 			restrict();
 		}
 	}
+
 	/**
 	 * Run a command as an administrator with a particular working directory and
-	 * iterator over all of the output as strings. An exception will be
-	 * thrown if the exit code is anything other than zero.  This is more efficient that
-	 * {@link #adminCommandAndCaptureOutput(String...)} as the output is not built
-	 * up into memory first.
+	 * iterator over all of the output as strings. An exception will be thrown
+	 * if the exit code is anything other than zero. This is more efficient that
+	 * {@link #adminCommandAndCaptureOutput(String...)} as the output is not
+	 * built up into memory first.
 	 * 
 	 * @param cwd working directory
 	 * @param args command arguments
@@ -283,10 +321,10 @@ public class OSCommand {
 
 	/**
 	 * Run a command as an administrator and iterate over all of the output as
-	 * strings. An exception will be thrown if the exit code is anything
-	 * other than zero.  This is more efficient that
-	 * {@link #adminCommandAndCaptureOutput(String...)} as the output is not built
-	 * up into memory first.
+	 * strings. An exception will be thrown if the exit code is anything other
+	 * than zero. This is more efficient that
+	 * {@link #adminCommandAndCaptureOutput(String...)} as the output is not
+	 * built up into memory first.
 	 * 
 	 * @param args command arguments
 	 * @return output as iterator of strings
@@ -480,19 +518,18 @@ public class OSCommand {
 	public static Process doCommand(List<String> args, OutputStream out) throws IOException {
 		return doCommand((File) null, args, out);
 	}
-	
+
 	/**
-	 * Run this Java application as an administrator if not already
-	 * any administrator.
+	 * Run this Java application as an administrator if not already any
+	 * administrator.
 	 * <p>
-	 * This is achieved by trying to reconstruct the java command
-	 * that was used to launch this application from system properties
-	 * and arguments.
+	 * This is achieved by trying to reconstruct the java command that was used
+	 * to launch this application from system properties and arguments.
 	 * <p>
-	 * NOTE: <strong>MUST</string> must called from the callers
-	 * main() method (as the stack is examined to determine the main
-	 * class to load). If you are calling from elsewhere, use the
-	 * alternative version of the method that takes a main classname argument. 
+	 * NOTE: <strong>MUST</string> must called from the callers main() method
+	 * (as the stack is examined to determine the main class to load). If you
+	 * are calling from elsewhere, use the alternative version of the method
+	 * that takes a main classname argument.
 	 * 
 	 * @param args application arguments
 	 * @return elevated app launched
@@ -502,18 +539,17 @@ public class OSCommand {
 		StackTraceElement[] els = Thread.currentThread().getStackTrace();
 		return elevateApp(args, els[2].getClassName());
 	}
-	
+
 	/**
-	 * Run this Java application as an administrator if not already
-	 * any administrator.
+	 * Run this Java application as an administrator if not already any
+	 * administrator.
 	 * <p>
-	 * This is achieved by trying to reconstruct the java command
-	 * that was used to launch this application from system properties
-	 * and arguments.
+	 * This is achieved by trying to reconstruct the java command that was used
+	 * to launch this application from system properties and arguments.
 	 * <p>
-	 * This should be ideally called at the very start of the application.
-	 * If <code>true</code> is returned then the caller should immediately
-	 * System.exit() as an elevated copy should be starting. 
+	 * This should be ideally called at the very start of the application. If
+	 * <code>true</code> is returned then the caller should immediately
+	 * System.exit() as an elevated copy should be starting.
 	 * 
 	 * @param args application arguments
 	 * @param mainClassName main class name
@@ -521,7 +557,7 @@ public class OSCommand {
 	 * @throws IOException on error
 	 */
 	public static boolean elevateApp(String[] args, String mainClassName) throws IOException {
-		if(OS.isAdministrator())
+		if (OS.isAdministrator())
 			return false;
 		else {
 			elevate();
@@ -529,7 +565,7 @@ public class OSCommand {
 				List<String> vargs = new ArrayList<String>();
 				vargs.add(OS.getJavaPath());
 				String cp = System.getProperty("java.class.path");
-				if(StringUtils.isNotBlank(cp)) {
+				if (StringUtils.isNotBlank(cp)) {
 					vargs.add("-classpath");
 					vargs.add(cp);
 				}
@@ -541,8 +577,7 @@ public class OSCommand {
 				vargs.addAll(Arrays.asList(args));
 				runCommand(vargs);
 				return true;
-			}
-			finally {
+			} finally {
 				restrict();
 			}
 		}

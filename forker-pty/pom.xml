@@ -36,11 +36,6 @@
 			<version>0.9.5</version>
 		</dependency>
 
-		<dependency>
-			<groupId>com.google.guava</groupId>
-			<artifactId>guava</artifactId>
-			<version>14.0.1</version>
-		</dependency>
 	</dependencies>
 
 	<repositories>
