@@ -35,6 +35,7 @@ public class ForkerDaemonProcessFactory implements ForkerProcessFactory {
 				if (effectiveUser != null) {
 					if (!Forker.isDaemonRunning() && !OS.isAdministrator())
 						return null;
+					effectiveUser.elevate(builder, forkerProcess, builder.getCommand());
 				}
 				try {
 					forkerProcess.start();
