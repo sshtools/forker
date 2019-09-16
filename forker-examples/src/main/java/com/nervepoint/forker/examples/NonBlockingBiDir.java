@@ -8,7 +8,6 @@ import org.apache.commons.lang3.SystemUtils;
 
 import com.sshtools.forker.client.DefaultNonBlockingProcessListener;
 import com.sshtools.forker.client.ForkerBuilder;
-import com.sshtools.forker.client.ForkerProcess;
 import com.sshtools.forker.client.impl.nonblocking.NonBlockingProcess;
 import com.sshtools.forker.common.IO;
 
@@ -25,7 +24,7 @@ public class NonBlockingBiDir {
 		} else {
 			throw new UnsupportedOperationException();
 		}
-		final ForkerProcess process = builder.start(new DefaultNonBlockingProcessListener() {
+		final NonBlockingProcess process = builder.start(new DefaultNonBlockingProcessListener() {
 			@Override
 			public void onStdout(NonBlockingProcess process, ByteBuffer buffer, boolean closed) {
 				if (!closed) {

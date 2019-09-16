@@ -147,7 +147,7 @@ public class ShellBuilder extends ForkerBuilder {
 		return this;
 	}
 
-	public ForkerProcess start(ForkerProcessListener listener) throws IOException {
+	public <P extends ForkerProcess> P start(ForkerProcessListener listener) throws IOException {
 		String shLocation = null;
 		
 		if (StringUtils.isNotBlank(shell)) {

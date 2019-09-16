@@ -194,14 +194,24 @@ public class NonBlockingProcessFactory implements ForkerProcessFactory {
 				}
 			}
 		}
-		if (SystemUtils.IS_OS_LINUX && (builder.io() == IO.NON_BLOCKING))
-			return new NonBlockingLinuxProcess(builder, this, (NonBlockingProcessListener) listener);
-		else if (SystemUtils.IS_OS_MAC_OSX && (builder.io() == IO.NON_BLOCKING))
-			return new NonBlockingOsxProcess(builder, this, (NonBlockingProcessListener) listener);
-		else if (SystemUtils.IS_OS_WINDOWS && (builder.io() == IO.NON_BLOCKING))
-			return new NonBlockingWindowsProcess(builder, this, (NonBlockingProcessListener) listener);
-		else
-			return null;
+		NonBlockingProcess process;
+		try {
+			if (SystemUtils.IS_OS_LINUX && (builder.io() == IO.NON_BLOCKING))
+				process = new NonBlockingLinuxProcess(builder, this, (NonBlockingProcessListener) listener);
+			else if (SystemUtils.IS_OS_MAC_OSX && (builder.io() == IO.NON_BLOCKING))
+				process = new NonBlockingOsxProcess(builder, this, (NonBlockingProcessListener) listener);
+			else if (SystemUtils.IS_OS_WINDOWS && (builder.io() == IO.NON_BLOCKING))
+				process = new NonBlockingWindowsProcess(builder, this, (NonBlockingProcessListener) listener);
+			else
+				return null;
+			if (listener != null) {
+				((NonBlockingProcessListener) listener).onStart(process);
+			}
+		} catch (ClassCastException cce) {
+			throw new IllegalArgumentException(
+					String.format("For a %s, the listener supplied must be a %s.", getClass(), NonBlockingProcess.class), cce);
+		}
+		return process;
 	}
 
 	/**

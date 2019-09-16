@@ -427,10 +427,12 @@ public class ForkerBuilder {
 	 * {@link Process} will be returned that can be used in the normal way.
 	 * 
 	 * @param listener listener
+	 * @param P type of process
 	 * @return process
 	 * @throws IOException on any error
 	 */
-	public ForkerProcess start(ForkerProcessListener listener) throws IOException {
+	@SuppressWarnings("unchecked")
+	public <P extends ForkerProcess> P start(ForkerProcessListener listener) throws IOException {
 		// Must convert to array first -- a malicious user-supplied
 		// list might try to circumvent the security check.
 		String[] cmdarray = command.getArguments().toArray(new String[command.getArguments().size()]);
@@ -450,10 +452,10 @@ public class ForkerBuilder {
 				throw new IOException("invalid null character in command");
 			}
 		}
-		ForkerProcess process = null;
+		P process = null;
 		for (ForkerProcessFactory processFactory : configuration.getProcessFactories()) {
 			try {
-				process = processFactory.createProcess(this, listener);
+				process = (P)processFactory.createProcess(this, listener);
 				if (process != null)
 					return process;
 			} catch (IOException e) {

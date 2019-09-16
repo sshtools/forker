@@ -47,7 +47,7 @@ public class NonBlockingShell {
 		/* Demonstrate we are actually in a different shell by setting PS1 */
 		shell.environment().put("MYENV", "An environment variable");
 		
-		final Process p = shell.start(new DefaultNonBlockingProcessListener() {
+		final NonBlockingProcess p = shell.start(new DefaultNonBlockingProcessListener() {
 			@Override
 			public void onStdout(NonBlockingProcess process, ByteBuffer buffer, boolean closed) {
 				if (!closed) {

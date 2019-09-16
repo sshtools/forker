@@ -28,4 +28,12 @@ public class DefaultNonBlockingProcessListener implements NonBlockingProcessList
 	public boolean onStdinReady(NonBlockingProcess process, ByteBuffer buffer) {
 		return false;
 	}
+
+	@Override
+	public void onStart(NonBlockingProcess process) {
+	}
+
+	@Override
+	public void onStarted(NonBlockingProcess process) {
+	}
 }

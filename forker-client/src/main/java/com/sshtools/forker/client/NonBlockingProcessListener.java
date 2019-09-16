@@ -19,6 +19,20 @@ public interface NonBlockingProcessListener extends ForkerProcessListener {
 	void onError(Exception exception, NonBlockingProcess process, boolean exiting);
 	
 	/**
+	 * This method is invoked when your user code starts the process using {@link ForkerBuilder#start()}. 
+	 *
+	 * @param process process
+	 */
+	void onStart(NonBlockingProcess process);
+	
+	/**
+	 * This method is invoked at some point after the process has actually started. 
+	 *
+	 * @param process process
+	 */
+	void onStarted(NonBlockingProcess process);
+	
+	/**
 	 * This method is invoked when the process exits. This method is also
 	 * invoked immediately in the case of a failure to launch the child process.
 	 * <p>

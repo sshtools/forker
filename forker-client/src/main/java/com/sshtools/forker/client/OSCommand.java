@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -60,13 +61,13 @@ public class OSCommand {
 	 * If it works for you now, it may not work in the future. It may help you find
 	 * a more robust solution for your application.
 	 * 
-	 * @param vmCentreClass main class, this will be what is launched and should
+	 * @param appClass main class, this will be what is launched and should
 	 *                      contain a main(String[]) method
 	 * @param args          original command line arguments to pass back on the
 	 *                      re-launched application.
 	 * @throws IOException
 	 */
-	public static void restartAsAdministrator(Class<?> vmCentreClass, String[] args) {
+	public static void restartAsAdministrator(Class<?> appClass, String[] args) {
 		if (System.getProperty("forker.restartingAsAdministrator") != null)
 			return;
 
@@ -80,7 +81,7 @@ public class OSCommand {
 				aargs.add("-D" + s + "=" + System.getProperty(s));
 		}
 		aargs.add("-Dforker.restartingAsAdministrator=true");
-		aargs.add(vmCentreClass.getName());
+		aargs.add(appClass.getName());
 		try {
 			OSCommand.admin(aargs);
 		} catch (IOException e) {
@@ -1043,7 +1044,7 @@ public class OSCommand {
 			}
 			pb.redirectErrorStream(true);
 			Process p = pb.start();
-			Collection<String> lines = IOUtils.readLines(p.getInputStream());
+			Collection<String> lines = IOUtils.readLines(p.getInputStream(),  Charset.defaultCharset());
 			try {
 				int ret = p.waitFor();
 				if (ret != 0) {

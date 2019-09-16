@@ -61,7 +61,7 @@ public class PowerShellBuilder extends ShellBuilder {
 	}
 
 	@Override
-	public ForkerProcess start(ForkerProcessListener listener) throws IOException {
+	public <P extends ForkerProcess> P start(ForkerProcessListener listener) throws IOException {
 		List<String> a = command();
 		if(a.size() > 0) {
 			a.add(0, "-Command");
