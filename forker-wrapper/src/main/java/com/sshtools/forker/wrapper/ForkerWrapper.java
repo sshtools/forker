@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.jar.JarFile;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -256,6 +257,12 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		String javaExe = getJVMPath();
 		String forkerClasspath = System.getProperty("java.class.path");
 		String wrapperClasspath = getOptionValue("classpath", forkerClasspath);
+		String jar = getOptionValue("jar", null);
+		if(jar != null) {
+			StringBuilder path = new StringBuilder(wrapperClasspath == null ? "" : wrapperClasspath);
+			appendPath(path, jar);
+			wrapperClasspath = path.toString();
+		}
 		String bootClasspath = getOptionValue("boot-classpath", null);
 		final boolean nativeMain = getSwitch("native", false);
 		final boolean useDaemon = !nativeMain && !getSwitch("no-forker-daemon", nativeMain);
@@ -608,6 +615,12 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		String main = getOptionValue("main", null);
 		if (StringUtils.isNotBlank(main))
 			classname = main;
+		else {
+			String jar = getOptionValue("jar", null);
+			if (StringUtils.isNotBlank(jar))
+				classname = readMain(jar);
+		}
+		
 		reconfigureLogging();
 	}
 
@@ -921,6 +934,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		options.addOption(
 				new Option("t", "timeout", true, "How long to wait since the last 'ping' from the launched application before "
 						+ "considering the process as hung. Requires forker daemon is enabled."));
+		options.addOption(new Option("f", "jar", true,
+				"The path of a jar file to run. If this is specified, then this path will be added to the classpath, and META-INF/MANIFEST.MF examined for Main-Class for the"
+						+ "main class to run. The first argument passed to the command becomes the first app argument."));
 		options.addOption(new Option("m", "main", true,
 				"The classname to run. If this is specified, then the first argument passed to the command "
 						+ "becomes the first app argument."));
@@ -1037,12 +1053,13 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				 * This doesn't yet work because of how JNA / Pty4J work with
 				 * their native library extraction. The forked VM will not
 				 * completely exit. It you use 'pstack' to show the native stack
-				 * of the process, it will show that it is in a native call for a
-				 * file that has been deleted (when the parent process exited).
-				 * Both of these libraries by default will extract the native
-				 * libraries to files, and mark them as to be deleted when JVM
-				 * exit. Because once forked, the original JVM doesn't exit, these
-				 * files are deleted, but they are needed by the forked process.
+				 * of the process, it will show that it is in a native call for
+				 * a file that has been deleted (when the parent process
+				 * exited). Both of these libraries by default will extract the
+				 * native libraries to files, and mark them as to be deleted
+				 * when JVM exit. Because once forked, the original JVM doesn't
+				 * exit, these files are deleted, but they are needed by the
+				 * forked process.
 				 */
 				logger.info("Running in background using native fork");
 				int pid = CSystem.INSTANCE.fork();
@@ -1349,9 +1366,15 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		List<String> args = cmd.getArgList();
 		String main = getOptionValue("main", null);
 		if (main == null) {
-			if (args.isEmpty())
-				throw new ParseException("Must supply class name of application that contains a main() method.");
-			classname = args.remove(0);
+			String jar = getOptionValue("jar", null);
+			if(jar == null) {
+				if (args.isEmpty())
+					throw new ParseException("Must supply class name of application that contains a main() method.");
+				classname = args.remove(0);
+			}
+			else {
+				readMain(jar);
+			}
 		} else
 			classname = main;
 		List<String> arguments = getOptionValues("apparg");
@@ -1372,6 +1395,16 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			}
 		}
 		this.arguments = arguments.toArray(new String[0]);
+	}
+
+	private String readMain(String jar) throws IOException {
+		try(JarFile jf = new JarFile(new File(jar))) {
+			String classname = jf.getManifest().getMainAttributes().getValue("Main-Class");
+			if(StringUtils.isBlank(classname)) {
+				throw new IOException(String.format("An executable jar (--jar %s) was provided, but it does not contain a Main-Class attribute in META-INF/MANIFEST.MF", jar));
+			}
+			return classname;
+		}
 	}
 
 	class SinkOutputStream extends OutputStream {
