@@ -65,7 +65,6 @@ public class OSCommand {
 	 *                      contain a main(String[]) method
 	 * @param args          original command line arguments to pass back on the
 	 *                      re-launched application.
-	 * @throws IOException on error
 	 */
 	public static void restartAsAdministrator(Class<?> appClass, String[] args) {
 		if (System.getProperty("forker.restartingAsAdministrator") != null)
