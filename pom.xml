@@ -142,7 +142,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-javadoc-plugin</artifactId>
-				<version>3.0.1</version>
+				<version>3.1.1</version>
 				<executions>
 					<execution>
 						<id>release</id>
@@ -157,7 +157,7 @@
 					<encoding>UTF-8</encoding>
 					<excludePackageNames>**.impl.*</excludePackageNames>
 					<!-- https://stackoverflow.com/questions/49472783/maven-is-unable-to-find-javadoc-command -->
-	   				<javadocExecutable>${java.home}/bin/javadoc</javadocExecutable>
+	   				<!-- <javadocExecutable>${java.home}/bin/javadoc</javadocExecutable> -->
 	   				
 	   				<!-- https://bugs.openjdk.java.net/browse/JDK-8212233 -->
 	   				<source>8</source>
