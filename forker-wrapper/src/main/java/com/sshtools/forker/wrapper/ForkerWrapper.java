@@ -18,6 +18,8 @@ import java.lang.reflect.Method;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
+import java.nio.file.FileSystems;
+import java.nio.file.PathMatcher;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -325,6 +327,12 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				boolean quietStdErr = quiet || getSwitch("quiet-stderr", false);
 				boolean quietStdOut = quiet || getSwitch("quiet-stdout", false);
 				boolean logoverwrite = getSwitch("log-overwrite", false);
+				
+				String tempPath = getOptionValue("init-temp", null);
+				if(tempPath!=null) {
+					initTempFolder(tempPath, cwd);
+				}
+				
 				/* Build the command to launch the application itself */
 				ForkerBuilder appBuilder = new ForkerBuilder();
 				if (!nativeMain) {
@@ -970,6 +978,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		options.addOption(new Option("y", "max-java", true,
 				"Maximum java version. If the selected JVM (default or otherwise) is lower than this, an "
 						+ "attempt will be made to locate an earlier version."));
+		options.addOption(new Option("i", "init-temp", true, "Initialise a named temporary folder before execution of application. The folder will be created if it does not exist, and emptied if it exists and has contents."));
+		options.addOption(new Option("T", "to-temp", true, "Copy file(s) to the named temporary folder. Supports glob syntax for final part of the path."));
 	}
 
 	protected String buildClasspath(File cwd, String defaultClasspath, String classpath, boolean appendByDefault)
@@ -1375,6 +1385,51 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		};
 	}
 
+	private void initTempFolder(String tempFolder, File cwd) throws IOException {
+
+		File tempFile = new File(tempFolder);
+		if(!tempFile.isAbsolute()) {
+			tempFile = new File(cwd, tempFolder);
+		}
+		delTree(tempFile);
+		
+		List<String> paths = getOptionValues("to-temp");
+		if(!paths.isEmpty()) {
+			for(String path : paths) {
+				String parentPath = FilenameUtils.getPath(path);
+				String pattern = FilenameUtils.getName(path);
+				PathMatcher matcher =
+				    FileSystems.getDefault().getPathMatcher("glob:" + pattern);
+				File parentFile = new File(parentPath);
+				if(!parentFile.isAbsolute()) {
+					parentFile = new File(cwd, parentPath);
+				}
+				File[] children = parentFile.listFiles();
+				if(children!=null) {
+					for(File child : children) {
+						if(matcher.matches(child.toPath().getFileName())) {
+							FileUtils.copyFile(child, new File(tempFile, child.getName()));
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	private void delTree(File file) {
+		
+		File[] children = file.listFiles();
+		if(children!=null) {
+			for(File child : children) {
+				if(child.isDirectory()) {
+					delTree(child);
+					child.delete();
+				} else {
+					child.delete();
+				}
+			}
+		}
+	}
 	private void process() throws ParseException, IOException {
 		List<String> args = cmd.getArgList();
 		String main = getOptionValue("main", null);
