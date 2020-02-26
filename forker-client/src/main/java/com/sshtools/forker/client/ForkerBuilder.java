@@ -426,7 +426,7 @@ public class ForkerBuilder {
 	 * Start the process and return immediately. Upon exit, an active
 	 * {@link Process} will be returned that can be used in the normal way.
 	 * 
-	 * @param P type of process
+	 * @param <P> type of process
 	 * @param listener listener
 	 * @return process
 	 * @throws IOException on any error
