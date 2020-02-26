@@ -23,7 +23,7 @@ public abstract class ForkerProcess extends Process {
 	 * @param force
 	 *            whether to wait for pending data to be written before closing (if
 	 *            supported)
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public void closeStdin(boolean force) throws IOException {
 		getOutputStream().close();

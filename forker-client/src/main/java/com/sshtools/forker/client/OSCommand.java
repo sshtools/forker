@@ -65,7 +65,7 @@ public class OSCommand {
 	 *                      contain a main(String[]) method
 	 * @param args          original command line arguments to pass back on the
 	 *                      re-launched application.
-	 * @throws IOException
+	 * @throws IOException on error
 	 */
 	public static void restartAsAdministrator(Class<?> appClass, String[] args) {
 		if (System.getProperty("forker.restartingAsAdministrator") != null)
@@ -525,7 +525,7 @@ public class OSCommand {
 	 * This is achieved by trying to reconstruct the java command that was used to
 	 * launch this application from system properties and arguments.
 	 * <p>
-	 * NOTE: <strong>MUST</string> must called from the callers main() method (as
+	 * NOTE: MUST must called from the callers main() method (as
 	 * the stack is examined to determine the main class to load). If you are
 	 * calling from elsewhere, use the alternative version of the method that takes
 	 * a main classname argument.
