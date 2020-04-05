@@ -1,6 +1,7 @@
 package com.sshtools.forker.client;
 
 import java.io.BufferedReader;
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FilterOutputStream;
@@ -277,7 +278,7 @@ public class OSCommand {
 	public static Collection<String> adminCommandAndCaptureOutput(File cwd, String... args) throws IOException {
 		elevate();
 		try {
-			return adminCommandAndCaptureOutput(cwd, args);
+			return runCommandAndCaptureOutput(cwd, args);
 		} finally {
 			restrict();
 		}
@@ -298,7 +299,7 @@ public class OSCommand {
 	public static Iterable<String> adminCommandAndIterateOutput(File cwd, String... args) throws IOException {
 		elevate();
 		try {
-			return adminCommandAndIterateOutput(cwd, args);
+			return runCommandAndIterateOutput(cwd, args);
 		} finally {
 			restrict();
 		}
@@ -620,8 +621,8 @@ public class OSCommand {
 	 * 
 	 * @return whether or not elevation was previously set
 	 */
-	public static AutoCloseable elevated() {
-		return new AutoCloseable() {
+	public static Closeable elevated() {
+		return new Closeable() {
 			{
 				if (elevate()) {
 					throw new IllegalStateException("Already elevated.");
@@ -629,7 +630,7 @@ public class OSCommand {
 			}
 
 			@Override
-			public void close() throws Exception {
+			public void close() throws IOException {
 				restrict();
 			}
 		};
