@@ -248,9 +248,14 @@ public class Forker {
 					System.exit(3);
 				}
 			} else {
-				System.err.println(String.format(
-						"[SERIOUS] Could not reduce file permission of cookie file %s. Other users may be able to execute processes under this user!",
-						cookieFile));
+				if(cookieFile.setReadable(true, true) && cookieFile.setWritable(true, true)) {
+						//
+				}
+				else {
+					System.err.println(String.format(
+							"[SERIOUS] Could not reduce file permission of cookie file %s. Other users may be able to execute processes under this user!",
+							cookieFile));
+				}
 			}
 		} finally {
 			pw.close();
