@@ -73,6 +73,7 @@
 		<module>forker-examples</module>
 		<module>forker-wrapper</module>
 		<module>forker-pty</module>
+		<module>forker-services</module>
 		<module>forker-assembly</module>
 	</modules>
 
