@@ -93,4 +93,7 @@ else {
 	// TODO detect other OSs
 }
 
+// You must then initialize with your own instance of ServicesContext
+ss.configure(new MyContext());
+
 ```

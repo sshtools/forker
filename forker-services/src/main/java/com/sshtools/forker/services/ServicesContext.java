@@ -6,5 +6,5 @@ import java.util.concurrent.TimeUnit;
 public interface ServicesContext {
 	void schedule(Runnable runnable, long initialDelay, long delay, TimeUnit units);
 
-	<T> T call(Callable<T> callable);
+	void call(Callable<?> callable);
 }

@@ -24,6 +24,9 @@ public class Services {
 				} catch (Exception e) {
 					throw new IllegalStateException("Failed to initialize services implementation.", e);
 				}
+				
+				// Now initialize
+				service.configure(new DefaultContext());
 			}
 			return service;
 		}
