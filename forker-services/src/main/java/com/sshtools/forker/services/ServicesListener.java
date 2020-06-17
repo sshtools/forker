@@ -2,11 +2,15 @@ package com.sshtools.forker.services;
 
 public interface ServicesListener {
 
-    void serviceAdded(Service service);
+    default void stateChanged(Service service) {
+    }
 
-    void serviceRemoved(Service service);
+    default void extendedStatusChanged(Service service, ExtendedServiceStatus extStatus) {
+    }
 
-    void stateChanged(Service service);
+    default void serviceAdded(Service service) {
+    }
 
-    void extendedStatusChanged(Service service, ExtendedServiceStatus extStatus);
+    default void serviceRemoved(Service service) {
+    }
 }

@@ -1,12 +1,15 @@
-# Forker Client
+# Forker Servers
 
 ## Introduction
 
-Forker Client provides a set of utilities, *OSCommand*, and the ProcessBuilder replacement *ForkerBuilder*. 
+Forker Servers provides a way of starting, stopping and querying local system services. Multiple
+implementations are provided for the 3 main operating systems the Forker suite supportes. On 
+Windows, the *sc* command is currently used (with polling). On Linux and Unix there are multiple
+options, with the most efficient being the SystemD DBus based one.  
    
-## Adding Forker Client To Your Project
+## Adding Forker Services To Your Project
 
-To include the Forker utilities in your project, you will need the module :-
+To include the Forker Services in your project, you will need the module :-
 
 ### Maven
 
@@ -14,207 +17,80 @@ To include the Forker utilities in your project, you will need the module :-
 <dependencies>
 	<dependency>
 		<groupId>com.sshtools</groupId>
-		<artifactId>forker-client</artifactId>
-		<version>1.5</version>
+		<artifactId>forker-services</artifactId>
+		<version>1.6</version>
 	</dependency>
 </dependencies>
 ```
 
 ## Usage
 
-### OSCommand
+The API is very simple. You just need to obtain an instane of a `ServiceService` and call it's various methods to control the local services.
 
-Generally this is a simply case of a single call and Forker will deal with checking the exit code and redirecting or capturing standard output and error output. OS commands can be run either as the current user or as an administrator.
+### Quick Start
 
-#### Running Commands
-
-```java
-/* Run a simple command, the first argument is command to run (on the PATH),
- * all subsequent arguments are passed to the command. If the exit value
- * is anything other than zero, an IOException will be thrown.
- */
-OSCommand.run("cp", "/tmp/file1", "/tmp/file2");
-
-/* Many methods also take a list .. */
-List<String> args = new ArrayList<>();
-args.add("cp");
-args.addAll(filenameList);
-args.add(targetDir);
-OSCommand.run(args);
-
-/* If you want to capture the exit code, use runCommand() */
-if(OSCommand.runCommand("cp", "/tmp/file1", "/tmp/file") != 0) {
-    System.err.println("File copy failed");
-}
-
-/* If you want to capture the output of a command (for short output) .. */
-for(String userline : OSCommand.runCommandAndCaptureOutput("cat", "/etc/passwd")) {
-    System.out.println(">>>> " + userline);  
-}
-
-/* If you want to capture the output of a command that is gong to output a lot,
-   you are better off using the 'iterate' varient. These look similar, but
-   the former is returning a List, the latter an Iterable. */
-for(String userline : OSCommand.runCommandAndIterateOutput("find", "/")) {
-    System.out.println(">>>> " + userline);  
-}
-
-/* If you want to capture the output of a command to a file .. */
-OSCommand.runCommandAndOutputToFile(new File("/tmp/mysqld.dump"), "mysqldump", "--add-drop-tables", "mydatabase");
-
-/* .. or to a stream, setting the working directory of the command */
-ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-OSCommand.run(new File("/tmp", buffer, "cat", "temp1") throws IOException {
-
-```
-#### Running Commands As Administrator
+For the impatient :-
 
 ```java
-/* Simple run as administrator. User will be prompted for administrator password (their own, the administrators, or perhaps a UAC prompt depending on the operating system and configuration.
-Most of the 'run' methods have 'admin' versions too */
-OSCommand.admin("cat", "/etc/shadow");
 
-/* You might want to sometimes run a command or group of commands as administrator. In this case you can elevate to admin
-and then return to user level as required (remember to always do some, once elevated, your current thread stays
-elevated for all future commands. */
-
-OSCommand.elevate();
-try {
-    OSCommand.run("cp", "/tmp/file1", "/tmp/file2");
-    OSCommand.run("cp", "-R", "/tmp/dir1", "/tmp/dir2");
-    OSCommand.run("rm", "/tmp/file1");
-}
-finally {
-    OSCommand.restrict();
+// List services
+ServiceService ss = Services.get();
+for(Service s : ss.getServices()) {
+	System.out.println(s.getNativeName());
 }
 
-/* If using Java8, you can use try-with-resource for a more compact form :- */
-try(OSCommand.elevated()) {
-    OSCommand.run("cp", "/tmp/file1", "/tmp/file2");
-    OSCommand.run("cp", "-R", "/tmp/dir1", "/tmp/dir2");
-    OSCommand.run("rm", "/tmp/file1");
-}
+// Stop a service
+ss.stopService(ss.getService("ntp"));
 
-/* Being prompted for the password every time a system command is need is probably 
-   not what you want. You can use the Forker Daemon to help with this  .. */
-   
-Forker.loadDaemon(true); // Will prompt for admin password
-OSCommand.run("id"); // Will run as normal user
-OSCommand.admin("id"); // Will run as admin without a prompt  
-System.out.println(OSCommand.adminCommandAndCaptureOutput("cat", "/etc/shadow")); // Will run as admin without a prompt
-```
+// Start a service
+ss.startService(ss.getService("ntp"));
 
-### ForkerBuilder 
+// Listen for changes in service state
+ss.addListener(new ServicesListener() {
 
-The replacement to ProcessBuilder, ForkerBuilder uses different methods depending on the type of  I/O used, and also allows processes to be run as an administrator (or any other user). Depending on whether input, output, or I/O is needed (which should be provided as hint to the API), popen, system or a standard process will be used, as well as the ability to use non-blocking
-I/O.
+    void stateChanged(Service service) {
+    	// Services has started, stopped, etc
+    }
 
-#### Running using non-blocking I/O
+    void extendedStatusChanged(Service service, ExtendedServiceStatus extStatus) {
+    	// Extended information about the state change if available, called after stateChange()
+    }
 
-One major feature of ForkerBuilder is the ability to use non-blocking I/O. Depending on how many processes you will be launching
-this can have major benefits, as it avoids the need to create one, two or even sometimes 3 threads that may be necessary
-for an ordinary ProcessBuilder process.
+    void serviceAdded(Service service) {
+    	// New service has appeared
+    }
 
-
-```java
-ForkerBuilder builder = new ForkerBuilder().io(IO.NON_BLOCKING).redirectErrorStream(true);
-if (SystemUtils.IS_OS_UNIX) {
-	// The unix example tries to list the root directory
-	builder.command("ls", "-al", "/");
-} else {
-	builder.command("DIR", "C:\\");
-}
-Process process = builder.start(new DefaultNonBlockingProcessListener() {
-	@Override
-	public void onStdout(NonBlockingProcess process, ByteBuffer buffer, boolean closed) {
-		if (!closed) {
-			byte[] bytes = new byte[buffer.remaining()];
-			/* Consume bytes from buffer (so position is updated) */
-			buffer.get(bytes);
-			System.out.println(new String(bytes));
-		}
-	}
+    void serviceRemoved(Service service) {
+    	// Service has disappeated
+    }
 });
+
 ```
 
-The same listener can be used for getting notifications of process exit, errors, or stderr (if you 
-are not using *redirectErrorStream(true)*).
+### Usage
+
+#### Obtaining ServiceService
+
+##### Using The Services Helper
+
+The default and easiest way to initialize and obtain a `ServiceService` is to call `Services.get()`. By default, this will detected the best implementation to use for your platform.
+
+You can specify you own implementation by setting the system property `forker.services.impl` before `get()` is called. 
+
+You can also call `Services.set(myServiceService)`, and again, this must be done before `get()` is called.
+
+##### Manually
+
+If you have you own platform detecting logic, simply instantiate the appropriate implementation yourself.
 
 ```java
 
-// ....
-Process process = builder.start(new DefaultNonBlockingProcessListener() {
-	@Override
-	public void onError(Exception exception, NonBlockingProcess process, boolean existing) {
-		// Got an error on the handler thread
-	}
+ServiceService ss;
+if(getMyOS().equals("WINDOWS")) {
+	ss = new Win32ServiceService();
+}
+else {
+	// TODO detect other OSs
+}
 
-	@Override
-	public void onExit(int exitCode, NonBlockingProcess process) {
-		// Process has exited
-	}
-
-	@Override
-	public void onStderr(NonBlockingProcess process, ByteBuffer buffer, boolean closed) {
-		// Have received some stderr. React in same way as you would for onStdout()
-	}
-});
-```
-
-Again, this listener can be used for dealing with *stdin* in a non-blocking fashion too. For this, 
-you override *onStdinReady*.
-
-```java
-
-// ....
-Process process = builder.start(new DefaultNonBlockingProcessListener() {
-	@Override
-	public boolean onStdinReady(NonBlockingProcess process, ByteBuffer buffer) {
-	
-		// Put data to write in the buffer, making sure you flip the buffer before exiting
-		
-		buffer.put("Data to send to stdin...".getBytes());
-		buffer.flip();
-		
-		/*
-		 * Return false to indicate there is no more to write. Return
-		 * true and this method will be called again when there is space
-		 * available (and so on until false is returned).
-		 */
-		return false;
-	}
-});
-```
-
-Then when you want some stdin to be written ..
-
-```java
-process.wantWrite();
-```
-
-You can also send data to a non-blocking processes stdin using either the standard *Process.getOutputStream()* 
-and write to that (you must *OutputStream.flush()* to flush the data to the process when doing it this way), or you can write directly using a *ByteBuffer* :-
-
-```java
-process.writeStdin(ByteBuffer.wrap("This is sent directly\n".getBytes()));
-```
-
-#### Running shells and scripts
-
-If you want to run a shell (useful with the PTY extension), or a shell script, you might want to use [ShellBuilder](src/main/java/com/sshtools/forker/client/ShellBuilder.java) instead. This will automatically wrap your shell script path with the appropriate commands to use the native shell (bash, CMD.exe or whatever).
-
-```java
-
-		/* ShellBuilder is a specialisation of ForkerBuilder. The script path does not
-		   need to be executable. */
-		   
-		ShellBuilder shell = new ShellBuilder("/home/myuser/ascript.sh");
-		shell.redirectErrorStream(true);
-		
-		/* Demonstrate we are actually in a different shell by setting PS1 */
-		shell.environment().put("MYENV", "An environment variable");
-		
-		/* Start the scription, giving it a window size listener */
-		process = shell.start();
-		
 ```

@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.lang3.SystemUtils;
+
 import com.sshtools.forker.client.OSCommand;
 import com.sshtools.forker.services.Service;
 import com.sshtools.forker.services.ServiceService;
@@ -13,24 +15,29 @@ import com.sshtools.forker.services.ServicesListener;
 public class AutoServiceService implements ServiceService {
 	private ServiceService services;
 
-	public AutoServiceService() throws Exception {
+	public AutoServiceService() throws IOException {
 		detect();
 	}
 
 	private void detect() throws IOException {
 		List<ServiceService> l = new ArrayList<ServiceService>();
-		if (OSCommand.hasCommand("systemctl")) {
-			l.add(new SystemDServiceService());
+		if(SystemUtils.IS_OS_WINDOWS) {
+			l.add(new Win32ServiceService());
 		}
-		if (l.isEmpty() && OSCommand.hasCommand("initctl")) {
-			l.add(new InitctlServiceService());
+		else {
+			if (OSCommand.hasCommand("systemctl")) {
+				l.add(new SystemDServiceService());
+			}
+			if (l.isEmpty() && OSCommand.hasCommand("initctl")) {
+				l.add(new InitctlServiceService());
+			}
+			if (l.isEmpty() && OSCommand.hasCommand("service")) {
+				l.add(new SysVServiceService());
+			}
+			// Fallback to SysV
+			if (l.isEmpty())
+				throw new IOException("Could not detect any service systems.");
 		}
-		if (l.isEmpty() && OSCommand.hasCommand("service")) {
-			l.add(new SysVServiceService());
-		}
-		// Fallback to SysV
-		if (l.isEmpty())
-			throw new IOException("Could not detect any service systems.");
 		services = new CompoundServicesService(l.toArray(new ServiceService[0]));
 	}
 
