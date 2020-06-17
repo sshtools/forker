@@ -15,6 +15,7 @@ import org.apache.commons.io.output.NullOutputStream;
 import org.freedesktop.dbus.connections.impl.DBusConnection;
 import org.freedesktop.dbus.exceptions.DBusException;
 import org.freedesktop.dbus.interfaces.DBusSigHandler;
+import org.freedesktop.dbus.interfaces.Properties;
 import org.freedesktop.dbus.interfaces.Properties.PropertiesChanged;
 
 import com.sshtools.forker.client.OSCommand;
@@ -24,7 +25,6 @@ import com.sshtools.forker.services.ServiceService;
 import com.sshtools.forker.services.ServicesContext;
 
 import de.thjom.java.systemd.Manager;
-import de.thjom.java.systemd.Properties;
 import de.thjom.java.systemd.Systemd;
 import de.thjom.java.systemd.Unit;
 import de.thjom.java.systemd.Unit.Mode;
@@ -186,7 +186,7 @@ public class SystemDServiceService extends AbstractServiceService implements Ser
 
 							Properties props = conn.getRemoteObject(Systemd.SERVICE_NAME, sig.getPath(),
 									Properties.class);
-							Vector<String> names = props.getVector("Names");
+							Vector<String> names = props.Get("org.freedesktop.systemd1.Unit", "Names");
 							for (String n : names) {
 								final de.thjom.java.systemd.Service unit = (de.thjom.java.systemd.Service) systemd
 										.getManager().getUnit(n);
