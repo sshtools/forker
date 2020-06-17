@@ -6,7 +6,6 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -186,7 +185,7 @@ public class SystemDServiceService extends AbstractServiceService implements Ser
 
 							Properties props = conn.getRemoteObject(Systemd.SERVICE_NAME, sig.getPath(),
 									Properties.class);
-							Vector<String> names = props.Get("org.freedesktop.systemd1.Unit", "Names");
+							List<String> names = props.Get("org.freedesktop.systemd1.Unit", "Names");
 							for (String n : names) {
 								final de.thjom.java.systemd.Service unit = (de.thjom.java.systemd.Service) systemd
 										.getManager().getUnit(n);
