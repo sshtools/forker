@@ -41,10 +41,10 @@ public class Forker {
 	 * TODO Is there a better way to discover this? perhaps looking at maven
 	 * meta-data
 	 */
-	final static String[] FORKER_JARS = { "^jna-.*", "^commons-lang3-.*", "^commons-io.*", "^jna-platform-.*", "^purejavacomm-.*",
-			"^guava-.*", "^log4j-.*", "^forker-common-.*", "^forker-client-.*", "^forker-daemon-.*", "^pty4j-.*",
-			"^forker-wrapper-.*", "^forker-pty-.*", "^jsr305-.*", "^checker-qual-.*", "^error_prone_annotations-.*",
-			"^jobjc-annotations-.*", "^animal-sniffer-annotations-.*" };
+	final static String[] FORKER_JARS = { "^jna.*", "^commons-lang3.*", "^commons-io.*", "^jna-platform.*", "^purejavacomm.*",
+			"^guava.*", "^log4j.*", "^forker-common.*", "^forker-client.*", "^forker-daemon.*", "^pty4j.*",
+			"^forker-wrapper.*", "^forker-pty.*", "^jsr305.*", "^checker-qua.*", "^error_prone_annotations.*",
+			"^jobjc-annotations.*", "^animal-sniffer-annotations.*" };
 	
 	private static boolean daemonAdministrator;
 	private static String daemonClasspath;
