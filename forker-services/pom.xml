@@ -51,7 +51,7 @@ be implemented.</description>
 		<dependency>
 			<groupId>com.github.thjomnx</groupId>
 			<artifactId>java-systemd</artifactId>
-			<version>1.2.0-SSHTOOLS-SNAPSHOT</version>
+			<version>1.2.0-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>junit</groupId>
