@@ -25,7 +25,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.lang.SystemUtils;
+import org.apache.commons.lang3.SystemUtils;
 
 import com.sshtools.forker.client.impl.ForkerDaemonProcess;
 import com.sshtools.forker.client.ui.AskPass;
@@ -65,7 +65,6 @@ import com.sshtools.forker.common.Util;
  *
  */
 public abstract class EffectiveUserFactory {
-
 	private static EffectiveUserFactory instance;
 	private final static Object lock = new Object();
 
@@ -96,18 +95,17 @@ public abstract class EffectiveUserFactory {
 	public abstract String getAppName();
 
 	/**
-	 * Get an effective user that may be used to execute a process with
-	 * privileges of the provided username.
+	 * Get an effective user that may be used to execute a process with privileges
+	 * of the provided username.
 	 * 
-	 * @param username
-	 *            username
+	 * @param username username
 	 * @return effective user for username
 	 */
 	public abstract EffectiveUser getUserForUsername(String username);
 
 	/**
-	 * Get the default {@link EffectiveUserFactory} that should be appropriate
-	 * for most common uses.
+	 * Get the default {@link EffectiveUserFactory} that should be appropriate for
+	 * most common uses.
 	 * 
 	 * @return default effective user factory
 	 */
@@ -127,7 +125,6 @@ public abstract class EffectiveUserFactory {
 	 *
 	 */
 	public static abstract class AbstractProcessBuilderEffectiveUser implements EffectiveUser {
-
 		File tempScript;
 
 		protected void createTempScript(String script) {
@@ -135,7 +132,6 @@ public abstract class EffectiveUserFactory {
 			try {
 				tempScript = File.createTempFile("sapa", ".sh");
 				tempScript.deleteOnExit();
-
 				OutputStream out = new FileOutputStream(tempScript);
 				PrintWriter pw = new PrintWriter(out);
 				try {
@@ -148,20 +144,16 @@ public abstract class EffectiveUserFactory {
 				} finally {
 					out.close();
 				}
-
 				tempScript.setExecutable(true);
-
 			} catch (Exception e) {
 				throw new RuntimeException(e);
 			}
 		}
 
 		protected String javaAskPassScript(Class<?> clazz) {
-
 			String javaExe = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
 			if (SystemUtils.IS_OS_WINDOWS)
 				javaExe += ".exe";
-
 			String cp = null;
 			String fullCp = System.getProperty("java.class.path", "");
 			for (String p : fullCp.split(File.pathSeparator)) {
@@ -179,21 +171,20 @@ public abstract class EffectiveUserFactory {
 	}
 
 	/**
-	 * Default implementation of {@link EffectiveUserFactory} that tries to
-	 * detect the host operating environment (OS and desktop) and provide @{link
-	 * {@link EffectiveUser} instances for forker to use for the actual
-	 * elevation of privileges.
+	 * Default implementation of {@link EffectiveUserFactory} that tries to detect
+	 * the host operating environment (OS and desktop) and provide @{link
+	 * {@link EffectiveUser} instances for forker to use for the actual elevation of
+	 * privileges.
 	 * 
-	 * This implementation also tries to automatically detect the 'app name',
-	 * that is used in the OS's privilege elevation dialog (such as gksu if
-	 * available) by examining the stack and looking for the main() method. If
-	 * your application bootstraps your application in a different way, or you
-	 * simply want to display something other than the main class name, then set
-	 * the system property <b>forker.app.name</b> or provide your own factory
-	 * implementation that overrides {@link #getAppName()}.
+	 * This implementation also tries to automatically detect the 'app name', that
+	 * is used in the OS's privilege elevation dialog (such as gksu if available) by
+	 * examining the stack and looking for the main() method. If your application
+	 * bootstraps your application in a different way, or you simply want to display
+	 * something other than the main class name, then set the system property
+	 * <b>forker.app.name</b> or provide your own factory implementation that
+	 * overrides {@link #getAppName()}.
 	 */
 	public static class DefaultEffectiveUserFactory extends EffectiveUserFactory {
-
 		private String appName;
 
 		/**
@@ -201,7 +192,6 @@ public abstract class EffectiveUserFactory {
 		 */
 		public DefaultEffectiveUserFactory() {
 			super(true);
-
 			appName = System.getProperty("forker.app.name", null);
 			if (appName == null) {
 				String thisAppName = null;
@@ -226,28 +216,33 @@ public abstract class EffectiveUserFactory {
 		@Override
 		public EffectiveUser administrator() {
 			/*
-			 * Wrap the effective user that tests at run time whether it's
-			 * actually needed. This is required be we do not know up front if
-			 * the process will be handled by the daemon
+			 * Wrap the effective user that tests at run time whether it's actually needed.
+			 * This is required be we do not know up front if the process will be handled by
+			 * the daemon
 			 */
 			final EffectiveUser user = createAdministrator();
 			return new EffectiveUser() {
 
+				private boolean elevated;
+
 				@Override
 				public void descend(ForkerBuilder builder, Process process, Command command) {
-					if ((Forker.isDaemonRunning() && !Forker.isDaemonRunningAsAdministrator()
-							&& process instanceof ForkerDaemonProcess)
-							|| (!OS.isAdministrator() && !(process instanceof ForkerDaemonProcess)))
+					if (elevated) {
 						user.descend(builder, process, command);
+						elevated = false;
+					}
 				}
 
 				@Override
 				public void elevate(ForkerBuilder builder, Process process, Command command) {
+					if (elevated)
+						throw new IllegalStateException("Already elevated.");
 					if ((Forker.isDaemonRunning() && !Forker.isDaemonRunningAsAdministrator()
 							&& process instanceof ForkerDaemonProcess)
-							|| (!OS.isAdministrator() && !(process instanceof ForkerDaemonProcess)))
+							|| (!OS.isAdministrator() && !(process instanceof ForkerDaemonProcess))) {
 						user.elevate(builder, process, command);
-
+						elevated = true;
+					}
 				}
 			};
 		}
@@ -260,13 +255,11 @@ public abstract class EffectiveUserFactory {
 		@Override
 		public EffectiveUser getUserForUsername(String username) {
 			if (SystemUtils.IS_OS_LINUX) {
-
 				// If already administrator, just su or sudo should be
 				// sufficient is no password will be required
 				if (OS.isAdministrator()) {
 					return new SUUser(username);
 				} else {
-
 					Desktop dt = OS.getDesktopEnvironment();
 					if (Arrays.asList(Desktop.CINNAMON, Desktop.GNOME, Desktop.GNOME3).contains(dt)) {
 						// Try gksudo first
@@ -277,13 +270,13 @@ public abstract class EffectiveUserFactory {
 							return new SudoAskPassGuiUser();
 						} else if (OSCommand.hasCommand("gksudo") || OSCommand.hasCommand("gksu")) {
 							/*
-							 * Last resort, used Gksud/Gksu. These are a last
-							 * resort because they do not support stdin
+							 * Last resort, used Gksud/Gksu. These are a last resort because they do not
+							 * support stdin
 							 */
 							return new GKSuUser(username);
+						} else if (OSCommand.hasCommand("pkexec")) {
 						}
 					} else if (dt == Desktop.CONSOLE) {
-
 						Console console = System.console();
 						if (OSCommand.hasCommand("sudo") && console == null)
 							return new SudoAskPassUser(username);
@@ -312,7 +305,6 @@ public abstract class EffectiveUserFactory {
 					Desktop dt = OS.getDesktopEnvironment();
 					if (Arrays.asList(Desktop.CINNAMON, Desktop.GNOME, Desktop.GNOME3).contains(dt)) {
 						// Try gksudo first
-
 						if (OSCommand.hasCommand("sudo")
 								&& (OSCommand.hasCommand("gksudo") || OSCommand.hasCommand("gksu"))) {
 							return new SudoGksudoUser();
@@ -320,13 +312,12 @@ public abstract class EffectiveUserFactory {
 							return new SudoAskPassGuiUser();
 						} else if (OSCommand.hasCommand("gksudo") || OSCommand.hasCommand("gksu")) {
 							/*
-							 * Last resort, used Gksud/Gksu. These are a last
-							 * resort because they do not support stdin
+							 * Last resort, used Gksud/Gksu. These are a last resort because they do not
+							 * support stdin
 							 */
 							return new GKSuUser();
 						}
 					} else if (dt == Desktop.CONSOLE) {
-
 						Console console = System.console();
 						if (OSCommand.hasCommand("sudo") && console == null)
 							return new SudoAskPassUser();
@@ -355,14 +346,12 @@ public abstract class EffectiveUserFactory {
 				}
 			}
 			return new EffectiveUser() {
-				
 				@Override
 				public void descend(ForkerBuilder builder, Process process, Command command) {
 				}
-				
+
 				@Override
 				public void elevate(ForkerBuilder builder, Process process, Command command) {
-					
 					throw new UnsupportedOperationException(System.getProperty("os.name")
 							+ " is currently unsupported. Will not be able to get administrative user. "
 							+ "To hard code an adminstrator password, set the system property forker.administrator.password. "
@@ -370,8 +359,6 @@ public abstract class EffectiveUserFactory {
 							+ "this in a production environment.");
 				}
 			};
-			
-
 		}
 
 		private String getFixedPassword() {
@@ -379,19 +366,16 @@ public abstract class EffectiveUserFactory {
 			// For backwards compatibility
 			return p == null ? System.getProperty("vm.sudo") : p;
 		}
-
 	}
 
 	/**
-	 * An {@link EffectiveUser} implementation that uses a combination
-	 * GkSu/Gksudo. Note, this method uses Gksu/Gksudo to do the actual
-	 * launching, but this means stdin is not supported. In order to use
-	 * Gksu/Gksudo and have stdin, {@link SudoGksudoUser} should be used
-	 * instead.
+	 * An {@link EffectiveUser} implementation that uses a combination GkSu/Gksudo.
+	 * Note, this method uses Gksu/Gksudo to do the actual launching, but this means
+	 * stdin is not supported. In order to use Gksu/Gksudo and have stdin,
+	 * {@link SudoGksudoUser} should be used instead.
 	 *
 	 */
 	public static class GKSuUser extends AbstractProcessBuilderEffectiveUser implements EffectiveUser {
-
 		private ArrayList<String> original;
 		private String username;
 
@@ -404,8 +388,7 @@ public abstract class EffectiveUserFactory {
 		/**
 		 * Constructor for specific username
 		 * 
-		 * @param username
-		 *            username
+		 * @param username username
 		 */
 		public GKSuUser(String username) {
 			this.username = username;
@@ -423,9 +406,7 @@ public abstract class EffectiveUserFactory {
 			if (command.getIO() == IO.IO || command.getIO() == IO.INPUT) {
 				throw new RuntimeException(String.format("%s does not support stdin, so may not be used.", getClass()));
 			}
-
 			List<String> cmd = builder.command();
-
 			// Take existing command and turn it into one escaped command
 			StringBuilder bui = new StringBuilder();
 			for (int i = 0; i < cmd.size(); i++) {
@@ -438,7 +419,6 @@ public abstract class EffectiveUserFactory {
 				if (i > 0)
 					bui.append("'");
 			}
-
 			cmd.clear();
 			if (OSCommand.hasCommand("gksudo")) {
 				cmd.add("gksudo");
@@ -466,13 +446,72 @@ public abstract class EffectiveUserFactory {
 	}
 
 	/**
-	 * Effective user that does nothing. May be used when a request has been
-	 * made to run as administrator, but the current process is already
-	 * administrator.
+	 * An {@link EffectiveUser} implementation that uses PkExec, which uses is a
+	 * very restrictive default method that is now recommended in Freedesktop
+	 * environments such as GNOME etc.
+	 *
+	 * By default it cannot run graphical applications as neither DISPLAY or XAUTH
+	 * are passed.
+	 * 
+	 * Standard streams are supported.
+	 */
+	public static class PkExecUser extends AbstractProcessBuilderEffectiveUser implements EffectiveUser {
+		private ArrayList<String> original;
+		private String username;
+
+		/**
+		 * Constructor for administrator (root)
+		 */
+		public PkExecUser() {
+		}
+
+		/**
+		 * Constructor for specific username
+		 * 
+		 * @param username username
+		 */
+		public PkExecUser(String username) {
+			this.username = username;
+		}
+
+		@Override
+		public void descend(ForkerBuilder builder, Process process, Command command) {
+			builder.command().clear();
+			builder.command().addAll(original);
+		}
+
+		@Override
+		public void elevate(ForkerBuilder builder, Process process, Command command) {
+			original = new ArrayList<String>(builder.command());
+			List<String> cmd = builder.command();
+			// Take existing command and turn it into one escaped command
+			StringBuilder bui = new StringBuilder();
+			for (int i = 0; i < cmd.size(); i++) {
+				if (bui.length() > 0) {
+					bui.append(' ');
+				}
+				if (i > 0)
+					bui.append("'");
+				bui.append(Util.escapeSingleQuotes(cmd.get(i)));
+				if (i > 0)
+					bui.append("'");
+			}
+			cmd.clear();
+			cmd.add("pkexec");
+			if (username != null) {
+				cmd.add("--user");
+				cmd.add(username);
+			}
+			cmd.add(bui.toString());
+		}
+	}
+
+	/**
+	 * Effective user that does nothing. May be used when a request has been made to
+	 * run as administrator, but the current process is already administrator.
 	 *
 	 */
 	public class NullEffectiveUser implements EffectiveUser {
-
 		@Override
 		public void descend(ForkerBuilder builder, Process process, Command command) {
 		}
@@ -480,20 +519,17 @@ public abstract class EffectiveUserFactory {
 		@Override
 		public void elevate(ForkerBuilder builder, Process process, Command command) {
 		}
-
 	}
 
 	/**
-	 * An {@link EffectiveUser} implementation for POSIX systems that take a
-	 * numeric UID to run the process as.
+	 * An {@link EffectiveUser} implementation for POSIX systems that take a numeric
+	 * UID to run the process as.
 	 */
 	public static class POSIXUIDEffectiveUser extends AbstractPOSIXEffectiveUser<Integer> {
-
 		/**
 		 * Constructor for particular UID.
 		 * 
-		 * @param uid
-		 *            uiid
+		 * @param uid uiid
 		 */
 		public POSIXUIDEffectiveUser(int uid) {
 			super(uid);
@@ -503,7 +539,6 @@ public abstract class EffectiveUserFactory {
 		void doSet(Integer value) {
 			seteuid(value);
 		}
-
 	}
 
 	/**
@@ -511,12 +546,10 @@ public abstract class EffectiveUserFactory {
 	 * username and turned it into a numeric UID to run the process as.
 	 */
 	public static class POSIXUsernameEffectiveUser extends AbstractPOSIXEffectiveUser<String> {
-
 		/**
 		 * Constructor for specific username
 		 * 
-		 * @param username
-		 *            username
+		 * @param username username
 		 */
 		public POSIXUsernameEffectiveUser(String username) {
 			super(username);
@@ -530,16 +563,14 @@ public abstract class EffectiveUserFactory {
 				throw new RuntimeException(e);
 			}
 		}
-
 	}
 
 	/**
-	 * An {@link EffectiveUser} implementation that uses {@link WinRunAs}, a
-	 * simple privilege escalation helper tool.
+	 * An {@link EffectiveUser} implementation that uses {@link WinRunAs}, a simple
+	 * privilege escalation helper tool.
 	 *
 	 */
 	public static class RunAsUser extends AbstractProcessBuilderEffectiveUser implements EffectiveUser {
-
 		private ArrayList<String> original;
 		private char[] password;
 		private boolean setRemote;
@@ -556,8 +587,7 @@ public abstract class EffectiveUserFactory {
 		/**
 		 * Constructor for specific username
 		 * 
-		 * @param username
-		 *            username
+		 * @param username username
 		 */
 		public RunAsUser(String username) {
 			this(username, null);
@@ -566,10 +596,8 @@ public abstract class EffectiveUserFactory {
 		/**
 		 * Constructor for specific username and fixed password
 		 * 
-		 * @param username
-		 *            username
-		 * @param password
-		 *            password
+		 * @param username username
+		 * @param password password
 		 */
 		public RunAsUser(String username, char[] password) {
 			this.username = username;
@@ -625,7 +653,6 @@ public abstract class EffectiveUserFactory {
 	 *
 	 */
 	public static class SUAdministrator extends AbstractProcessBuilderEffectiveUser implements EffectiveUser {
-
 		private ArrayList<String> original;
 
 		@Override
@@ -639,10 +666,9 @@ public abstract class EffectiveUserFactory {
 			original = new ArrayList<String>(builder.command());
 			if (OSCommand.hasCommand("sudo")) {
 				/*
-				 * This is the only thing we can do to determine if to use sudo
-				 * or not. /etc/shadow could not always be read to determine if
-				 * root has a password which might be a hint. Neither could
-				 * /etc/sudoers
+				 * This is the only thing we can do to determine if to use sudo or not.
+				 * /etc/shadow could not always be read to determine if root has a password
+				 * which might be a hint. Neither could /etc/sudoers
 				 */
 				builder.command().add(0, "sudo");
 			} else {
@@ -658,14 +684,13 @@ public abstract class EffectiveUserFactory {
 				cmd.add(bui.toString());
 			}
 		}
-
 	}
 
 	/**
-	 * An {@link EffectiveUser} implementation that uses the 'sudo' command and
-	 * the {@link AskPass} application to request a password for a particular
-	 * user. The advantage of this over plain sudo based implementations, is
-	 * that a friendly GUI is displayed with more descriptive text.
+	 * An {@link EffectiveUser} implementation that uses the 'sudo' command and the
+	 * {@link AskPass} application to request a password for a particular user. The
+	 * advantage of this over plain sudo based implementations, is that a friendly
+	 * GUI is displayed with more descriptive text.
 	 */
 	public static class SudoAskPassGuiUser extends AbstractProcessBuilderEffectiveUser implements EffectiveUser {
 		private String username;
@@ -679,8 +704,7 @@ public abstract class EffectiveUserFactory {
 		/**
 		 * Constructor for specific user
 		 * 
-		 * @param username
-		 *            username
+		 * @param username username
 		 */
 		public SudoAskPassGuiUser(String username) {
 			this();
@@ -711,18 +735,16 @@ public abstract class EffectiveUserFactory {
 			}
 			builder.environment().put("SUDO_ASKPASS", tempScript.getAbsolutePath());
 		}
-
 	}
 
 	/**
-	 * An {@link EffectiveUser} implementation that uses the 'sudo' command and
-	 * the {@link AskPassConsole} application to request a password for a
-	 * particular user. The advantage of this over plain sudo based
-	 * implementations, is that a more descriptive text may be displayed, and it
-	 * works without a tty (although may echo the password).
+	 * An {@link EffectiveUser} implementation that uses the 'sudo' command and the
+	 * {@link AskPassConsole} application to request a password for a particular
+	 * user. The advantage of this over plain sudo based implementations, is that a
+	 * more descriptive text may be displayed, and it works without a tty (although
+	 * may echo the password).
 	 */
 	public static class SudoAskPassUser extends AbstractProcessBuilderEffectiveUser implements EffectiveUser {
-
 		private String username;
 
 		/**
@@ -734,8 +756,7 @@ public abstract class EffectiveUserFactory {
 		/**
 		 * Constructor for specific user
 		 * 
-		 * @param username
-		 *            username
+		 * @param username username
 		 */
 		public SudoAskPassUser(String username) {
 			this();
@@ -766,26 +787,23 @@ public abstract class EffectiveUserFactory {
 			}
 			builder.environment().put("SUDO_ASKPASS", tempScript.getAbsolutePath());
 		}
-
 	}
 
 	/**
 	 * An {@link EffectiveUser} implementation that uses the 'sudo' command to
-	 * either escalate privileges to administrator or switch to another user
-	 * using a <b>fixed</b> password. <b>This is not secure</b> and should only
-	 * be used for automated processes where security is not a consideration or
-	 * is provided by some other mechanism, or for testing and development.
+	 * either escalate privileges to administrator or switch to another user using a
+	 * <b>fixed</b> password. <b>This is not secure</b> and should only be used for
+	 * automated processes where security is not a consideration or is provided by
+	 * some other mechanism, or for testing and development.
 	 */
 	public static class SudoFixedPasswordUser extends AbstractProcessBuilderEffectiveUser implements EffectiveUser {
-
 		private char[] password;
 		private String username;
 
 		/**
 		 * Constructor for administrator (root) and a fixed password
 		 * 
-		 * @param password
-		 *            fixed password
+		 * @param password fixed password
 		 */
 		public SudoFixedPasswordUser(char[] password) {
 			this(null, password);
@@ -794,10 +812,8 @@ public abstract class EffectiveUserFactory {
 		/**
 		 * Constructor for a particular user and a fixed password
 		 * 
-		 * @param username
-		 *            username
-		 * @param password
-		 *            fixed password
+		 * @param username username
+		 * @param password fixed password
 		 */
 		public SudoFixedPasswordUser(String username, char[] password) {
 			this.username = username;
@@ -826,18 +842,16 @@ public abstract class EffectiveUserFactory {
 			}
 			builder.environment().put("SUDO_ASKPASS", tempScript.getAbsolutePath());
 		}
-
 	}
 
 	/**
-	 * An {@link EffectiveUser} implementation that uses a combination of Sudo
-	 * and Gksudo. Note, we use both of these tools because Gksudo/Gksu do not
-	 * support stdin. However 'sudo' does, and Gksudo has a print-pass option
-	 * that can make it act in the way required by the 'SUDO_ASKPASS'.
+	 * An {@link EffectiveUser} implementation that uses a combination of Sudo and
+	 * Gksudo. Note, we use both of these tools because Gksudo/Gksu do not support
+	 * stdin. However 'sudo' does, and Gksudo has a print-pass option that can make
+	 * it act in the way required by the 'SUDO_ASKPASS'.
 	 *
 	 */
 	public static class SudoGksudoUser extends AbstractProcessBuilderEffectiveUser implements EffectiveUser {
-
 		private String username;
 
 		/**
@@ -849,8 +863,7 @@ public abstract class EffectiveUserFactory {
 		/**
 		 * Constructor for specific user
 		 * 
-		 * @param username
-		 *            username
+		 * @param username username
 		 */
 		public SudoGksudoUser(String username) {
 			this.username = username;
@@ -880,23 +893,20 @@ public abstract class EffectiveUserFactory {
 			}
 			builder.environment().put("SUDO_ASKPASS", tempScript.getAbsolutePath());
 		}
-
 	}
 
 	/**
-	 * Effective user implementation that raises privileges using sudo (or
-	 * 'su'). Generally you would only use this in console applications.
+	 * Effective user implementation that raises privileges using sudo (or 'su').
+	 * Generally you would only use this in console applications.
 	 */
 	public static class SUUser extends AbstractProcessBuilderEffectiveUser implements EffectiveUser {
-
 		private List<String> original;
 		private String username;
 
 		/**
 		 * Constructor for specific user
 		 * 
-		 * @param username
-		 *            username
+		 * @param username username
 		 */
 		public SUUser(String username) {
 			this.username = username;
@@ -913,10 +923,9 @@ public abstract class EffectiveUserFactory {
 			original = new ArrayList<String>(builder.command());
 			if (OSCommand.hasCommand("sudo")) {
 				/*
-				 * This is the only thing we can do to determine if to use sudo
-				 * or not. /etc/shadow could not always be read to determine if
-				 * root has a password which might be a hint. Neither could
-				 * /etc/sudoers
+				 * This is the only thing we can do to determine if to use sudo or not.
+				 * /etc/shadow could not always be read to determine if root has a password
+				 * which might be a hint. Neither could /etc/sudoers
 				 */
 				builder.command().add(0, "sudo");
 				builder.command().add(1, "-u");
@@ -935,7 +944,6 @@ public abstract class EffectiveUserFactory {
 				cmd.add(username);
 			}
 		}
-
 	}
 
 	/**
@@ -943,7 +951,6 @@ public abstract class EffectiveUserFactory {
 	 * that have 'seteuid'.
 	 */
 	static abstract class AbstractPOSIXEffectiveUser<T> extends AbstractProcessBuilderEffectiveUser {
-
 		private boolean setRemote;
 		private T value;
 		private int was = Integer.MIN_VALUE;
@@ -990,6 +997,5 @@ public abstract class EffectiveUserFactory {
 		}
 
 		abstract void doSet(T value);
-
 	}
 }

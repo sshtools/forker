@@ -36,3 +36,10 @@ See [forker-pty/README.md](forker-pty/README.md)
 The Forker Daemon can be used to reduce forking costs on Linux, by starting a separate small JVM whose job it is to just execute commands on behalf of another runtime. The daemon can be started as an administrator either on demand or up front (meaning the administrator password is only requested once), also allowing opening of administrator only files for reading and writing. The same daemon is also used by Forker Wrapper to provide communication between the wrapper and the wrapped application.
 
 Depending on your requirements, you probably do not need to worry about Forker Daemon yourself as the client utilities manage it's use for you. However, if you have special requirements, you may manage the daemon yourself. See [forker-daemon/README.md](forker-daemon/README.md).
+
+## Forker Services
+
+This allows you to control local system services in a cross platform way. Support is provided for Linux and Windows
+currently, and allows enumerating of services and their states, as well as control services and configuring their start on boot setting.
+
+See [forker-services/README.md](forker-services/README.md).

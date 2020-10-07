@@ -17,7 +17,7 @@ package com.sshtools.forker.client.impl.jna.posix;
 
 import java.nio.ByteBuffer;
 
-import org.apache.commons.lang.SystemUtils;
+import org.apache.commons.lang3.SystemUtils;
 
 import com.sun.jna.Callback;
 import com.sun.jna.Library;

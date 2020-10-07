@@ -44,7 +44,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
-import org.apache.commons.lang.SystemUtils;
+import org.apache.commons.lang3.SystemUtils;
 
 import com.sshtools.forker.common.Cookie;
 import com.sshtools.forker.common.Cookie.Instance;
@@ -147,7 +147,7 @@ public class Forker {
 
 	/**
 	 * Start an instance of the forker daemon using the provided cookie instance
-	 * to secure iit,
+	 * to secure it,
 	 * 
 	 * @param thisCookie cookie
 	 * @throws IOException on any error
@@ -252,9 +252,14 @@ public class Forker {
 					System.exit(3);
 				}
 			} else {
-				System.err.println(String.format(
-						"[SERIOUS] Could not reduce file permission of cookie file %s. Other users may be able to execute processes under this user!",
-						cookieFile));
+				if(cookieFile.setReadable(true, true) && cookieFile.setWritable(true, true)) {
+						//
+				}
+				else {
+					System.err.println(String.format(
+							"[SERIOUS] Could not reduce file permission of cookie file %s. Other users may be able to execute processes under this user!",
+							cookieFile));
+				}
 			}
 		} finally {
 			pw.close();

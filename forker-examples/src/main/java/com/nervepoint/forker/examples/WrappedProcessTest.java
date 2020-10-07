@@ -16,7 +16,7 @@
 package com.nervepoint.forker.examples;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.SystemUtils;
+import org.apache.commons.lang3.SystemUtils;
 
 import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.wrapper.ForkerWrapper;

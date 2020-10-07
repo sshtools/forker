@@ -16,6 +16,7 @@
 package com.sshtools.forker.client;
 
 import java.io.BufferedReader;
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FilterOutputStream;
@@ -23,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -35,11 +37,12 @@ import java.util.logging.Logger;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.NullOutputStream;
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.SystemUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.SystemUtils;
 
 import com.sshtools.forker.client.EffectiveUserFactory.SudoFixedPasswordUser;
 import com.sshtools.forker.common.IO;
+import com.sshtools.forker.common.OS;
 
 /**
  * Some helper methods for running commands and doing common things with minimal
@@ -68,11 +71,46 @@ public class OSCommand {
 	private static char[] sudoPassword = null;
 
 	/**
-	 * Run a command as an administrator with the working directory set to a
-	 * particular location. I/O will be redirected to the standard streams, and
-	 * an exception will be thrown if the exit code is anything other than zero.
+	 * A very simplistic mechanism for restarting an application as an administrator
+	 * (on supported platforms).
+	 * <p>
+	 * If it works for you now, it may not work in the future. It may help you find
+	 * a more robust solution for your application.
 	 * 
-	 * @param cwd working directory
+	 * @param appClass main class, this will be what is launched and should
+	 *                      contain a main(String[]) method
+	 * @param args          original command line arguments to pass back on the
+	 *                      re-launched application.
+	 */
+	public static void restartAsAdministrator(Class<?> appClass, String[] args) {
+		if (System.getProperty("forker.restartingAsAdministrator") != null)
+			return;
+
+		List<String> aargs = new ArrayList<>();
+		String forkerClasspath = System.getProperty("java.class.path");
+		aargs.add(OS.getJavaPath());
+		aargs.add("-classpath");
+		aargs.add(forkerClasspath);
+		for (String s : Arrays.asList("java.library.path", "jna.library.path")) {
+			if (System.getProperty(s) != null)
+				aargs.add("-D" + s + "=" + System.getProperty(s));
+		}
+		aargs.add("-Dforker.restartingAsAdministrator=true");
+		aargs.add(appClass.getName());
+		try {
+			OSCommand.admin(aargs);
+		} catch (IOException e) {
+			throw new IllegalStateException("Failed to restart as administrator", e);
+		}
+		System.exit(0);
+	}
+
+	/**
+	 * Run a command as an administrator with the working directory set to a
+	 * particular location. I/O will be redirected to the standard streams, and an
+	 * exception will be thrown if the exit code is anything other than zero.
+	 * 
+	 * @param cwd  working directory
 	 * @param args command arguments
 	 * @throws IOException on any error
 	 */
@@ -82,30 +120,29 @@ public class OSCommand {
 
 	/**
 	 * Run a command as an administrator with the working directory set to a
-	 * particular location. I/O will be redirected to the provied output stream,
-	 * and an exception will be thrown if the exit code is anything other than
-	 * zero.
+	 * particular location. I/O will be redirected to the provied output stream, and
+	 * an exception will be thrown if the exit code is anything other than zero.
 	 * 
-	 * @param cwd working directory
-	 * @param out output stream to write to
+	 * @param cwd  working directory
+	 * @param out  output stream to write to
 	 * @param args command arguments
 	 * @throws IOException on any error
 	 */
 	public static void admin(File cwd, OutputStream out, List<String> args) throws IOException {
 		Process process = doAdminCommand(cwd, args, out);
 		if (process.exitValue() != 0) {
-			throw new IOException("Update process exited with status " + process.exitValue() + ". See log for more details.");
+			throw new IOException(
+					"Update process exited with status " + process.exitValue() + ". See log for more details.");
 		}
 	}
 
 	/**
 	 * Run a command as an administrator with the working directory set to a
-	 * particular location. I/O will be redirected to the provied output stream,
-	 * and an exception will be thrown if the exit code is anything other than
-	 * zero.
+	 * particular location. I/O will be redirected to the provied output stream, and
+	 * an exception will be thrown if the exit code is anything other than zero.
 	 * 
-	 * @param cwd working directory
-	 * @param out output stream to write to
+	 * @param cwd  working directory
+	 * @param out  output stream to write to
 	 * @param args command arguments
 	 * @throws IOException on any error
 	 */
@@ -118,10 +155,10 @@ public class OSCommand {
 
 	/**
 	 * Run a command as an administrator with the working directory set to a
-	 * particular location. I/O will be redirected to the standard streams, and
-	 * an exception will be thrown if the exit code is anything other than zero.
+	 * particular location. I/O will be redirected to the standard streams, and an
+	 * exception will be thrown if the exit code is anything other than zero.
 	 * 
-	 * @param cwd working directory
+	 * @param cwd  working directory
 	 * @param args command arguments
 	 * @throws IOException on any error
 	 */
@@ -135,8 +172,8 @@ public class OSCommand {
 
 	/**
 	 * Run a command as administrator. I/O will be redirected to the standard
-	 * streams, and an exception will be thrown if the exit code is anything
-	 * other than zero.
+	 * streams, and an exception will be thrown if the exit code is anything other
+	 * than zero.
 	 * 
 	 * @param args command arguments
 	 * @throws IOException on any error
@@ -147,10 +184,10 @@ public class OSCommand {
 
 	/**
 	 * Run a command as an administrator. I/O will be redirected to the provied
-	 * output stream, and an exception will be thrown if the exit code is
-	 * anything other than zero.
+	 * output stream, and an exception will be thrown if the exit code is anything
+	 * other than zero.
 	 * 
-	 * @param out output stream to write to
+	 * @param out  output stream to write to
 	 * @param args command arguments
 	 * @throws IOException on any error
 	 */
@@ -160,8 +197,8 @@ public class OSCommand {
 
 	/**
 	 * Run a command as administrator. I/O will be redirected to the standard
-	 * streams, and an exception will be thrown if the exit code is anything
-	 * other than zero.
+	 * streams, and an exception will be thrown if the exit code is anything other
+	 * than zero.
 	 * 
 	 * @param args command arguments
 	 * @throws IOException on any error
@@ -172,11 +209,11 @@ public class OSCommand {
 
 	/**
 	 * Run a command as an administrator with the working directory set to a
-	 * particular location. I/O will be redirected to the provied output stream,
-	 * and the exit code will be returned.
+	 * particular location. I/O will be redirected to the provied output stream, and
+	 * the exit code will be returned.
 	 * 
-	 * @param cwd working directory
-	 * @param out output stream to write to
+	 * @param cwd  working directory
+	 * @param out  output stream to write to
 	 * @param args command arguments
 	 * @return exit code
 	 * @throws IOException on any error
@@ -192,10 +229,10 @@ public class OSCommand {
 
 	/**
 	 * Run a command as an administrator with the working directory set to a
-	 * particular location. I/O will be redirected to the standard streams, and
-	 * the exit code will be returned.
+	 * particular location. I/O will be redirected to the standard streams, and the
+	 * exit code will be returned.
 	 * 
-	 * @param cwd working directory
+	 * @param cwd  working directory
 	 * @param args command arguments
 	 * @return exit code
 	 * @throws IOException on any error
@@ -220,7 +257,7 @@ public class OSCommand {
 	 * Run a command as an administrator. I/O will be redirected to the provied
 	 * output stream, and the exit code will be returned.
 	 * 
-	 * @param out output stream to write to
+	 * @param out  output stream to write to
 	 * @param args command arguments
 	 * @return exit code
 	 * @throws IOException on any error
@@ -243,11 +280,12 @@ public class OSCommand {
 
 	/**
 	 * Run a command as an administrator with a particular working directory and
-	 * capture all of the output to a list of strings. An exception will be
-	 * thrown if the exit code is anything other than zero.Note, if there is a lot of output, you might want to use
+	 * capture all of the output to a list of strings. An exception will be thrown
+	 * if the exit code is anything other than zero.Note, if there is a lot of
+	 * output, you might want to use
 	 * {@link #adminCommandAndIterateOutput(String...)} instead.
 	 * 
-	 * @param cwd working directory
+	 * @param cwd  working directory
 	 * @param args command arguments
 	 * @return output as list of strings
 	 * @throws IOException on any error
@@ -255,19 +293,20 @@ public class OSCommand {
 	public static Collection<String> adminCommandAndCaptureOutput(File cwd, String... args) throws IOException {
 		elevate();
 		try {
-			return adminCommandAndCaptureOutput(cwd, args);
+			return runCommandAndCaptureOutput(cwd, args);
 		} finally {
 			restrict();
 		}
 	}
+
 	/**
 	 * Run a command as an administrator with a particular working directory and
-	 * iterator over all of the output as strings. An exception will be
-	 * thrown if the exit code is anything other than zero.  This is more efficient that
+	 * iterator over all of the output as strings. An exception will be thrown if
+	 * the exit code is anything other than zero. This is more efficient that
 	 * {@link #adminCommandAndCaptureOutput(String...)} as the output is not built
 	 * up into memory first.
 	 * 
-	 * @param cwd working directory
+	 * @param cwd  working directory
 	 * @param args command arguments
 	 * @return output as list of strings
 	 * @throws IOException on any error
@@ -275,16 +314,16 @@ public class OSCommand {
 	public static Iterable<String> adminCommandAndIterateOutput(File cwd, String... args) throws IOException {
 		elevate();
 		try {
-			return adminCommandAndIterateOutput(cwd, args);
+			return runCommandAndIterateOutput(cwd, args);
 		} finally {
 			restrict();
 		}
 	}
 
 	/**
-	 * Run a command as an administrator and capture all of the output to a list
-	 * of strings. An exception will be thrown if the exit code is anything
-	 * other than zero.Note, if there is a lot of output, you might want to use
+	 * Run a command as an administrator and capture all of the output to a list of
+	 * strings. An exception will be thrown if the exit code is anything other than
+	 * zero.Note, if there is a lot of output, you might want to use
 	 * {@link #runCommandAndIterateOutput(String...)} instead.
 	 * 
 	 * @param args command arguments
@@ -297,8 +336,8 @@ public class OSCommand {
 
 	/**
 	 * Run a command as an administrator and iterate over all of the output as
-	 * strings. An exception will be thrown if the exit code is anything
-	 * other than zero.  This is more efficient that
+	 * strings. An exception will be thrown if the exit code is anything other than
+	 * zero. This is more efficient that
 	 * {@link #adminCommandAndCaptureOutput(String...)} as the output is not built
 	 * up into memory first.
 	 * 
@@ -314,7 +353,7 @@ public class OSCommand {
 	 * Run a command as an administrator with a particular working directory and
 	 * capture all of the output to a file. The exit code will be returned.
 	 * 
-	 * @param cwd working directory
+	 * @param cwd  working directory
 	 * @param file file to write output to
 	 * @param args command arguments
 	 * @return output as list of strings
@@ -330,8 +369,8 @@ public class OSCommand {
 	}
 
 	/**
-	 * Run a command as an administrator. I/O will be written to the provided
-	 * file, and the exit code will be returned.
+	 * Run a command as an administrator. I/O will be written to the provided file,
+	 * and the exit code will be returned.
 	 * 
 	 * @param file file to write to
 	 * @param args command arguments
@@ -344,10 +383,10 @@ public class OSCommand {
 
 	/**
 	 * Run a command as an administrator with the working directory set to a
-	 * particular location. I/O will be redirected to the standard streams, and
-	 * the process will be returned.
+	 * particular location. I/O will be redirected to the standard streams, and the
+	 * process will be returned.
 	 * 
-	 * @param cwd working directory
+	 * @param cwd  working directory
 	 * @param args command arguments
 	 * @return process
 	 * @throws IOException on any error
@@ -358,12 +397,12 @@ public class OSCommand {
 
 	/**
 	 * Run a command as an administrator with the working directory set to a
-	 * particular location. I/O will be redirected to the provied output stream,
-	 * and the process will be returned
+	 * particular location. I/O will be redirected to the provied output stream, and
+	 * the process will be returned
 	 * 
-	 * @param cwd working directory
+	 * @param cwd  working directory
 	 * @param args command arguments
-	 * @param out output stream to write to
+	 * @param out  output stream to write to
 	 * @return process
 	 * @throws IOException on any error
 	 */
@@ -393,7 +432,7 @@ public class OSCommand {
 	 * output stream, and the process will be returned
 	 * 
 	 * @param args command arguments
-	 * @param out output stream to write to
+	 * @param out  output stream to write to
 	 * @return process
 	 * @throws IOException on any error
 	 */
@@ -402,11 +441,10 @@ public class OSCommand {
 	}
 
 	/**
-	 * Run a command with the working directory set to a particular location.
-	 * I/O will be redirected to the standard streams, and the process will be
-	 * returned.
+	 * Run a command with the working directory set to a particular location. I/O
+	 * will be redirected to the standard streams, and the process will be returned.
 	 * 
-	 * @param cwd working directory
+	 * @param cwd  working directory
 	 * @param args command arguments
 	 * @return process
 	 * @throws IOException on any error
@@ -416,13 +454,13 @@ public class OSCommand {
 	}
 
 	/**
-	 * Run a command with the working directory set to a particular location.
-	 * I/O will be redirected to the provied output stream, and the process will
-	 * be returned
+	 * Run a command with the working directory set to a particular location. I/O
+	 * will be redirected to the provied output stream, and the process will be
+	 * returned
 	 * 
-	 * @param cwd working directory
+	 * @param cwd  working directory
 	 * @param args command arguments
-	 * @param out output stream to write to
+	 * @param out  output stream to write to
 	 * @return process
 	 * @throws IOException on any error
 	 */
@@ -431,7 +469,7 @@ public class OSCommand {
 		LOG.fine("Running command: " + StringUtils.join(args, " "));
 		ForkerBuilder builder = new ForkerBuilder(args);
 		if (builder.io() == null)
-			builder.io(io.get() == null ? IO.INPUT : io.get());
+			builder.io(io.get() == null ? IO.NON_BLOCKING : io.get());
 		checkElevationAndEnvironment(builder);
 		if (cwd != null) {
 			builder.directory(cwd);
@@ -483,11 +521,11 @@ public class OSCommand {
 	}
 
 	/**
-	 * Run a command. I/O will be redirected to the provied output stream, and
-	 * the process will be returned
+	 * Run a command. I/O will be redirected to the provied output stream, and the
+	 * process will be returned
 	 * 
 	 * @param args command arguments
-	 * @param out output stream to write to
+	 * @param out  output stream to write to
 	 * @return process
 	 * @throws IOException on any error
 	 */
@@ -496,9 +534,73 @@ public class OSCommand {
 	}
 
 	/**
-	 * Make any commands executed using this class be run as an administrator
-	 * until the configuration is removed. Usually paired with a
-	 * {@link #restrict()} or {@link #reset()} call, e.g.
+	 * Run this Java application as an administrator if not already any
+	 * administrator.
+	 * <p>
+	 * This is achieved by trying to reconstruct the java command that was used to
+	 * launch this application from system properties and arguments.
+	 * <p>
+	 * NOTE: MUST must called from the callers main() method (as
+	 * the stack is examined to determine the main class to load). If you are
+	 * calling from elsewhere, use the alternative version of the method that takes
+	 * a main classname argument.
+	 * 
+	 * @param args application arguments
+	 * @return elevated app launched
+	 * @throws IOException on error
+	 */
+	public static boolean elevateApp(String[] args) throws IOException {
+		StackTraceElement[] els = Thread.currentThread().getStackTrace();
+		return elevateApp(args, els[2].getClassName());
+	}
+
+	/**
+	 * Run this Java application as an administrator if not already any
+	 * administrator.
+	 * <p>
+	 * This is achieved by trying to reconstruct the java command that was used to
+	 * launch this application from system properties and arguments.
+	 * <p>
+	 * This should be ideally called at the very start of the application. If
+	 * <code>true</code> is returned then the caller should immediately
+	 * System.exit() as an elevated copy should be starting.
+	 * 
+	 * @param args          application arguments
+	 * @param mainClassName main class name
+	 * @return elevated app launched
+	 * @throws IOException on error
+	 */
+	public static boolean elevateApp(String[] args, String mainClassName) throws IOException {
+		if (OS.isAdministrator())
+			return false;
+		else {
+			elevate();
+			try {
+				List<String> vargs = new ArrayList<String>();
+				vargs.add(OS.getJavaPath());
+				String cp = System.getProperty("java.class.path");
+				if (StringUtils.isNotBlank(cp)) {
+					vargs.add("-classpath");
+					vargs.add(cp);
+				}
+				for (String s : Arrays.asList("java.library.path", "jna.library.path")) {
+					if (System.getProperty(s) != null)
+						vargs.add("-D" + s + "=" + System.getProperty(s));
+				}
+				vargs.add(mainClassName);
+				vargs.addAll(Arrays.asList(args));
+				runCommand(vargs);
+				return true;
+			} finally {
+				restrict();
+			}
+		}
+	}
+
+	/**
+	 * Make any commands executed using this class be run as an administrator until
+	 * the configuration is removed. Usually paired with a {@link #restrict()} or
+	 * {@link #reset()} call, e.g.
 	 * 
 	 * <pre>
 	 * <code>
@@ -534,8 +636,8 @@ public class OSCommand {
 	 * 
 	 * @return whether or not elevation was previously set
 	 */
-	public static AutoCloseable elevated() {
-		return new AutoCloseable() {
+	public static Closeable elevated() {
+		return new Closeable() {
 			{
 				if (elevate()) {
 					throw new IllegalStateException("Already elevated.");
@@ -543,7 +645,7 @@ public class OSCommand {
 			}
 
 			@Override
-			public void close() throws Exception {
+			public void close() throws IOException {
 				restrict();
 			}
 		};
@@ -611,8 +713,8 @@ public class OSCommand {
 				}
 				return found;
 			}
-			throw new UnsupportedOperationException(
-					System.getProperty("os.name") + " is not supported. Cannot determine if command " + command + " exists");
+			throw new UnsupportedOperationException(System.getProperty("os.name")
+					+ " is not supported. Cannot determine if command " + command + " exists");
 		}
 	}
 
@@ -628,8 +730,8 @@ public class OSCommand {
 
 	/**
 	 * 
-	 * Make any commands executed using this class be run using the specified
-	 * I/O mode. Usually paired with a 2nd call or {@link #reset()} call.
+	 * Make any commands executed using this class be run using the specified I/O
+	 * mode. Usually paired with a 2nd call or {@link #reset()} call.
 	 * 
 	 * <pre>
 	 * <code>
@@ -675,11 +777,11 @@ public class OSCommand {
 	}
 
 	/**
-	 * Run a command with the working directory set to a particular location.
-	 * I/O will be redirected to the standard streams, and an exception will be
-	 * thrown if the exit code is anything other than zero.
+	 * Run a command with the working directory set to a particular location. I/O
+	 * will be redirected to the standard streams, and an exception will be thrown
+	 * if the exit code is anything other than zero.
 	 * 
-	 * @param cwd working directory
+	 * @param cwd  working directory
 	 * @param args command arguments
 	 * @throws IOException on any error
 	 */
@@ -688,29 +790,30 @@ public class OSCommand {
 	}
 
 	/**
-	 * Run a command with the working directory set to a particular location.
-	 * I/O will be redirected to the provied output stream, and an exception
-	 * will be thrown if the exit code is anything other than zero.
+	 * Run a command with the working directory set to a particular location. I/O
+	 * will be redirected to the provied output stream, and an exception will be
+	 * thrown if the exit code is anything other than zero.
 	 * 
-	 * @param cwd working directory
-	 * @param out output stream to write to
+	 * @param cwd  working directory
+	 * @param out  output stream to write to
 	 * @param args command arguments
 	 * @throws IOException on any error
 	 */
 	public static void run(File cwd, OutputStream out, List<String> args) throws IOException {
 		Process process = doCommand(cwd, args, out);
 		if (process.exitValue() != 0) {
-			throw new IOException("Update process exited with status " + process.exitValue() + ". See log for more details.");
+			throw new IOException(
+					"Update process exited with status " + process.exitValue() + ". See log for more details.");
 		}
 	}
 
 	/**
-	 * Run a command with the working directory set to a particular location.
-	 * I/O will be redirected to the provied output stream, and an exception
-	 * will be thrown if the exit code is anything other than zero.
+	 * Run a command with the working directory set to a particular location. I/O
+	 * will be redirected to the provied output stream, and an exception will be
+	 * thrown if the exit code is anything other than zero.
 	 * 
-	 * @param cwd working directory
-	 * @param out output stream to write to
+	 * @param cwd  working directory
+	 * @param out  output stream to write to
 	 * @param args command arguments
 	 * @throws IOException on any error
 	 */
@@ -722,11 +825,11 @@ public class OSCommand {
 	}
 
 	/**
-	 * Run a command with the working directory set to a particular location.
-	 * I/O will be redirected to the standard streams, and an exception will be
-	 * thrown if the exit code is anything other than zero.
+	 * Run a command with the working directory set to a particular location. I/O
+	 * will be redirected to the standard streams, and an exception will be thrown
+	 * if the exit code is anything other than zero.
 	 * 
-	 * @param cwd working directory
+	 * @param cwd  working directory
 	 * @param args command arguments
 	 * @throws IOException on any error
 	 */
@@ -740,8 +843,8 @@ public class OSCommand {
 
 	/**
 	 * Simplest way to run a command. I/O will be redirected to the standard
-	 * streams, and an exception will be thrown if the exit code is anything
-	 * other than zero.
+	 * streams, and an exception will be thrown if the exit code is anything other
+	 * than zero.
 	 * 
 	 * @param args command arguments
 	 * @throws IOException on any error
@@ -751,10 +854,10 @@ public class OSCommand {
 	}
 
 	/**
-	 * Run a command. I/O will be redirected to the provied output stream, and
-	 * an exception will be thrown if the exit code is anything other than zero.
+	 * Run a command. I/O will be redirected to the provied output stream, and an
+	 * exception will be thrown if the exit code is anything other than zero.
 	 * 
-	 * @param out output stream to write to
+	 * @param out  output stream to write to
 	 * @param args command arguments
 	 * @throws IOException on any error
 	 */
@@ -764,8 +867,8 @@ public class OSCommand {
 
 	/**
 	 * Simplest way to run a command. I/O will be redirected to the standard
-	 * streams, and an exception will be thrown if the exit code is anything
-	 * other than zero.
+	 * streams, and an exception will be thrown if the exit code is anything other
+	 * than zero.
 	 * 
 	 * @param args command arguments
 	 * @throws IOException on any error
@@ -775,12 +878,12 @@ public class OSCommand {
 	}
 
 	/**
-	 * Run a command with the working directory set to a particular location.
-	 * I/O will be redirected to the provied output stream, and the exit code
-	 * will be returned.
+	 * Run a command with the working directory set to a particular location. I/O
+	 * will be redirected to the provied output stream, and the exit code will be
+	 * returned.
 	 * 
-	 * @param cwd working directory
-	 * @param out output stream to write to
+	 * @param cwd  working directory
+	 * @param out  output stream to write to
 	 * @param args command arguments
 	 * @return exit code
 	 * @throws IOException on any error
@@ -790,7 +893,7 @@ public class OSCommand {
 		List<String> largs = new ArrayList<String>(Arrays.asList(args));
 		ForkerBuilder pb = new ForkerBuilder(largs);
 		if (pb.io() == null)
-			pb.io(io.get() == null ? IO.INPUT : io.get());
+			pb.io(io.get() == null ? IO.NON_BLOCKING : io.get());
 		checkElevationAndEnvironment(pb);
 		if (cwd != null) {
 			pb.directory(cwd);
@@ -807,11 +910,11 @@ public class OSCommand {
 	}
 
 	/**
-	 * Run a command with the working directory set to a particular location.
-	 * I/O will be redirected to the standard streams, and the exit code will be
+	 * Run a command with the working directory set to a particular location. I/O
+	 * will be redirected to the standard streams, and the exit code will be
 	 * returned.
 	 * 
-	 * @param cwd working directory
+	 * @param cwd  working directory
 	 * @param args command arguments
 	 * @return exit code
 	 * @throws IOException on any error
@@ -821,8 +924,8 @@ public class OSCommand {
 	}
 
 	/**
-	 * Run a command. I/O will be redirected to the standard streams, and the
-	 * exit code will be returned.
+	 * Run a command. I/O will be redirected to the standard streams, and the exit
+	 * code will be returned.
 	 * 
 	 * @param args command arguments
 	 * @return exit code
@@ -833,10 +936,10 @@ public class OSCommand {
 	}
 
 	/**
-	 * Run a command. I/O will be redirected to the provied output stream, and
-	 * the exit code will be returned.
+	 * Run a command. I/O will be redirected to the provied output stream, and the
+	 * exit code will be returned.
 	 * 
-	 * @param out output stream to write to
+	 * @param out  output stream to write to
 	 * @param args command arguments
 	 * @return exit code
 	 * @throws IOException on any error
@@ -846,8 +949,8 @@ public class OSCommand {
 	}
 
 	/**
-	 * Run a command. I/O will be redirected to the standard streams, and the
-	 * exit code will be returned.
+	 * Run a command. I/O will be redirected to the standard streams, and the exit
+	 * code will be returned.
 	 * 
 	 * @param args command arguments
 	 * @return exit code
@@ -858,11 +961,11 @@ public class OSCommand {
 	}
 
 	/**
-	 * Run a command with a particular working directory and iterate over all of
-	 * the output. An exception will be thrown if the exit code is anything
-	 * other than zero.
+	 * Run a command with a particular working directory and iterate over all of the
+	 * output. An exception will be thrown if the exit code is anything other than
+	 * zero.
 	 * 
-	 * @param cwd working directory
+	 * @param cwd  working directory
 	 * @param args command arguments
 	 * @return iterated output
 	 * @throws IOException on any error
@@ -872,7 +975,7 @@ public class OSCommand {
 		LOG.fine("Running command: " + StringUtils.join(largs, " "));
 		ForkerBuilder pb = new ForkerBuilder(largs);
 		if (pb.io() == null)
-			pb.io(io.get() == null ? IO.INPUT : io.get());
+			pb.io(io.get() == null ? IO.NON_BLOCKING : io.get());
 		checkElevationAndEnvironment(pb);
 		if (cwd != null) {
 			pb.directory(cwd);
@@ -917,8 +1020,12 @@ public class OSCommand {
 
 						@Override
 						public String next() {
-							checkNext();
-							return next;
+							try {
+								checkNext();
+								return next;
+							} finally {
+								next = null;
+							}
 						}
 					};
 					return iterator;
@@ -930,10 +1037,10 @@ public class OSCommand {
 
 	/**
 	 * Run a command with a particular working directory and capture all of the
-	 * output to a list of strings. An exception will be thrown if the exit code
-	 * is anything other than zero.
+	 * output to a list of strings. An exception will be thrown if the exit code is
+	 * anything other than zero.
 	 * 
-	 * @param cwd working directory
+	 * @param cwd  working directory
 	 * @param args command arguments
 	 * @return output as list of strings
 	 * @throws IOException on any error
@@ -945,19 +1052,19 @@ public class OSCommand {
 			LOG.fine("Running command: " + StringUtils.join(largs, " "));
 			ForkerBuilder pb = new ForkerBuilder(largs);
 			if (pb.io() == null)
-				pb.io(io.get() == null ? IO.INPUT : io.get());
+				pb.io(io.get() == null ? IO.NON_BLOCKING : io.get());
 			checkElevationAndEnvironment(pb);
 			if (cwd != null) {
 				pb.directory(cwd);
 			}
 			pb.redirectErrorStream(true);
 			Process p = pb.start();
-			Collection<String> lines = IOUtils.readLines(p.getInputStream());
+			Collection<String> lines = IOUtils.readLines(p.getInputStream(),  Charset.defaultCharset());
 			try {
 				int ret = p.waitFor();
 				if (ret != 0) {
-					throw new IOException("Command '" + StringUtils.join(largs, " ") + "' returned non-zero status. Returned " + ret
-							+ ". " + StringUtils.join(lines, "\n"));
+					throw new IOException("Command '" + StringUtils.join(largs, " ")
+							+ "' returned non-zero status. Returned " + ret + ". " + StringUtils.join(lines, "\n"));
 				}
 			} catch (InterruptedException e) {
 				LOG.log(Level.SEVERE, "Command interrupted.", e);
@@ -973,8 +1080,8 @@ public class OSCommand {
 
 	/**
 	 * Run a command, iterating over it's output. This is more efficient that
-	 * {@link #runCommandAndCaptureOutput(String...)} as the output is not built
-	 * up into memory first.
+	 * {@link #runCommandAndCaptureOutput(String...)} as the output is not built up
+	 * into memory first.
 	 * 
 	 * @param args command arguments
 	 * @return output as list of strings
@@ -987,8 +1094,8 @@ public class OSCommand {
 
 	/**
 	 * Run a command and capture all of the output to a list of strings. An
-	 * exception will be thrown if the exit code is anything other than zero.
-	 * Note, if there is a lot of output, you might want to use
+	 * exception will be thrown if the exit code is anything other than zero. Note,
+	 * if there is a lot of output, you might want to use
 	 * {@link #runCommandAndIterateOutput(String...)} instead.
 	 * 
 	 * @param args command arguments
@@ -1004,7 +1111,7 @@ public class OSCommand {
 	 * Run a command with a particular working directory and capture all of the
 	 * output to a file. The exit code will be returned.
 	 * 
-	 * @param cwd working directory
+	 * @param cwd  working directory
 	 * @param file file to write output to
 	 * @param args command arguments
 	 * @return output as list of strings
@@ -1015,7 +1122,7 @@ public class OSCommand {
 		FileOutputStream fos = new FileOutputStream(file);
 		try {
 			ForkerBuilder pb = new ForkerBuilder(args);
-			pb.io(io.get() == null ? IO.INPUT : io.get());
+			pb.io(io.get() == null ? IO.NON_BLOCKING : io.get());
 			if (cwd != null) {
 				pb.directory(cwd);
 			}
@@ -1035,8 +1142,8 @@ public class OSCommand {
 	}
 
 	/**
-	 * Run a command. I/O will be written to the provided file, and the exit
-	 * code will be returned.
+	 * Run a command. I/O will be written to the provided file, and the exit code
+	 * will be returned.
 	 * 
 	 * @param file file to write to
 	 * @param args command arguments
@@ -1048,10 +1155,10 @@ public class OSCommand {
 	}
 
 	/**
-	 * Set the fixed password to use. This is only used when elevation is
-	 * required and the daemon is not running. If it is not runiing, the
-	 * password will be asked be for in some fashion. There should be little
-	 * reason to use this outside of testing or development.
+	 * Set the fixed password to use. This is only used when elevation is required
+	 * and the daemon is not running. If it is not runiing, the password will be
+	 * asked be for in some fashion. There should be little reason to use this
+	 * outside of testing or development.
 	 * 
 	 * @param password sudo password
 	 */

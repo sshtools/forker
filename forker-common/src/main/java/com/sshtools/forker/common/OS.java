@@ -18,10 +18,11 @@ package com.sshtools.forker.common;
 import java.io.File;
 import java.io.IOException;
 
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.SystemUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.SystemUtils;
 
 import com.sshtools.forker.common.CSystem.Termios;
+import com.sun.jna.Memory;
 import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.ptr.IntByReference;
@@ -310,19 +311,14 @@ public class OS {
 	 * @return success
 	 */
 	public static boolean setProcname(String procname) {
-//		if (SystemUtils.IS_OS_UNIX && !SystemUtils.IS_OS_MAC_OSX) {
-//			Memory name = new Memory(procname.length() + 1);
-//			name.setString(0, procname);
-//			return CSystem.INSTANCE.prctl(CSystem.PR_SET_NAME, name, new IntByReference(0).getPointer(),
-//					new IntByReference(0).getPointer(), new IntByReference(0).getPointer()) == 0;
-//		}
-		/**
-		 * LDP: Why cause an error? Its just the process name? Throwing exception breaks cross-platform 
-		 * compatibility. The alternative would be to add a "isProcnameAvailable" type method to allow
-		 * wrapper to skip calling it.
-		 */
-		// 
-		//throw new UnsupportedOperationException();
+		if (SystemUtils.IS_OS_UNIX && !SystemUtils.IS_OS_MAC_OSX) {
+			if(procname.length() > 15)
+				procname = procname.substring(0, 15);
+			Memory name = new Memory(procname.length() + 1);
+			name.setString(0, procname);
+			return CSystem.INSTANCE.prctl(CSystem.PR_SET_NAME, name, new IntByReference(0).getPointer(),
+					new IntByReference(0).getPointer(), new IntByReference(0).getPointer()) == 0;
+		}
 		return false;
 
 	}

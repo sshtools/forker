@@ -434,6 +434,8 @@ public abstract class NonBlockingBasePosixProcess extends NonBlockingProcess {
 			parkNanos(testSleep);
 		}
 		isRunning = true;
+		if(listener != null)
+			listener.onStarted(this);
 	}
 
 	protected void initializeBuffers() {

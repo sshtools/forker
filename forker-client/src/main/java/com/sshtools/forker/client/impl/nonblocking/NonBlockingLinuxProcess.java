@@ -24,12 +24,14 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.logging.Level;
 
+import org.apache.commons.lang3.SystemUtils;
+
 import com.sshtools.forker.client.EffectiveUser;
 import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.client.NonBlockingProcessListener;
-import com.sshtools.forker.client.impl.jna.posix.LibAzulJava8;
 import com.sshtools.forker.client.impl.jna.posix.LibC;
 import com.sshtools.forker.client.impl.jna.posix.LibEpoll;
+import com.sshtools.forker.client.impl.jna.posix.LibJava10;
 import com.sshtools.forker.client.impl.jna.posix.LibJava8;
 import com.sun.jna.JNIEnv;
 import com.sun.jna.ptr.IntByReference;
@@ -64,7 +66,7 @@ public class NonBlockingLinuxProcess extends NonBlockingBasePosixProcess {
 			effectiveUser.elevate(builder, null, builder.getCommand());
 		}
 		try {
-			String[] cmdarray = builder.command().toArray(new String[0]);
+			String[] cmdarray = builder.getCommand().getArguments().toArray(new String[0]);
 			// See
 			// https://github.com/JetBrains/jdk8u_jdk/blob/master/src/solaris/classes/java/lang/ProcessImpl.java#L71-L83
 			byte[][] args = new byte[cmdarray.length - 1][];
@@ -88,23 +90,22 @@ public class NonBlockingLinuxProcess extends NonBlockingBasePosixProcess {
 				// https://github.com/JetBrains/jdk8u_jdk/blob/master/src/solaris/classes/java/lang/ProcessImpl.java#L96
 				createPipes();
 				int[] child_fds = { stdinWidow, stdoutWidow, stderrWidow };
-				if (isAzul) {
-					pid = LibAzulJava8.Java_java_lang_ProcessImpl_forkAndExec(JNIEnv.CURRENT, this,
+				if (!isAzul && SystemUtils.IS_JAVA_1_8) {
+					pid = LibJava8.Java_java_lang_UNIXProcess_forkAndExec(JNIEnv.CURRENT, this,
 							LaunchMechanism.VFORK.ordinal() + 1, toCString(System.getProperty("java.home") + "/lib/jspawnhelper"), // used
 																																	// on
 																																	// Linux
 							toCString(cmdarray[0]), argBlock, args.length, envBlock, builder.environment().size(),
 							(builder.directory() != null ? toCString(builder.directory().toString()) : null), child_fds,
 							(byte) 0 /* redirectErrorStream */);
-				} else {
-					// See
+				} else {// See
 					// https://github.com/JetBrains/jdk8u_jdk/blob/master/src/solaris/classes/java/lang/UNIXProcess.java#L247
 					// Native source code:
 					// https://github.com/JetBrains/jdk8u_jdk/blob/master/src/solaris/native/java/lang/UNIXProcess_md.c#L566
-					pid = LibJava8.Java_java_lang_UNIXProcess_forkAndExec(JNIEnv.CURRENT, this, LaunchMechanism.VFORK.ordinal() + 1,
-							toCString(System.getProperty("java.home") + "/lib/jspawnhelper"), // used
-																								// on
-																								// Linux
+					pid = LibJava10.Java_java_lang_ProcessImpl_forkAndExec(JNIEnv.CURRENT, this,
+							LaunchMechanism.VFORK.ordinal() + 1, toCString(System.getProperty("java.home") + "/lib/jspawnhelper"), // used
+																																	// on
+																																	// Linux
 							toCString(cmdarray[0]), argBlock, args.length, envBlock, builder.environment().size(),
 							(builder.directory() != null ? toCString(builder.directory().toString()) : null), child_fds,
 							(byte) 0 /* redirectErrorStream */);

@@ -1,23 +1,4 @@
-<!--
-
-    Copyright © 2015 - 2018 SSHTOOLS Limited (support@sshtools.com)
-
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-        http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
-
--->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
 
 	<properties>
@@ -25,12 +6,13 @@
 		<maven.compiler.source>1.7</maven.compiler.source>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+	
 	</properties>
 
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.sshtools</groupId>
 	<artifactId>forker</artifactId>
-	<version>1.5</version>
+	<version>1.6-SNAPSHOT</version>
 	<name>Forker</name>
 	<description>Forker is a set of utilities and helpers for executing operating system commands.</description>
 	<url>http://www.sshtools.com</url>
@@ -73,6 +55,7 @@
 		<module>forker-examples</module>
 		<module>forker-wrapper</module>
 		<module>forker-pty</module>
+		<module>forker-services</module>
 		<module>forker-assembly</module>
 	</modules>
 
@@ -205,8 +188,18 @@
 				</configuration>
 			</plugin>
 			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>build-helper-maven-plugin</artifactId>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<source>1.8</source>
+					<target>1.8</target>
+					<encoding>UTF-8</encoding>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-javadoc-plugin</artifactId>
+				<version>3.1.1</version>
 				<executions>
 					<execution>
 						<phase>package</phase>
@@ -220,6 +213,16 @@
 						</configuration>
 					</execution>
 				</executions>
+				<configuration>
+					<!-- <skip>true</skip> -->
+					<encoding>UTF-8</encoding>
+					<excludePackageNames>**.impl.*</excludePackageNames>
+					<!-- https://stackoverflow.com/questions/49472783/maven-is-unable-to-find-javadoc-command -->
+	   				<!-- <javadocExecutable>${java.home}/bin/javadoc</javadocExecutable> -->
+	   				
+	   				<!-- https://bugs.openjdk.java.net/browse/JDK-8212233 -->
+	   				<source>8</source>
+				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>com.mycila</groupId>

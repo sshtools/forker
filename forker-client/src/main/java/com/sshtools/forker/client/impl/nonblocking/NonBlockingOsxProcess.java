@@ -164,10 +164,10 @@ public class NonBlockingOsxProcess extends NonBlockingBasePosixProcess {
 	}
 
 	private Pointer createPosixSpawnFileActions() {
-		return new Memory(Pointer.SIZE);
+		return new Memory(Native.POINTER_SIZE);
 	}
 
 	private Pointer createPosixSpawnAttributes() {
-		return new Memory(Pointer.SIZE);
+		return new Memory(Native.POINTER_SIZE);
 	}
 }

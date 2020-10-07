@@ -22,8 +22,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
 
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.SystemUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.SystemUtils;
 
 import com.pty4j.PtyProcess;
 import com.pty4j.WinSize;
@@ -119,8 +119,14 @@ public class PTYExecutor implements CommandExecutor {
 				arguments.remove(0);
 			}
 
+			if(euid > -1) {
+				System.err.println("WARNING: Effective UID support temporarily disabled.");
+			}
+//			ptyorig = PtyProcess.exec((String[]) arguments.toArray(new String[0]), cmd.getEnvironment(),
+//					cmd.getDirectory().getAbsolutePath(), euid);
 			ptyorig = PtyProcess.exec((String[]) arguments.toArray(new String[0]), cmd.getEnvironment(),
-					cmd.getDirectory().getAbsolutePath(), euid);
+					cmd.getDirectory().getAbsolutePath());
+			
 			final PtyProcess pty = ptyorig;
 
 			// The JVM is now forked, so free up some resources we won't

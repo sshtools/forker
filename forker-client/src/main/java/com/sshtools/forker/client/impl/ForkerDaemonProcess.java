@@ -143,7 +143,6 @@ public class ForkerDaemonProcess extends ForkerProcess {
 			result = din.readInt();
 			if (result == States.FAILED) {
 				String mesg = din.readUTF();
-				System.out.println("FORK: Command failed " + mesg);
 				try {
 					dout.close();
 				} catch (IOException ioe) {

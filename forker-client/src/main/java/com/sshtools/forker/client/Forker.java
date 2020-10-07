@@ -46,11 +46,9 @@ import com.sshtools.forker.common.States;
  *
  */
 public class Forker {
-
 	final static String[] FORKER_DIRS = { ".*[/\\\\]forker-client[/\\\\].*", ".*[/\\\\]forker-wrapper[/\\\\].*",
 			".*[/\\\\]forker-pty[/\\\\].*", ".*[/\\\\]forker-common[/\\\\].*", ".*[/\\\\]forker-daemon[/\\\\].*",
 			".*[/\\\\]pty4j[/\\\\].*" };
-
 	/*
 	 * The jars forker daemon needs. If it's dependencies ever change, this will
 	 * have to updated too.
@@ -58,17 +56,19 @@ public class Forker {
 	 * TODO Is there a better way to discover this? perhaps looking at maven
 	 * meta-data
 	 */
-	final static String[] FORKER_JARS = { "^jna-.*", "^commons-lang-.*", "^commons-io.*", "^jna-platform-.*",
-			"^purejavacomm-.*", "^guava-.*", "^log4j-.*", "^forker-common-.*", "^forker-client-.*", "^forker-daemon-.*",
-			"^pty4j-.*", "^forker-wrapper-.*", "^forker-pty-.*" };
+	final static String[] FORKER_JARS = { "^jna.*", "^commons-lang3.*", "^commons-io.*", "^jna-platform.*", "^purejavacomm.*",
+			"^guava.*", "^log4j.*", "^forker-common.*", "^forker-client.*", "^forker-daemon.*", "^pty4j.*",
+			"^forker-wrapper.*", "^forker-pty.*", "^jsr305.*", "^checker-qua.*", "^error_prone_annotations.*",
+			"^jobjc-annotations.*", "^animal-sniffer-annotations.*" };
+	
 	private static boolean daemonAdministrator;
-
 	private static String daemonClasspath;
 	private static boolean daemonLoaded;
 	private static Socket daemonMaintenanceSocket;
 	private static boolean daemonRunning;
 	private final static Forker INSTANCE = new Forker();
 	private static boolean wrapped;
+
 	/**
 	 * @param io IO
 	 * @param command command
@@ -121,7 +121,6 @@ public class Forker {
 	public Process exec(IO io, String command, String[] envp, File dir) throws IOException {
 		if (command.length() == 0)
 			throw new IllegalArgumentException("Empty command");
-
 		StringTokenizer st = new StringTokenizer(command);
 		String[] cmdarray = new String[st.countTokens()];
 		for (int i = 0; st.hasMoreTokens(); i++)
@@ -203,7 +202,7 @@ public class Forker {
 	/**
 	 * Get a cut-down classpath that may be used to launch forker from the
 	 * current classpath.
-	 *  
+	 * 
 	 * @return forker classpath
 	 */
 	public static String getForkerClasspath() {
@@ -317,8 +316,7 @@ public class Forker {
 	 * cookie file may connect to the forker daemon and ask it to run processes
 	 * too.
 	 * 
-	 * @param effectiveUser
-	 *            effective user
+	 * @param effectiveUser effective user
 	 */
 	public static void loadDaemon(final EffectiveUser effectiveUser) {
 		loadDaemon(null, effectiveUser, effectiveUser != null);
@@ -339,19 +337,14 @@ public class Forker {
 	 * second is the class name to actually load, the remaining arguments are
 	 * the program arguments.
 	 * 
-	 * @param args
-	 *            command line arguments
-	 * @throws Exception
-	 *             on any error
+	 * @param args command line arguments
+	 * @throws Exception on any error
 	 */
 	public static void main(String[] args) throws Exception {
-
 		BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
 		String cookieText = reader.readLine();
 		final Instance cookie = new Instance(cookieText);
-		
 		Cookie.get().set(cookie);
-		
 		daemonLoaded = true;
 		wrapped = true;
 		daemonRunning = true;
@@ -359,19 +352,14 @@ public class Forker {
 		daemonAdministrator = "true".equals(argList.remove(0));
 		String classname = argList.remove(0);
 		Class<?> clazz = Class.forName(classname);
-		
-		
-		
-
 		@SuppressWarnings("resource")
 		final Socket daemonSocket = new Socket();
 		long started = System.currentTimeMillis();
-		
-		while(true) {
+		while (true) {
 			try {
 				daemonSocket.connect(new InetSocketAddress("127.0.0.1", cookie.getPort()), 5000);
 			} catch (Exception e) {
-				if((System.currentTimeMillis() - started) > 30000) {
+				if ((System.currentTimeMillis() - started) > 30000) {
 					return;
 				}
 				continue;
@@ -384,7 +372,6 @@ public class Forker {
 		 * wrapper process has died, and so we should shutdown too
 		 */
 		new Thread() {
-
 			{
 				setDaemon(true);
 				setPriority(MIN_PRIORITY);
@@ -404,7 +391,6 @@ public class Forker {
 						dos.writeByte(0);
 						dos.flush();
 					}
-
 					// Now we leave this open
 				} catch (Exception e) {
 					if (daemonSocket != null) {
@@ -428,11 +414,9 @@ public class Forker {
 	 * administrator, this includes files that are normally only accessible by
 	 * an administrative user.
 	 * 
-	 * @param file
-	 *            file
+	 * @param file file
 	 * @return stream to read from
-	 * @throws IOException
-	 *             on any I/O error
+	 * @throws IOException on any I/O error
 	 */
 	public static InputStream readFile(File file) throws IOException {
 		Cookie cookie = Cookie.get();
@@ -487,16 +471,12 @@ public class Forker {
 	 * administrator, this includes files that are normally only accessible by
 	 * an administrative user.
 	 * 
-	 * @param file
-	 *            file
-	 * @param append
-	 *            open and append
+	 * @param file file
+	 * @param append open and append
 	 * @return stream to write to
-	 * @throws IOException
-	 *             on any I/O error
+	 * @throws IOException on any I/O error
 	 */
 	public static OutputStream writeFile(File file, boolean append) throws IOException {
-
 		Cookie cookie = Cookie.get();
 		Instance instance = cookie.load();
 		final Socket daemonSocket = new Socket("127.0.0.1", instance.getPort());
@@ -577,34 +557,27 @@ public class Forker {
 
 	private static void loadDaemon(Instance fixedCookie, final EffectiveUser effectiveUser, boolean isolated) {
 		if (!daemonLoaded) {
-
 			/* Only attempt this if forker daemon is on the class path */
 			try {
 				Class.forName("com.sshtools.forker.daemon.Forker");
-
 				try {
 					/*
 					 * If running as another user, always create a new isolated
 					 * forker daemon
 					 */
 					Instance cookie = fixedCookie == null ? (isolated ? null : Cookie.get().load()) : fixedCookie;
-
 					boolean isRunning = cookie != null && cookie.isRunning();
 					if (!isRunning) {
-
 						if (fixedCookie != null) {
 							System.err.println("[WARNING] A fixed cookie of " + fixedCookie
 									+ " was provided, but a daemon for this is not running.");
 							return;
 						}
-
 						final ForkerDaemonThread fdt = new ForkerDaemonThread(effectiveUser, isolated);
 						fdt.start();
-
 						// Wait for a little bit for the daemon to start
 						long now = System.currentTimeMillis();
-						long expire = now
-								+ (Integer.parseInt(System.getProperty("forker.daemon.launchTimeout", "180")) * 1000);
+						long expire = now + (Integer.parseInt(System.getProperty("forker.daemon.launchTimeout", "180")) * 1000);
 						while (now < expire && !fdt.errored) {
 							try {
 								cookie = Cookie.get().load();
@@ -617,9 +590,7 @@ public class Forker {
 						}
 						if (cookie == null || !cookie.isRunning())
 							throw new RuntimeException("Failed to start forker daemon.");
-
 						daemonRunning = true;
-
 						if (isolated) {
 							/*
 							 * Open a connection to the forker daemon and keep
@@ -645,7 +616,6 @@ public class Forker {
 								DataInputStream din = new DataInputStream(daemonMaintenanceSocket.getInputStream());
 								if (din.readInt() != States.OK)
 									throw new Exception("Unexpected response.");
-
 								// Now we leave this open
 							} catch (Exception e) {
 								if (daemonMaintenanceSocket != null) {
@@ -664,7 +634,6 @@ public class Forker {
 					System.err.println("[WARNING] Could not load cookie, and so could not start a daemon.");
 				}
 			} catch (ClassNotFoundException cnfe) {
-
 			} finally {
 				// Don't try again whatever
 				daemonLoaded = true;
@@ -687,15 +656,12 @@ public class Forker {
 
 		public void run() {
 			String javaExe = OS.getJavaPath();
-
 			/*
 			 * Build up a cut down classpath with only the jars forker daemon
 			 * needs
 			 */
-			String forkerClasspath = (daemonClasspath == null ? System.getProperty("java.class.path", "")
-					: daemonClasspath);
+			String forkerClasspath = (daemonClasspath == null ? System.getProperty("java.class.path", "") : daemonClasspath);
 			String classpath = getForkerClasspath(forkerClasspath);
-
 			ForkerBuilder fb = new ForkerBuilder(javaExe, "-Xmx" + System.getProperty("forker.daemon.maxMemory", "8m"),
 					"-Djava.library.path=" + System.getProperty("java.library.path", ""), "-classpath", classpath,
 					"com.sshtools.forker.daemon.Forker");
@@ -712,7 +678,6 @@ public class Forker {
 				process = fb.start();
 				try {
 					InputStream inputStream = process.getInputStream();
-
 					/*
 					 * Need stdin in case we need to elevate and dont have a
 					 * GUI. Must flush after every character too
@@ -732,7 +697,6 @@ public class Forker {
 							}
 						}
 					}.start();
-
 					if (isolated) {
 						/*
 						 * Wait for cookie. We can't just read stdout line by
@@ -776,11 +740,9 @@ public class Forker {
 										System.out.print(chr);
 									}
 								}
-
 							}
 						}
 					}
-
 					// Now just read till it dies (or we die)
 					IOUtils.copy(inputStream, System.err);
 				} finally {
@@ -793,7 +755,5 @@ public class Forker {
 				errored = true;
 			}
 		}
-
 	}
-
 }

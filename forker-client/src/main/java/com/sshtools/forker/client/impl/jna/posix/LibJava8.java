@@ -15,11 +15,10 @@
  */
 package com.sshtools.forker.client.impl.jna.posix;
 
-
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.commons.lang.SystemUtils;
+import org.apache.commons.lang3.SystemUtils;
 
 import com.sshtools.forker.client.impl.nonblocking.NonBlockingBasePosixProcess;
 import com.sun.jna.JNIEnv;
@@ -31,9 +30,9 @@ import com.sun.jna.NativeLibrary;
  */
 public class LibJava8 {
 	static {
-		Map<String, Object> options = new HashMap<String, Object>();
+		Map<String, Object> options = new HashMap<>();
 		options.put(Library.OPTION_ALLOW_OBJECTS, Boolean.TRUE);
-		if (SystemUtils.IS_OS_MAC_OSX) {
+		if (SystemUtils.IS_OS_MAC) {
 			Native.register(NativeLibrary.getProcess(options));
 		} else {
 			Native.register(NativeLibrary.getInstance("java", options));
@@ -52,7 +51,7 @@ public class LibJava8 {
 	 * *env, jobject process, jint mode, jbyteArray helperpath, jbyteArray prog,
 	 * jbyteArray argBlock, jint argc, jbyteArray envBlock, jint envc,
 	 * jbyteArray dir, jintArray std_fds, jboolean redirectErrorStream)
-	 *
+	 * 
 	 * @param jniEnv
 	 * @param process
 	 * @param mode
@@ -65,6 +64,7 @@ public class LibJava8 {
 	 * @param dir
 	 * @param fds
 	 * @param redirectErrorStream
+	 *
 	 * @return the PID of the process
 	 */
 	public static native int Java_java_lang_UNIXProcess_forkAndExec(JNIEnv jniEnv, Object process, int mode, Object helperpath,

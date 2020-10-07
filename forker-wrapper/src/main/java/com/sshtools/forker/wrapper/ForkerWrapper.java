@@ -27,18 +27,33 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
+import java.io.UnsupportedEncodingException;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
+import java.nio.file.PathMatcher;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.jar.JarFile;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -60,8 +75,8 @@ import org.apache.commons.cli.ParseException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.output.TeeOutputStream;
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.SystemUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.SystemUtils;
 
 import com.sshtools.forker.client.EffectiveUserFactory;
 import com.sshtools.forker.client.ForkerBuilder;
@@ -98,6 +113,7 @@ import com.sshtools.forker.wrapper.JVM.Version;
  * <li>Process priority and affinity</li>
  * <li>Forker Daemon integration</li>
  * <li>Wildcard classpaths</li>
+ * <li>Automatic reconfiguration when configuration files change.</li>
  * <li>.. and more</li>
  * </ul>
  *
@@ -166,6 +182,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	private String[] arguments;
 	private CommandLine cmd;
 	private List<KeyValuePair> properties = new ArrayList<KeyValuePair>();
+	private List<KeyValuePair> externalProperties = new ArrayList<KeyValuePair>();
 	private Forker daemon;
 	private Instance cookie;
 	private Process process;
@@ -179,6 +196,13 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	private boolean stopping = false;
 	private boolean preventRestart = false;
 	private ScriptEngine engine;
+	private Set<File> files = new LinkedHashSet<>();
+	private ScheduledExecutorService configChange;
+	private Object cfgLock = new Object();
+	private ScheduledFuture<?> changeTask;
+	private Thread monitorThread;
+	private Thread fileMonThread;
+	
 	{
 		reconfigureLogging();
 	}
@@ -216,25 +240,38 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	}
 
 	public void setProperty(String key, Object value) {
-		for (KeyValuePair nvp : properties) {
-			if (nvp.getName().equals(key)) {
-				nvp.setValue(String.valueOf(value));
-				return;
+		synchronized(properties) {
+			for (KeyValuePair nvp : properties) {
+				if (nvp.getName().equals(key)) {
+					nvp.setValue(String.valueOf(value));
+					return;
+				}
 			}
+			KeyValuePair kp = new KeyValuePair(key, String.valueOf(value));
+			externalProperties.add(kp);
+			properties.add(0, kp);
 		}
-		properties.add(new KeyValuePair(key, String.valueOf(value)));
+	}
+
+	public void readConfigFile(File file) throws IOException {
+		readConfigFile(file, properties);
 	}
 
 	public String getClassname() {
 		return classname;
 	}
 
-	public File relativize(File context, String path) throws IOException {
+	public File relativize(File context, String path) {
 		File p = new File(path);
-		if (p.isAbsolute()) {
-			return p.getCanonicalFile();
+		try {
+			if (p.isAbsolute()) {
+				return p.getCanonicalFile();
+			}
+			return new File(context, p.getPath()).getCanonicalFile();
 		}
-		return new File(context, p.getPath()).getCanonicalFile();
+		catch(IOException ioe) {
+			throw new IllegalArgumentException(String.format("Cannot relativize %s and %s.", context, path));
+		}
 	}
 
 	public void restart() throws InterruptedException {
@@ -261,16 +298,10 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		 * Calculate CWD. All file paths from this point are calculated relative
 		 * to the CWD
 		 */
-		String cwdpath = getOptionValue("cwd", null);
-		File cwd = new File(System.getProperty("user.dir"));
-		if (StringUtils.isNotBlank(cwdpath)) {
-			cwd = relativize(cwd, cwdpath);
-			if (!cwd.exists())
-				throw new IOException(String.format("No such directory %s", cwd));
-		}
+		File cwd = resolveCwd();
 		String javaExe = getJVMPath();
+		String wrapperClasspath = resolveWrapperClasspath();
 		String forkerClasspath = System.getProperty("java.class.path");
-		String wrapperClasspath = getOptionValue("classpath", forkerClasspath);
 		String bootClasspath = getOptionValue("boot-classpath", null);
 		final boolean nativeMain = getSwitch("native", false);
 		final boolean useDaemon = !nativeMain && !getSwitch("no-forker-daemon", nativeMain);
@@ -281,9 +312,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		if (nativeMain && !jvmArgs.isEmpty()) {
 			throw new IOException("Native main may not be used with jvmarg option.");
 		}
-		boolean daemonize = getSwitch("daemon", false);
+		boolean daemonize = isDaemon();
 		String pidfile = getOptionValue("pidfile", null);
-		final int exitWait = Integer.parseInt(getOptionValue("exit-wait", "10"));
 		if (daemonize(cwd, javaExe, forkerClasspath, daemonize, pidfile))
 			return 0;
 		/**
@@ -291,13 +321,13 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		 * exception
 		 */
 		if (StringUtils.isNotBlank(classname) && !OS.setProcname(classname)) {
-			logger.warning(String.format("Failed to set process name to %s", classname));
+			logger.finest(String.format("Failed to set process name to %s", classname));
 		}
 		try {
 			ManagementFactory.getPlatformMBeanServer().registerMBean(this,
 					new ObjectName("com.sshtools.forker.wrapper:type=Wrapper"));
 		} catch (Exception e) {
-			throw new IOException("Failed to register MBean.", e);
+			logger.warning("Could not start MBean server, no JMX features will be available.");
 		}
 		/*
 		 * Create a lock file if 'single instance' was specified
@@ -305,9 +335,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		FileLock lock = null;
 		FileChannel lockChannel = null;
 		File lockFile = new File(new File(System.getProperty("java.io.tmpdir")), "forker-wrapper-" + classname + ".lock");
-		addShutdownHook(useDaemon, exitWait);
+		addShutdownHook(useDaemon);
 		try {
-			if (getSwitch("single-instance", false)) {
+			if (isSingleInstance()) {
 				lockChannel = new RandomAccessFile(lockFile, "rw").getChannel();
 				try {
 					logger.info(String.format("Attempting to acquire lock on %s", lockFile));
@@ -319,9 +349,10 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					throw new IOException(String.format("The application %s is already running.", classname));
 				}
 			}
-			if (useDaemon) {
-				monitorWrappedApplication();
-			}
+
+			monitorConfigurationFiles();
+			monitorWrappedApplication();
+			
 			int retval = 2;
 			int times = 0;
 			int lastRetVal = -1;
@@ -329,106 +360,18 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				times++;
 				stopping = false;
 				process = null;
-				boolean quiet = getSwitch("quiet", false);
-				boolean quietStdErr = quiet || getSwitch("quiet-stderr", false);
-				boolean quietStdOut = quiet || getSwitch("quiet-stdout", false);
-				boolean logoverwrite = getSwitch("log-overwrite", false);
+				boolean quietStdErr = isQuietStderr();
+				boolean quietStdOut = isQuietStdout();
+				boolean logoverwrite = isLogOverwrite();
+				
+				String tempPath = getOptionValue("init-temp", null);
+				if(tempPath!=null) {
+					initTempFolder(tempPath, cwd);
+				}
+				
 				/* Build the command to launch the application itself */
-				ForkerBuilder appBuilder = new ForkerBuilder();
-				if (!nativeMain) {
-					appBuilder.command().add(javaExe);
-					String classpath = buildClasspath(cwd, getSwitch("no-forker-classpath", false) ? null : forkerClasspath,
-							wrapperClasspath, true);
-					if (classpath != null) {
-						appBuilder.command().add("-classpath");
-						appBuilder.command().add(classpath);
-					}
-					boolean hasBootCp = false;
-					for (String val : jvmArgs) {
-						if (val.startsWith("-Xbootclasspath"))
-							hasBootCp = true;
-						appBuilder.command().add(val);
-					}
-					if (!hasBootCp) {
-						String bootcp = buildClasspath(cwd, null, bootClasspath, false);
-						if (bootcp != null && !bootcp.equals("")) {
-							/*
-							 * Do our own processing of append/prepend as there
-							 * are special JVM arguments for it
-							 */
-							if (bootClasspath != null && bootClasspath.startsWith("+"))
-								appBuilder.command().add("-Xbootclasspath/a:" + bootcp);
-							else if (bootClasspath != null && bootClasspath.startsWith("-"))
-								appBuilder.command().add("-Xbootclasspath/p:" + bootcp);
-							else
-								appBuilder.command().add("-Xbootclasspath:" + bootcp);
-						}
-					}
-					if (StringUtils.isBlank(classname))
-						throw new IllegalArgumentException(
-								"Must provide a 'main' property to specify the class that contains the main() method that is your applications entry point.");
-				}
-				if (!nativeMain && !getSwitch("no-info", false)) {
-					if (lastRetVal > -1) {
-						appBuilder.command().add(String.format("-Dforker.info.lastExitCode=%d", lastRetVal));
-					}
-					appBuilder.command().add(String.format("-Dforker.info.attempts=%d", times));
-				}
-				/*
-				 * If the daemon should be used, we assume that forker-client is
-				 * on the classpath and execute the application via that, pssing
-				 * the forker daemon cookie via stdin. *
-				 */
-				if (useDaemon) {
-					/*
-					 * Otherwise we are just running the application directly
-					 */
-					appBuilder.command().add(com.sshtools.forker.client.Forker.class.getName());
-					appBuilder.command().add(String.valueOf(OS.isAdministrator()));
-					appBuilder.command().add(classname);
-					if (arguments != null)
-						appBuilder.command().addAll(Arrays.asList(arguments));
-				} else {
-					/*
-					 * Otherwise we are just running the application directly
-					 */
-					appBuilder.command().add(classname);
-					if (arguments != null)
-						appBuilder.command().addAll(Arrays.asList(arguments));
-				}
-				String priStr = getOptionValue("priority", null);
-				if (priStr != null) {
-					appBuilder.priority(Priority.valueOf(priStr));
-				}
-				appBuilder.io(IO.DEFAULT);
-				appBuilder.directory(cwd);
-				/* Environment variables */
-				for (String env : getOptionValues("setenv")) {
-					String key = env;
-					String value = "";
-					int idx = env.indexOf('=');
-					if (idx != -1) {
-						key = env.substring(0, idx);
-						value = env.substring(idx + 1);
-					}
-					appBuilder.environment().put(key, value);
-				}
-				List<String> cpus = getOptionValues("cpu");
-				for (String cpu : cpus) {
-					appBuilder.affinity().add(Integer.parseInt(cpu));
-				}
-				if (getSwitch("administrator", false)) {
-					if (!OS.isAdministrator()) {
-						logger.info("Raising privileges to administartor");
-						appBuilder.effectiveUser(EffectiveUserFactory.getDefault().administrator());
-					}
-				} else {
-					String runas = getOptionValue("run-as", null);
-					if (runas != null && !runas.equals(System.getProperty("user.name"))) {
-						logger.info(String.format("Switching user to %s", runas));
-						appBuilder.effectiveUser(EffectiveUserFactory.getDefault().getUserForUsername(runas));
-					}
-				}
+				ForkerBuilder appBuilder = buildCommand(cwd, javaExe, forkerClasspath, wrapperClasspath, bootClasspath, nativeMain,
+						useDaemon, jvmArgs, times, lastRetVal);
 				daemon = null;
 				cookie = null;
 				if (useDaemon) {
@@ -437,112 +380,16 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				event(STARTING_APPLICATION, String.valueOf(times), cwd.getAbsolutePath(), classname, String.valueOf(lastRetVal));
 				process = appBuilder.start();
 				event(STARTED_APPLICATION, classname);
-				if (useDaemon) {
-					process.getOutputStream().write(cookie.toString().getBytes("UTF-8"));
-					process.getOutputStream().write("\r\n".getBytes("UTF-8"));
-					process.getOutputStream().flush();
-				}
-				String logpath = getOptionValue("log", null);
-				String errpath = getOptionValue("errors", null);
-				if (errpath == null)
-					errpath = logpath;
-				OutputStream outlog = null;
-				OutputStream errlog = null;
-				long logDelay = Long.parseLong(getOptionValue("log-write-delay", "50"));
-				if (StringUtils.isNotBlank(logpath)) {
-					logger.info(String.format("Writing stdout output to %s", logpath));
-					outlog = new LazyLogStream(logDelay, makeDirectoryForFile(relativize(cwd, logpath)), !logoverwrite);
-				}
-				if (errpath != null) {
-					if (Objects.equals(logpath, errpath))
-						errlog = outlog;
-					else {
-						logger.info(String.format("Writing stderr output to %s", logpath));
-						errlog = new LazyLogStream(logDelay, makeDirectoryForFile(relativize(cwd, errpath)), !logoverwrite);
-					}
-				}
-				OutputStream stdout = quietStdOut ? null : defaultOut;
-				OutputStream out = null;
-				if (stdout != null) {
-					if (outlog != null) {
-						out = new TeeOutputStream(stdout, outlog);
-					} else {
-						out = stdout;
-					}
-				} else if (outlog != null)
-					out = outlog;
-				if (out == null) {
-					out = new SinkOutputStream();
-				}
-				OutputStream stderr = quietStdErr ? null : defaultErr;
-				OutputStream err = null;
-				if (stderr != null) {
-					if (errlog != null) {
-						err = new TeeOutputStream(stderr, errlog);
-					} else {
-						err = stderr;
-					}
-				} else if (errlog != null)
-					err = errlog;
-				if (err == null) {
-					err = out;
-				}
-				Thread errThread = new Thread(copyRunnable(process.getErrorStream(), err), "StdErr");
-				errThread.setDaemon(true);
-				errThread.start();
-				Thread inThread = null;
-				try {
-					if (!daemonize) {
-						inThread = new Thread(copyRunnable(defaultIn, process.getOutputStream()), "StdIn");
-						inThread.setDaemon(true);
-						inThread.start();
-					}
-					try {
-						copy(process.getInputStream(), out, newBuffer());
-					} catch (IOException ioe) {
-						if (!stopping)
-							throw ioe;
-					}
-					retval = process.waitFor();
-				} finally {
-					if (inThread != null) {
-						inThread.interrupt();
-					}
-					errThread.interrupt();
-					if (outlog != null && !outlog.equals(defaultOut)) {
-						outlog.close();
-					}
-					if (errlog != null && errlog != outlog && !errlog.equals(defaultErr)) {
-						errlog.close();
-					}
-					if (daemon != null) {
-						daemon.shutdown(true);
-					}
-				}
-				List<String> restartValues = Arrays.asList(getOptionValue("restart-on", "").split(","));
-				List<String> dontRestartValues = new ArrayList<String>(
-						Arrays.asList(getOptionValue("dont-restart-on", "0,1,2").split(",")));
-				dontRestartValues.removeAll(restartValues);
-				String strret = String.valueOf(retval);
-				event(APPPLICATION_STOPPED, strret, classname);
-				boolean restart = !preventRestart && (((restartValues.size() == 1 && restartValues.get(0).equals(""))
-						|| restartValues.size() == 0 || restartValues.contains(strret)) && !dontRestartValues.contains(strret));
-				if (tempRestartOnExit || restart) {
-					try {
-						tempRestartOnExit = false;
-						int waitSec = Integer.parseInt(getOptionValue("restart-wait", "0"));
-						if (waitSec == 0)
-							throw new NumberFormatException();
-						event(RESTARTING_APPLICATION, classname, String.valueOf(waitSec));
-						logger.warning(String.format("Process exited with %d, attempting restart in %d seconds", retval, waitSec));
-						lastRetVal = retval;
-						Thread.sleep(waitSec * 1000);
-					} catch (NumberFormatException nfe) {
-						event(RESTARTING_APPLICATION, classname, "0");
-						logger.warning(String.format("Process exited with %d, attempting restart", retval));
-					}
-				} else
+				
+				/* The process is now started, capture the streams and log or sink them */
+				retval = captureStreams(cwd, useDaemon, daemonize, quietStdErr, quietStdOut, logoverwrite);
+				
+				/* Decide whether to restart the process */
+				int rv = maybeRestart(retval, lastRetVal);
+				if(rv == Integer.MIN_VALUE)
 					break;
+				else
+					lastRetVal = rv;
 			}
 			// TODO cant find out why just exiting fails (process stays
 			// running).
@@ -566,6 +413,54 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
+	private boolean isLogOverwrite() {
+		return getSwitch("log-overwrite", false);
+	}
+
+	private boolean isQuietStdout() {
+		return isQuiet() || getSwitch("quiet-stdout", false);
+	}
+
+	private boolean isQuietStderr() {
+		return isQuiet() || getSwitch("quiet-stderr", false);
+	}
+
+	private boolean isDaemon() {
+		return getSwitch("daemon", false);
+	}
+
+	private String resolveWrapperClasspath() {
+		String forkerClasspath = System.getProperty("java.class.path");
+		String wrapperClasspath = getOptionValue("classpath", forkerClasspath);
+		String jar = getOptionValue("jar", null);
+		if(jar != null) {
+			StringBuilder path = new StringBuilder(wrapperClasspath == null ? "" : wrapperClasspath);
+			appendPath(path, jar);
+			wrapperClasspath = path.toString();
+		}
+		return wrapperClasspath;
+	}
+	
+	private boolean isNativeMain() {
+		return getSwitch("native", false);
+	}
+
+	private boolean isUseDaemon() {
+		boolean nativeMain = isNativeMain();
+		return !nativeMain && !getSwitch("no-forker-daemon", nativeMain);
+	} 
+
+	private File resolveCwd() {
+		String cwdpath = getOptionValue("cwd", null);
+		File cwd = new File(System.getProperty("user.dir"));
+		if (StringUtils.isNotBlank(cwdpath)) {
+			cwd = relativize(cwd, cwdpath);
+			if (!cwd.exists())
+				throw new IllegalArgumentException(String.format("No such directory %s", cwd));
+		}
+		return cwd;
+	}
+
 	public ArgMode getArgMode() {
 		return ArgMode.valueOf(getOptionValue("argmode", ArgMode.DEFAULT.name()));
 	}
@@ -576,54 +471,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 	public void setClassname(String classname) {
 		this.classname = classname;
-	}
-
-	public void readConfigFile(File file) throws IOException {
-		logger.info(String.format("Loading configuration file %s", file));
-		if (file.getName().endsWith(".js")) {
-			if (engine == null) {
-				ScriptEngineManager engineManager = new ScriptEngineManager();
-				engine = engineManager.getEngineByName("nashorn");
-				Bindings bindings = engine.createBindings();
-				bindings.put("wrapper", this);
-				bindings.put("log", logger);
-				if (engine == null)
-					throw new IOException("Cannot find JavaScript engine. Are you on at least Java 8?");
-			}
-			FileReader r = new FileReader(file);
-			try {
-				@SuppressWarnings("unchecked")
-				Map<String, Object> o = (Map<String, Object>) engine.eval(r);
-				for (Map.Entry<String, Object> en : o.entrySet()) {
-					if (en.getValue() instanceof Map) {
-						@SuppressWarnings("unchecked")
-						Map<String, Object> m = (Map<String, Object>) en.getValue();
-						for (Map.Entry<String, Object> men : m.entrySet()) {
-							properties.add(
-									new KeyValuePair(en.getKey(), men.getValue() == null ? null : String.valueOf(men.getValue())));
-						}
-					} else
-						properties.add(new KeyValuePair(en.getKey(), en.getValue() == null ? null : String.valueOf(en.getValue())));
-				}
-			} catch (ScriptException e) {
-				throw new IOException("Failed to evaluate configuration script.", e);
-			}
-		}
-		BufferedReader fin = new BufferedReader(new FileReader(file));
-		try {
-			String line = null;
-			while ((line = fin.readLine()) != null) {
-				if (!line.trim().startsWith("#") && !line.trim().equals("")) {
-					properties.add(new KeyValuePair(ReplacementUtils.replaceSystemProperties(line)));
-				}
-			}
-		} finally {
-			fin.close();
-		}
-		String main = getOptionValue("main", null);
-		if (StringUtils.isNotBlank(main))
-			classname = main;
-		reconfigureLogging();
 	}
 
 	public static String getAppName() {
@@ -708,15 +555,17 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				}
 			}
 			if (cmd.hasOption("configuration")) {
-				wrapper.readConfigFile(new File(cmd.getOptionValue('c')));
+				wrapper.readConfigFile(new File(cmd.getOptionValue('c')),wrapper.getProperties());
 			}
 			String cfgDir = wrapper.getOptionValue("configuration-directory", null);
 			if (cfgDir != null) {
 				File dir = new File(cfgDir);
 				if (dir.exists()) {
-					for (File f : dir.listFiles()) {
+					List<File> fl = new ArrayList<>(Arrays.asList(dir.listFiles()));
+					Collections.sort(fl, (f1, f2) -> f1.getName().compareTo(f2.getName()));
+					for (File f : fl) {
 						if (f.isFile() && !f.isHidden())
-							wrapper.readConfigFile(f);
+							wrapper.readConfigFile(f,wrapper.getProperties());
 					}
 				}
 			}
@@ -775,10 +624,21 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
-	protected String getJVMPath() throws IOException {
-		String javaExe = getOptionValue("java", System.getProperty("java.home") + File.separator + "bin" + File.separator + "java");
-		if (SystemUtils.IS_OS_WINDOWS && !javaExe.endsWith(".exe"))
-			javaExe += ".exe";
+	protected String getJVMPath() {
+		String javaExe = OS.getJavaPath();
+		String altJava = getOptionValue("java", null);
+		if(StringUtils.isNotBlank(altJava)) {
+			if (SystemUtils.IS_OS_WINDOWS) {
+				if(altJava.toLowerCase().endsWith(".exe")) {
+					altJava = altJava.substring(0, altJava.length() - 4);
+				}
+				if (!altJava.toLowerCase().endsWith("w")) {
+					altJava += "w";
+				}
+				altJava += ".exe";
+			}
+			javaExe = altJava;
+		}
 		String minjava = getOptionValue("min-java", null);
 		String maxjava = getOptionValue("max-java", null);
 		if (StringUtils.isNotBlank(minjava) || StringUtils.isNotBlank(maxjava)) {
@@ -788,20 +648,25 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				maxjava = "9999.9999.9999";
 			Version minver = new Version(minjava);
 			Version maxver = new Version(maxjava);
-			JVM jvm = new JVM(javaExe);
-			if (jvm.getVersion().compareTo(minver) < 0 || jvm.getVersion().compareTo(maxver) > 0) {
-				logger.info(String.format("Initially chosen JVM %s (%s) is not within the JVM version range of %s to %s", javaExe,
-						jvm.getVersion(), minver, maxver));
-				for (JVM altJvm : JVM.jvms()) {
-					if (altJvm.getVersion().compareTo(minver) >= 0 && altJvm.getVersion().compareTo(maxver) <= 0) {
-						javaExe = altJvm.getPath();
-						logger.info(String.format("Using alternative JVM %s which version %s", javaExe, altJvm.getVersion()));
-						break;
+			try {
+				JVM jvm = new JVM(javaExe);
+				if (jvm.getVersion().compareTo(minver) < 0 || jvm.getVersion().compareTo(maxver) > 0) {
+					logger.info(String.format("Initially chosen JVM %s (%s) is not within the JVM version range of %s to %s", javaExe,
+							jvm.getVersion(), minver, maxver));
+					for (JVM altJvm : JVM.jvms()) {
+						if (altJvm.getVersion().compareTo(minver) >= 0 && altJvm.getVersion().compareTo(maxver) <= 0) {
+							javaExe = altJvm.getPath();
+							logger.info(String.format("Using alternative JVM %s which version %s", javaExe, altJvm.getVersion()));
+							break;
+						}
 					}
+				} else {
+					logger.info(String.format("Initially chosen JVM %s (%s) is valid for the version range %s to %s", javaExe,
+							jvm.getVersion(), minver, maxver));
 				}
-			} else {
-				logger.info(String.format("Initially chosen JVM %s (%s) is valid for the version range %s to %s", javaExe,
-						jvm.getVersion(), minver, maxver));
+			}
+			catch(IOException ioe) {
+				throw new IllegalArgumentException("Invalid JVM Path.", ioe);
 			}
 		}
 		return javaExe;
@@ -874,6 +739,12 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				"When the forker daemon is being used, the wrappers own classpath will be appened to "
 						+ "to the application classpath. This option prevents that behaviour for example if "
 						+ "the application includes the modules itself."));
+		options.addOption(new Option("K", "monitor-configuration", false,
+				"Monitor for configuration file changes. Some changes can be applied while the wrapped application is running, while "
+				+ "some may cause the application to be restarted, and finally others may have no effect at all (until forker itself is restarted)."));
+		options.addOption(new Option("k", "never-restart", false,
+				"Prevent wrapper from restarting the process, regardless of the exti value  from the spawned process. Totall overrides "
+						+ "dont-restart-on and restart-on options."));
 		options.addOption(new Option("r", "restart-on", true,
 				"Which exit values from the spawned process will cause the wrapper to attempt to restart it. When not specified, all exit "
 						+ "values will cause a restart except those that are configure not to (see dont-restart-on)."));
@@ -938,6 +809,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		options.addOption(
 				new Option("t", "timeout", true, "How long to wait since the last 'ping' from the launched application before "
 						+ "considering the process as hung. Requires forker daemon is enabled."));
+		options.addOption(new Option("f", "jar", true,
+				"The path of a jar file to run. If this is specified, then this path will be added to the classpath, and META-INF/MANIFEST.MF examined for Main-Class for the"
+						+ "main class to run. The first argument passed to the command becomes the first app argument."));
 		options.addOption(new Option("m", "main", true,
 				"The classname to run. If this is specified, then the first argument passed to the command "
 						+ "becomes the first app argument."));
@@ -958,6 +832,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		options.addOption(new Option("y", "max-java", true,
 				"Maximum java version. If the selected JVM (default or otherwise) is lower than this, an "
 						+ "attempt will be made to locate an earlier version."));
+		options.addOption(new Option("i", "init-temp", true, "Initialise a named temporary folder before execution of application. The folder will be created if it does not exist, and emptied if it exists and has contents."));
+		options.addOption(new Option("T", "to-temp", true, "Copy file(s) to the named temporary folder. Supports glob syntax for final part of the path."));
 	}
 
 	protected String buildClasspath(File cwd, String defaultClasspath, String classpath, boolean appendByDefault)
@@ -1054,12 +930,13 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				 * This doesn't yet work because of how JNA / Pty4J work with
 				 * their native library extraction. The forked VM will not
 				 * completely exit. It you use 'pstack' to show the native stack
-				 * of the process, it will show that it is in a native call for a
-				 * file that has been deleted (when the parent process exited).
-				 * Both of these libraries by default will extract the native
-				 * libraries to files, and mark them as to be deleted when JVM
-				 * exit. Because once forked, the original JVM doesn't exit, these
-				 * files are deleted, but they are needed by the forked process.
+				 * of the process, it will show that it is in a native call for
+				 * a file that has been deleted (when the parent process
+				 * exited). Both of these libraries by default will extract the
+				 * native libraries to files, and mark them as to be deleted
+				 * when JVM exit. Because once forked, the original JVM doesn't
+				 * exit, these files are deleted, but they are needed by the
+				 * forked process.
 				 */
 				logger.info("Running in background using native fork");
 				int pid = CSystem.INSTANCE.fork();
@@ -1109,7 +986,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return false;
 	}
 
-	protected void addShutdownHook(final boolean useDaemon, final int exitWait) {
+	protected void addShutdownHook(final boolean useDaemon) {
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			@Override
 			public void run() {
@@ -1144,6 +1021,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				}
 				final Thread current = Thread.currentThread();
 				Thread exitWaitThread = null;
+				final int exitWait = Integer.parseInt(getOptionValue("exit-wait", "10"));
 				if (exitWait > 0) {
 					exitWaitThread = new Thread() {
 						{
@@ -1180,10 +1058,76 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		});
 	}
 
+	protected void monitorConfigurationFiles() {
+		if (getSwitch("monitor-configuration", false) && fileMonThread == null) {
+			fileMonThread = new Thread() {
+				{
+					setName("MonitorConfigurationFiles");
+					setDaemon(true);
+				}
+
+				public void run() {
+					logger.info("Monitoring configuration files for changes");
+					try (WatchService watcher = FileSystems.getDefault().newWatchService()) {
+						/*
+						 * Find all of the common parent directories of all
+						 * known configuration files *?
+						 */
+						Set<File> parents = new LinkedHashSet<>();
+						for (File cfg : files) {
+							parents.add(cfg.getCanonicalFile().getCanonicalFile());
+						}
+						/* Register all parents for watching */
+						for (File parent : parents) {
+							Path path = parent.toPath().getParent();
+							path.register(watcher, StandardWatchEventKinds.ENTRY_MODIFY);
+						}
+						while (true) {
+							WatchKey key;
+							try {
+								key = watcher.poll(500, TimeUnit.MILLISECONDS);
+							} catch (InterruptedException e) {
+								return;
+							}
+							if (key == null) {
+								Thread.yield();
+								continue;
+							}
+							for (WatchEvent<?> event : key.pollEvents()) {
+								WatchEvent.Kind<?> kind = event.kind();
+								@SuppressWarnings("unchecked")
+								WatchEvent<Path> ev = (WatchEvent<Path>) event;
+								Path filename = ev.context();
+								if (kind == StandardWatchEventKinds.OVERFLOW) {
+									Thread.yield();
+									continue;
+								} else if (kind == java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY
+										&& files.contains(filename.toFile())) {
+									configurationFileChanged(filename.toFile());
+								}
+								boolean valid = key.reset();
+								if (!valid) {
+									break;
+								}
+							}
+							Thread.yield();
+						}
+					} catch (Throwable e) {
+						// Log or rethrow the error
+					}
+				}
+			};
+			fileMonThread.start();
+		} else if (!getSwitch("monitor-configuration", false) && fileMonThread != null) {
+			fileMonThread.interrupt();
+			fileMonThread = null;
+			logger.info("Stoppe monitoring configuration files.");
+		}
+	}
+	
 	protected void monitorWrappedApplication() {
-		final int timeout = Integer.parseInt(getOptionValue("timeout", "60"));
-		if (timeout > 0) {
-			new Thread() {
+		if (isUseDaemon() && Integer.parseInt(getOptionValue("timeout", "60")) > 0 && monitorThread == null) {
+			monitorThread = new Thread() {
 				{
 					setName("ForkerWrapperMonitor");
 					setDaemon(true);
@@ -1195,6 +1139,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 						while (!stopping) {
 							if (process != null && daemon != null) {
 								WrapperHandler wrapper = daemon.getHandler(WrapperHandler.class);
+								int timeout = Integer.parseInt(getOptionValue("timeout", "60"));
 								if (wrapper.getLastPing() > 0
 										&& (wrapper.getLastPing() + timeout * 1000) <= System.currentTimeMillis()) {
 									logger.warning(String
@@ -1212,7 +1157,13 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					} catch (InterruptedException ie) {
 					}
 				}
-			}.start();
+			};
+			monitorThread.start();
+		}
+		else if ( (!isUseDaemon() || Integer.parseInt(getOptionValue("timeout", "60")) == 0 ) && monitorThread != null) {
+			monitorThread.interrupt();
+			monitorThread = null;
+			logger.info("Stopping forker monitor thread.");
 		}
 	}
 
@@ -1232,62 +1183,68 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	}
 
 	protected boolean isBool(String key) {
-		for (KeyValuePair nvp : properties) {
-			if (nvp.getName().equals(key))
-				return nvp.isBool();
+		synchronized(cfgLock) {
+			for (KeyValuePair nvp : properties) {
+				if (nvp.getName().equals(key))
+					return nvp.isBool();
+			}
+			return false;
 		}
-		return false;
 	}
 
 	protected String getProperty(String key) {
-		for (KeyValuePair nvp : properties) {
-			if (nvp.getName().equals(key))
-				return nvp.getValue();
+		synchronized(cfgLock) {
+			for (KeyValuePair nvp : properties) {
+				if (nvp.getName().equals(key))
+					return nvp.getValue();
+			}
+			return null;
 		}
-		return null;
 	}
 
 	protected List<String> getOptionValues(String key) {
-		String os = getOsPrefix();
-		String[] vals = cmd == null ? null : cmd.getOptionValues(key);
-		if (vals != null)
-			return Arrays.asList(vals);
-		List<String> valList = new ArrayList<String>();
-		for (KeyValuePair nvp : properties) {
-			if ((nvp.getName().equals(key) || nvp.getName().equals(os + "-" + key)) && nvp.getValue() != null) {
-				valList.add(nvp.getValue());
+		synchronized(cfgLock) {
+			String os = getOsPrefix();
+			String[] vals = cmd == null ? null : cmd.getOptionValues(key);
+			if (vals != null)
+				return Arrays.asList(vals);
+			List<String> valList = new ArrayList<String>();
+			for (KeyValuePair nvp : properties) {
+				if ((nvp.getName().equals(key) || nvp.getName().equals(os + "-" + key)) && nvp.getValue() != null) {
+					valList.add(nvp.getValue());
+				}
 			}
-		}
-		/*
-		 * System properties, e.g. forker.somevar.1=val, forker.somevar.2=val2
-		 */
-		List<String> varNames = new ArrayList<String>();
-		for (Map.Entry<Object, Object> en : System.getProperties().entrySet()) {
-			if (((String) en.getKey()).startsWith("forker." + (key.replace("-", ".")) + ".")
-					|| ((String) en.getKey()).startsWith("forker." + os.replace("-", ".") + "." + (key.replace("-", ".")) + ".")) {
-				varNames.add((String) en.getKey());
+			/*
+			 * System properties, e.g. forker.somevar.1=val, forker.somevar.2=val2
+			 */
+			List<String> varNames = new ArrayList<String>();
+			for (Map.Entry<Object, Object> en : System.getProperties().entrySet()) {
+				if (((String) en.getKey()).startsWith("forker." + (key.replace("-", ".")) + ".")
+						|| ((String) en.getKey()).startsWith("forker." + os.replace("-", ".") + "." + (key.replace("-", ".")) + ".")) {
+					varNames.add((String) en.getKey());
+				}
 			}
-		}
-		Collections.sort(varNames);
-		for (String vn : varNames) {
-			valList.add(System.getProperty(vn));
-		}
-		/*
-		 * Environment variables, e.g. FORKER_SOMEVAR_1=val,
-		 * FORKER_SOMEVAR_2=val2
-		 */
-		varNames.clear();
-		for (Map.Entry<String, String> en : System.getenv().entrySet()) {
-			if (en.getKey().startsWith("FORKER_" + (key.toUpperCase().replace("-", "_")) + "_")
-					|| en.getKey().startsWith("FORKER_" + ((os + "-" + key).toUpperCase().replace("-", "_")) + "_")) {
-				varNames.add(en.getKey());
+			Collections.sort(varNames);
+			for (String vn : varNames) {
+				valList.add(System.getProperty(vn));
 			}
+			/*
+			 * Environment variables, e.g. FORKER_SOMEVAR_1=val,
+			 * FORKER_SOMEVAR_2=val2
+			 */
+			varNames.clear();
+			for (Map.Entry<String, String> en : System.getenv().entrySet()) {
+				if (en.getKey().startsWith("FORKER_" + (key.toUpperCase().replace("-", "_")) + "_")
+						|| en.getKey().startsWith("FORKER_" + ((os + "-" + key).toUpperCase().replace("-", "_")) + "_")) {
+					varNames.add(en.getKey());
+				}
+			}
+			Collections.sort(varNames);
+			for (String vn : varNames) {
+				valList.add(System.getenv(vn));
+			}
+			return valList;
 		}
-		Collections.sort(varNames);
-		for (String vn : varNames) {
-			valList.add(System.getenv(vn));
-		}
-		return valList;
 	}
 
 	protected String getOsPrefix() {
@@ -1330,6 +1287,76 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return val;
 	}
 
+	protected void readConfigFile(File file, List<KeyValuePair> properties) throws IOException {
+		synchronized(files) {
+			if(files.contains(file)) {
+				logger.info(String.format("Re-loading configuration file %s", file));
+			}
+			else {
+				logger.info(String.format("Loading configuration file %s", file));
+				files.add(file);
+			}
+			
+			//
+			// TODO restart app and/or adjust other configuration on reload
+			// TODO it shouldnt reload one at a time, it should wait a short while for
+			// all changes, then reload all configuration files in the same order
+			// 'properties' should
+			// be cleared before all are reloaded.
+			
+			if (file.getName().endsWith(".js")) {
+				if (engine == null) {
+					ScriptEngineManager engineManager = new ScriptEngineManager();
+					engine = engineManager.getEngineByName("nashorn");
+					Bindings bindings = engine.createBindings();
+					bindings.put("wrapper", this);
+					bindings.put("log", logger);
+					if (engine == null)
+						throw new IOException("Cannot find JavaScript engine. Are you on at least Java 8?");
+				}
+				FileReader r = new FileReader(file);
+				try {
+					@SuppressWarnings("unchecked")
+					Map<String, Object> o = (Map<String, Object>) engine.eval(r);
+					for (Map.Entry<String, Object> en : o.entrySet()) {
+						if (en.getValue() instanceof Map) {
+							@SuppressWarnings("unchecked")
+							Map<String, Object> m = (Map<String, Object>) en.getValue();
+							for (Map.Entry<String, Object> men : m.entrySet()) {
+								properties.add(
+										new KeyValuePair(en.getKey(), men.getValue() == null ? null : String.valueOf(men.getValue())));
+							}
+						} else
+							properties.add(new KeyValuePair(en.getKey(), en.getValue() == null ? null : String.valueOf(en.getValue())));
+					}
+				} catch (ScriptException e) {
+					throw new IOException("Failed to evaluate configuration script.", e);
+				}
+			}
+			BufferedReader fin = new BufferedReader(new FileReader(file));
+			try {
+				String line = null;
+				while ((line = fin.readLine()) != null) {
+					if (!line.trim().startsWith("#") && !line.trim().equals("")) {
+						properties.add(new KeyValuePair(ReplacementUtils.replaceSystemProperties(line)));
+					}
+				}
+			} finally {
+				fin.close();
+			}
+			String main = getOptionValue("main", null);
+			if (StringUtils.isNotBlank(main))
+				classname = main;
+			else {
+				String jar = getOptionValue("jar", null);
+				if (StringUtils.isNotBlank(jar))
+					classname = readMain(jar);
+			}
+			
+			reconfigureLogging();
+		}
+	}
+
 	private File makeDirectoryForFile(File file) throws IOException {
 		File dir = file.getParentFile();
 		if (dir != null && !dir.exists() && !dir.mkdirs())
@@ -1362,13 +1389,64 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		};
 	}
 
+	private void initTempFolder(String tempFolder, File cwd) throws IOException {
+
+		File tempFile = new File(tempFolder);
+		if(!tempFile.isAbsolute()) {
+			tempFile = new File(cwd, tempFolder);
+		}
+		delTree(tempFile);
+		
+		List<String> paths = getOptionValues("to-temp");
+		if(!paths.isEmpty()) {
+			for(String path : paths) {
+				String parentPath = FilenameUtils.getPath(path);
+				String pattern = FilenameUtils.getName(path);
+				PathMatcher matcher =
+				    FileSystems.getDefault().getPathMatcher("glob:" + pattern);
+				File parentFile = new File(parentPath);
+				if(!parentFile.isAbsolute()) {
+					parentFile = new File(cwd, parentPath);
+				}
+				File[] children = parentFile.listFiles();
+				if(children!=null) {
+					for(File child : children) {
+						if(matcher.matches(child.toPath().getFileName())) {
+							FileUtils.copyFile(child, new File(tempFile, child.getName()));
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	private void delTree(File file) {
+		
+		File[] children = file.listFiles();
+		if(children!=null) {
+			for(File child : children) {
+				if(child.isDirectory()) {
+					delTree(child);
+					child.delete();
+				} else {
+					child.delete();
+				}
+			}
+		}
+	}
 	private void process() throws ParseException, IOException {
 		List<String> args = cmd.getArgList();
 		String main = getOptionValue("main", null);
 		if (main == null) {
-			if (args.isEmpty())
-				throw new ParseException("Must supply class name of application that contains a main() method.");
-			classname = args.remove(0);
+			String jar = getOptionValue("jar", null);
+			if(jar == null) {
+				if (args.isEmpty())
+					throw new ParseException("Must supply class name of application that contains a main() method.");
+				classname = args.remove(0);
+			}
+			else {
+				readMain(jar);
+			}
 		} else
 			classname = main;
 		List<String> arguments = getOptionValues("apparg");
@@ -1391,6 +1469,364 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		this.arguments = arguments.toArray(new String[0]);
 	}
 
+	private  void configurationFileChanged(File file) {
+		synchronized(cfgLock) { 
+			if(configChange == null) {
+				configChange = Executors.newSingleThreadScheduledExecutor();
+			}
+			if(changeTask != null) {
+				changeTask.cancel(false);
+			}
+			changeTask = configChange.schedule(() -> {
+				synchronized(cfgLock) { 
+
+					String wasClassname = classname;
+					File wasCwd = resolveCwd();
+					String wasJavaExe = getJVMPath();
+					String wasBootClasspath = getOptionValue("boot-classpath", null);
+					boolean wasNativeMain = isNativeMain();
+					boolean wasUseDaemon = isUseDaemon();
+					boolean wasDaemon = isDaemon();
+					String wasPidfile = getOptionValue("pidfile", null);
+					List<String> wasJvmArgs = getOptionValues("jvmarg");
+					boolean wasSingleInstance = isSingleInstance();
+					boolean wasQuietStdErr = isQuietStderr();
+					boolean wasQuietStdOut = isQuietStdout();
+					boolean wasLogoverwrite = isLogOverwrite();
+					String wasInitTemp = getOptionValue("init-temp", null);
+					boolean wasNoForkerClasspath = isNoForkerClasspath();
+					
+					List<KeyValuePair> kvp = new ArrayList<>();
+					kvp.addAll(externalProperties);
+					for(File f : new ArrayList<>(files)) {
+						try {
+							readConfigFile(f, kvp);
+						}
+						catch(IOException ioe) {
+							logger.log(Level.WARNING, String.format("Failed to re-load configuration file %s", file), ioe);
+						}	
+					}
+
+					properties.clear();
+					properties.addAll(kvp);
+					
+					/* Decide if to restart, or to try to reconfigure while running */
+					boolean restart = false;
+					boolean fullRestart = false;
+					if(Objects.equals(wasUseDaemon, isUseDaemon()) || Objects.equals(wasDaemon, isDaemon()) || Objects.equals(wasPidfile, getOptionValue("pidfile", null))) {
+						logger.warning("Changing daemon mode or pidfile requires restart of forker JVM for full effect.");
+						fullRestart = restart = true;
+					}
+					else if(Objects.equals(wasClassname, classname) || 
+                       Objects.equals(wasCwd, resolveCwd())|| 
+                       Objects.equals(wasJavaExe, getJVMPath())|| 
+                       Objects.equals(wasBootClasspath, getOptionValue("boot-classpath", null))|| 
+                       Objects.equals(wasNativeMain, isNativeMain())|| 
+                       Objects.equals(wasJvmArgs, getOptionValues("jvmarg")) ||
+                       Objects.equals(wasSingleInstance, isSingleInstance())) {
+						fullRestart = restart = true;
+					}
+					else if(Objects.equals(wasQuietStdOut, isQuietStderr()) ||
+							Objects.equals(wasQuietStdErr, isQuietStdout()) ||
+							Objects.equals(wasLogoverwrite, isLogOverwrite()) ||
+							Objects.equals(wasNoForkerClasspath, isNoForkerClasspath()) ||
+							Objects.equals(wasInitTemp, getOptionValue("init-temp", null))) {
+						restart = true;
+					}
+					
+					if(fullRestart) {
+						logger.info(String.format("The configuration change will cause a full restart of forker."));
+						try {
+							stop();
+						} catch (InterruptedException e) {
+							logger.fine("Restart interrupted.");
+						}
+						try {
+							start();
+						} catch (IOException e) {
+						} catch (InterruptedException e) {
+						}
+					}
+					else if(restart) {
+						logger.info(String.format("The configuration change will cause a restart of the application."));
+						try {
+							restart();
+						} catch (InterruptedException e) {
+							logger.fine("Restart interrupted.");
+						}
+					}
+					else {
+						logger.info(String.format("The configuration change will adjust the running service."));
+						monitorWrappedApplication();
+						monitorConfigurationFiles();
+					}
+				}
+			}, 1, TimeUnit.SECONDS); 
+		}
+		
+		
+	}
+
+	private boolean isNoForkerClasspath() {
+		return getSwitch("no-forker-classpath", false);
+	}
+private boolean isQuiet() {
+	return getSwitch("quiet", false);
+}
+
+	private boolean isSingleInstance() {
+		return getSwitch("single-instance", false);
+	}
+
+	private String readMain(String jar) throws IOException {
+		try(JarFile jf = new JarFile(new File(jar))) {
+			String classname = jf.getManifest().getMainAttributes().getValue("Main-Class");
+			if(StringUtils.isBlank(classname)) {
+				throw new IOException(String.format("An executable jar (--jar %s) was provided, but it does not contain a Main-Class attribute in META-INF/MANIFEST.MF", jar));
+			}
+			return classname;
+		}
+	}
+
+	private int maybeRestart(int retval, int lastRetVal) throws IOException, InterruptedException {
+		List<String> restartValues = Arrays.asList(getOptionValue("restart-on", "").split(","));
+		List<String> dontRestartValues = new ArrayList<String>(
+				Arrays.asList(getOptionValue("dont-restart-on", "0,1,2").split(",")));
+		dontRestartValues.removeAll(restartValues);
+		String strret = String.valueOf(retval);
+		event(APPPLICATION_STOPPED, strret, classname);
+		boolean restart = !getSwitch("never-restart", false) && !preventRestart && (((restartValues.size() == 1 && restartValues.get(0).equals(""))
+				|| restartValues.size() == 0 || restartValues.contains(strret)) && !dontRestartValues.contains(strret));
+		if (tempRestartOnExit || restart) {
+			try {
+				tempRestartOnExit = false;
+				int waitSec = Integer.parseInt(getOptionValue("restart-wait", "0"));
+				if (waitSec == 0)
+					throw new NumberFormatException();
+				event(RESTARTING_APPLICATION, classname, String.valueOf(waitSec));
+				logger.warning(String.format("Process exited with %d, attempting restart in %d seconds", retval, waitSec));
+				lastRetVal = retval;
+				Thread.sleep(waitSec * 1000);
+			} catch (NumberFormatException nfe) {
+				event(RESTARTING_APPLICATION, classname, "0");
+				logger.warning(String.format("Process exited with %d, attempting restart", retval));
+			}
+		} else
+			return Integer.MIN_VALUE;
+		return lastRetVal;
+	}
+
+	private int captureStreams(File cwd, final boolean useDaemon, boolean daemonize, boolean quietStdErr, boolean quietStdOut,
+			boolean logoverwrite) throws IOException, UnsupportedEncodingException, InterruptedException {
+		int retval;
+		if (useDaemon) {
+			process.getOutputStream().write(cookie.toString().getBytes("UTF-8"));
+			process.getOutputStream().write("\r\n".getBytes("UTF-8"));
+			process.getOutputStream().flush();
+		}
+		String logpath = getOptionValue("log", null);
+		String errpath = getOptionValue("errors", null);
+		if (errpath == null)
+			errpath = logpath;
+		OutputStream outlog = null;
+		OutputStream errlog = null;
+		long logDelay = Long.parseLong(getOptionValue("log-write-delay", "50"));
+		if (StringUtils.isNotBlank(logpath)) {
+			logger.info(String.format("Writing stdout output to %s", logpath));
+			outlog = new LazyLogStream(logDelay, makeDirectoryForFile(relativize(cwd, logpath)), !logoverwrite);
+		}
+		if (errpath != null) {
+			if (Objects.equals(logpath, errpath))
+				errlog = outlog;
+			else {
+				logger.info(String.format("Writing stderr output to %s", logpath));
+				errlog = new LazyLogStream(logDelay, makeDirectoryForFile(relativize(cwd, errpath)), !logoverwrite);
+			}
+		}
+		OutputStream stdout = quietStdOut ? null : defaultOut;
+		OutputStream out = null;
+		if (stdout != null) {
+			if (outlog != null) {
+				out = new TeeOutputStream(stdout, outlog);
+			} else {
+				out = stdout;
+			}
+		} else if (outlog != null)
+			out = outlog;
+		if (out == null) {
+			out = new SinkOutputStream();
+		}
+		OutputStream stderr = quietStdErr ? null : defaultErr;
+		OutputStream err = null;
+		if (stderr != null) {
+			if (errlog != null) {
+				err = new TeeOutputStream(stderr, errlog);
+			} else {
+				err = stderr;
+			}
+		} else if (errlog != null)
+			err = errlog;
+		if (err == null) {
+			err = out;
+		}
+		Thread errThread = new Thread(copyRunnable(process.getErrorStream(), err), "StdErr");
+		errThread.setDaemon(true);
+		errThread.start();
+		Thread inThread = null;
+		try {
+			if (!daemonize) {
+				inThread = new Thread(copyRunnable(defaultIn, process.getOutputStream()), "StdIn");
+				inThread.setDaemon(true);
+				inThread.start();
+			}
+			try {
+				copy(process.getInputStream(), out, newBuffer());
+			} catch (IOException ioe) {
+				if (!stopping)
+					throw ioe;
+			}
+			retval = process.waitFor();
+		} finally {
+			if (inThread != null) {
+				inThread.interrupt();
+			}
+			errThread.interrupt();
+			if (outlog != null && !outlog.equals(defaultOut)) {
+				outlog.close();
+			}
+			if (errlog != null && errlog != outlog && !errlog.equals(defaultErr)) {
+				errlog.close();
+			}
+			if (daemon != null) {
+				daemon.shutdown(true);
+			}
+		}
+		return retval;
+	}
+
+	private ForkerBuilder buildCommand(File cwd, String javaExe, String forkerClasspath, String wrapperClasspath,
+			String bootClasspath, final boolean nativeMain, final boolean useDaemon, List<String> jvmArgs, int times,
+			int lastRetVal) throws IOException {
+		
+		ForkerBuilder appBuilder = new ForkerBuilder();
+		if (!nativeMain) {
+			/* This is launching a Java class, so construct the classpath */
+			appBuilder.command().add(javaExe);
+			String classpath = buildClasspath(cwd, isNoForkerClasspath() ? null : forkerClasspath,
+					wrapperClasspath, true);
+			if (classpath != null) {
+				appBuilder.command().add("-classpath");
+				appBuilder.command().add(classpath);
+			}
+			
+			boolean hasBootCp = false;
+			for (String val : jvmArgs) {
+				if (val.startsWith("-Xbootclasspath"))
+					hasBootCp = true;
+				appBuilder.command().add(val);
+			}
+			if (!hasBootCp) {
+				String bootcp = buildClasspath(cwd, null, bootClasspath, false);
+				if (bootcp != null && !bootcp.equals("")) {
+					/*
+					 * Do our own processing of append/prepend as there
+					 * are special JVM arguments for it
+					 */
+					if (bootClasspath != null && bootClasspath.startsWith("+"))
+						appBuilder.command().add("-Xbootclasspath/a:" + bootcp);
+					else if (bootClasspath != null && bootClasspath.startsWith("-"))
+						appBuilder.command().add("-Xbootclasspath/p:" + bootcp);
+					else
+						appBuilder.command().add("-Xbootclasspath:" + bootcp);
+				}
+			}
+			
+			if (StringUtils.isBlank(classname))
+				throw new IllegalArgumentException(
+						"Must provide a 'main' property to specify the class that contains the main() method that is your applications entry point.");
+		}
+		
+		/* Pass information to the launched application about the last exit status and number
+		 * of attempts
+		 */
+		if (!getSwitch("no-info", false)) {
+			if(nativeMain) {
+				appBuilder.environment().put("FORKER_INFO_LAST_EXIT_CODE", String.valueOf(lastRetVal));
+				appBuilder.environment().put("FORKER_INFO_ATTEMPTS", String.valueOf(times));
+			}
+			else {
+				if (lastRetVal > -1) {
+					appBuilder.command().add(String.format("-Dforker.info.lastExitCode=%d", lastRetVal));
+				}
+				appBuilder.command().add(String.format("-Dforker.info.attempts=%d", times));
+			}
+		}
+		
+		/*
+		 * If the daemon should be used, we assume that forker-client is
+		 * on the classpath and execute the application via that, passing
+		 * the forker daemon cookie via stdin. *
+		 */
+		if (useDaemon) {
+			appBuilder.command().add(com.sshtools.forker.client.Forker.class.getName());
+			appBuilder.command().add(String.valueOf(OS.isAdministrator()));
+			appBuilder.command().add(classname);
+			if (arguments != null)
+				appBuilder.command().addAll(Arrays.asList(arguments));
+		} else {
+			/*
+			 * Otherwise we are just running the application directly
+			 */
+			appBuilder.command().add(classname);
+			if (arguments != null)
+				appBuilder.command().addAll(Arrays.asList(arguments));
+		}
+		
+		/* Process priority */
+		String priStr = getOptionValue("priority", null);
+		if (priStr != null) {
+			appBuilder.priority(Priority.valueOf(priStr));
+		}
+		
+		/* Directory and IO */
+		appBuilder.io(IO.DEFAULT);
+		appBuilder.directory(cwd);
+		
+		/* Environment variables */
+		
+		for (String env : getOptionValues("setenv")) {
+			String key = env;
+			String value = "";
+			int idx = env.indexOf('=');
+			if (idx != -1) {
+				key = env.substring(0, idx);
+				value = env.substring(idx + 1);
+			}
+			appBuilder.environment().put(key, value);
+		}
+		
+		/* Affinity with CPU cores */
+		List<String> cpus = getOptionValues("cpu");
+		for (String cpu : cpus) {
+			appBuilder.affinity().add(Integer.parseInt(cpu));
+		}
+		
+		/* Run as as administrator or a specific user */
+		if (getSwitch("administrator", false)) {
+			if (!OS.isAdministrator()) {
+				logger.info("Raising privileges to administartor");
+				appBuilder.effectiveUser(EffectiveUserFactory.getDefault().administrator());
+			}
+		} else {
+			String runas = getOptionValue("run-as", null);
+			if (runas != null && !runas.equals(System.getProperty("user.name"))) {
+				logger.info(String.format("Switching user to %s", runas));
+				appBuilder.effectiveUser(EffectiveUserFactory.getDefault().getUserForUsername(runas));
+			}
+		}
+		return appBuilder;
+	}
+	
 	class SinkOutputStream extends OutputStream {
 		@Override
 		public void write(int b) throws IOException {

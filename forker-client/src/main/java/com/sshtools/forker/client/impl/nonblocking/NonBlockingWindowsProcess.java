@@ -472,6 +472,8 @@ public final class NonBlockingWindowsProcess extends NonBlockingProcess {
 		// Ensure stdin initially has 0 bytes pending write. We'll
 		// update this before invoking onStdinReady.
 		stdinPipe.buffer.limit(0);
+		if(listener != null)
+			listener.onStarted(this);
 	}
 
 	@SuppressWarnings("unchecked")

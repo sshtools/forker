@@ -15,10 +15,13 @@
  */
 package com.nervepoint.forker.examples;
 
-import org.apache.commons.lang.SystemUtils;
+import static com.sshtools.forker.client.OSCommand.elevate;
+import static com.sshtools.forker.client.OSCommand.restrict;
+import static com.sshtools.forker.client.OSCommand.run;
+
+import org.apache.commons.lang3.SystemUtils;
 
 import com.sshtools.forker.client.OSCommand;
-import static com.sshtools.forker.client.OSCommand.*;
 
 /**
  * Show uses {@link OSCommand}, that uses {@link ThreadLocal} state to configure

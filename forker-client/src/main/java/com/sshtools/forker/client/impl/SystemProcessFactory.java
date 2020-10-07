@@ -17,10 +17,10 @@ package com.sshtools.forker.client.impl;
 
 import java.io.IOException;
 
-import org.apache.commons.lang.SystemUtils;
+import org.apache.commons.lang3.SystemUtils;
 
-import com.sshtools.forker.client.ForkerProcess;
 import com.sshtools.forker.client.ForkerBuilder;
+import com.sshtools.forker.client.ForkerProcess;
 import com.sshtools.forker.client.ForkerProcessFactory;
 import com.sshtools.forker.client.ForkerProcessListener;
 import com.sshtools.forker.client.NonBlockingProcessListener;

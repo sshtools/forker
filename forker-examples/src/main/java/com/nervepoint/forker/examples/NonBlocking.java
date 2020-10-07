@@ -17,11 +17,10 @@ package com.nervepoint.forker.examples;
 
 import java.nio.ByteBuffer;
 
-import org.apache.commons.lang.SystemUtils;
+import org.apache.commons.lang3.SystemUtils;
 
 import com.sshtools.forker.client.DefaultNonBlockingProcessListener;
 import com.sshtools.forker.client.ForkerBuilder;
-import com.sshtools.forker.client.ForkerProcess;
 import com.sshtools.forker.client.impl.nonblocking.NonBlockingProcess;
 import com.sshtools.forker.common.IO;
 
@@ -37,7 +36,7 @@ public class NonBlocking {
 		} else {
 			builder.command("DIR", "C:\\");
 		}
-		ForkerProcess process = new ForkerBuilder("ls","-al", "/").io(IO.NON_BLOCKING).redirectErrorStream(true).start(new DefaultNonBlockingProcessListener() {
+		NonBlockingProcess process = new ForkerBuilder("ls","-al", "/").io(IO.NON_BLOCKING).redirectErrorStream(true).start(new DefaultNonBlockingProcessListener() {
 			@Override
 			public void onStdout(NonBlockingProcess process, ByteBuffer buffer, boolean closed) {
 				if (!closed) {

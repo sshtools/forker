@@ -46,9 +46,7 @@ public class Shell {
 		
 		/* ShellBuilder is a specialisation of ForkerBuilder */
 		ShellBuilder shell = new ShellBuilder();
-		shell.loginShell(true);
 		shell.io(PTYExecutor.PTY);
-		shell.redirectErrorStream(true);
 		
 		/* Demonstrate we are actually in a different shell by setting PS1 */
 		shell.environment().put("MYENV", "An environment variable");
