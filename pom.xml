@@ -1,9 +1,11 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
 
 	<properties>
-		<maven.compiler.target>1.7</maven.compiler.target>
-		<maven.compiler.source>1.7</maven.compiler.source>
+		<maven.compiler.source>9</maven.compiler.source>
+		<maven.compiler.target>9</maven.compiler.target>
 		<maven.checkstyle.plugin>2.17</maven.checkstyle.plugin>
 		<maven.cobertura.plugin>2.7</maven.cobertura.plugin>
 		<maven.doxia.module.markdown.version>1.7</maven.doxia.module.markdown.version>
@@ -18,7 +20,7 @@
 		<maven.versions.plugin>2.3</maven.versions.plugin>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-	
+
 	</properties>
 
 	<modelVersion>4.0.0</modelVersion>
@@ -67,8 +69,10 @@
 	</distributionManagement>
 
 	<modules>
+		<module>forker-updater-maven-plugin</module>
 		<module>forker-common</module>
 		<module>forker-daemon</module>
+		<module>forker-updater</module>
 		<module>forker-client</module>
 		<module>forker-examples</module>
 		<module>forker-wrapper</module>
@@ -122,28 +126,7 @@
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-jar-plugin</artifactId>
-				<configuration>
-					<archive>
-						<manifest>
-							<addClasspath>true</addClasspath>
-						</manifest>
-					</archive>
-				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<configuration>
-					<source>1.8</source>
-					<target>1.8</target>
-					<encoding>UTF-8</encoding>
-				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-javadoc-plugin</artifactId>
-				<version>3.1.1</version>
 				<executions>
 					<execution>
 						<id>release</id>
@@ -158,16 +141,15 @@
 					<encoding>UTF-8</encoding>
 					<excludePackageNames>**.impl.*</excludePackageNames>
 					<!-- https://stackoverflow.com/questions/49472783/maven-is-unable-to-find-javadoc-command -->
-	   				<!-- <javadocExecutable>${java.home}/bin/javadoc</javadocExecutable> -->
-	   				
-	   				<!-- https://bugs.openjdk.java.net/browse/JDK-8212233 -->
-	   				<source>8</source>
+					<javadocExecutable>${java.home}/bin/javadoc</javadocExecutable>
+
+					<!-- https://bugs.openjdk.java.net/browse/JDK-8212233 -->
+					<source>8</source>
 				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-deploy-plugin</artifactId>
-				<version>2.8.2</version>
 				<executions>
 					<execution>
 						<id>default-deploy</id>
@@ -191,7 +173,6 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-site-plugin</artifactId>
-				<version>${maven.site.plugin}</version>
 				<executions>
 					<!-- used for multiproject builds -->
 					<execution>
@@ -246,28 +227,15 @@
 								<outputDirectory>%{project.reporting.outputDirectory}/cobertura</outputDirectory>
 							</configuration>
 						</plugin>
-						<!-- <plugin>
-							<groupId>org.apache.maven.plugins</groupId>
-							<artifactId>maven-pmd-plugin</artifactId>
-							<version>${maven.pmd.plugin}</version>
-							<configuration>
-								<aggregate>true</aggregate>
-								<sourceEncoding>${project.build.sourceEncoding}</sourceEncoding>
-								The minimum tokens before a violation
-								<minimumTokens>100</minimumTokens>
-								Turn off if no xref report
-								<linkXRef>true</linkXRef>
-								<verbose>true</verbose>
-								<targetJdk>${java.version}</targetJdk>
-								<rulesets>
-									<ruleset>/rulesets/maven.xml</ruleset>
-									<ruleset>/rulesets/migrating_to_junit4.xml</ruleset>
-									<ruleset>/rulesets/design.xml</ruleset>
-									<ruleset>/rulesets/unusedcode.xml</ruleset>
-									<ruleset>/rulesets/typeresolution.xml</ruleset>
-								</rulesets>
-							</configuration>
-						</plugin> -->
+						<!-- <plugin> <groupId>org.apache.maven.plugins</groupId> <artifactId>maven-pmd-plugin</artifactId> 
+							<version>${maven.pmd.plugin}</version> <configuration> <aggregate>true</aggregate> 
+							<sourceEncoding>${project.build.sourceEncoding}</sourceEncoding> The minimum 
+							tokens before a violation <minimumTokens>100</minimumTokens> Turn off if 
+							no xref report <linkXRef>true</linkXRef> <verbose>true</verbose> <targetJdk>${java.version}</targetJdk> 
+							<rulesets> <ruleset>/rulesets/maven.xml</ruleset> <ruleset>/rulesets/migrating_to_junit4.xml</ruleset> 
+							<ruleset>/rulesets/design.xml</ruleset> <ruleset>/rulesets/unusedcode.xml</ruleset> 
+							<ruleset>/rulesets/typeresolution.xml</ruleset> </rulesets> </configuration> 
+							</plugin> -->
 						<plugin>
 							<groupId>org.codehaus.mojo</groupId>
 							<artifactId>findbugs-maven-plugin</artifactId>
@@ -301,7 +269,28 @@
 		</plugins>
 
 		<pluginManagement>
+			
 			<plugins>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-compiler-plugin</artifactId>
+					<version>3.8.1</version>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-javadoc-plugin</artifactId>
+					<version>3.2.0</version>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-site-plugin</artifactId>
+					<version>${maven.site.plugin}</version>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-deploy-plugin</artifactId>
+					<version>3.0.0-M1</version>
+				</plugin>
 				<plugin>
 					<groupId>org.eclipse.m2e</groupId>
 					<artifactId>lifecycle-mapping</artifactId>
