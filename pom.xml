@@ -26,7 +26,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.sshtools</groupId>
 	<artifactId>forker</artifactId>
-	<version>1.6-SNAPSHOT</version>
+	<version>1.7-SNAPSHOT</version>
 	<name>Forker</name>
 	<description>Forker is a set of utilities and helpers for executing operating system commands.</description>
 	<url>http://www.sshtools.com</url>
