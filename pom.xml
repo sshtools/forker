@@ -1,4 +1,6 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
 
 	<properties>
@@ -6,13 +8,13 @@
 		<maven.compiler.source>1.7</maven.compiler.source>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-	
+
 	</properties>
 
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.sshtools</groupId>
 	<artifactId>forker</artifactId>
-	<version>1.6-SNAPSHOT</version>
+	<version>1.6</version>
 	<name>Forker</name>
 	<description>Forker is a set of utilities and helpers for executing operating system commands.</description>
 	<url>http://www.sshtools.com</url>
@@ -197,9 +199,9 @@
 				</configuration>
 			</plugin>
 			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-javadoc-plugin</artifactId>
-				<version>3.1.1</version>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>build-helper-maven-plugin</artifactId>
+				<version>3.2.0</version>
 				<executions>
 					<execution>
 						<phase>package</phase>
@@ -213,15 +215,20 @@
 						</configuration>
 					</execution>
 				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-javadoc-plugin</artifactId>
+				<version>3.1.1</version>
 				<configuration>
 					<!-- <skip>true</skip> -->
 					<encoding>UTF-8</encoding>
 					<excludePackageNames>**.impl.*</excludePackageNames>
 					<!-- https://stackoverflow.com/questions/49472783/maven-is-unable-to-find-javadoc-command -->
-	   				<!-- <javadocExecutable>${java.home}/bin/javadoc</javadocExecutable> -->
-	   				
-	   				<!-- https://bugs.openjdk.java.net/browse/JDK-8212233 -->
-	   				<source>8</source>
+					<!-- <javadocExecutable>${java.home}/bin/javadoc</javadocExecutable> -->
+
+					<!-- https://bugs.openjdk.java.net/browse/JDK-8212233 -->
+					<source>8</source>
 				</configuration>
 			</plugin>
 			<plugin>
