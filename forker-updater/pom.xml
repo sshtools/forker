@@ -1,8 +1,8 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 	<modelVersion>4.0.0</modelVersion>
-	<artifactId>forker-daemon</artifactId>
-	<name>Forker Daemon</name>
-	<description>This is the forker daemon itself. It listens on localhost for connections from forker-client's and executes system commands on their behalf in order to reduce forking memory costs.</description>
+	<artifactId>forker-updater</artifactId>
+	<name>Forker Updater</name>
+	<description>Extends forker-daemon to add update features.</description>
 	<parent>
 		<groupId>com.sshtools</groupId>
 		<artifactId>forker</artifactId>
@@ -45,12 +45,11 @@
 							<addClasspath>true</addClasspath>
 						</manifest>
 						<manifestEntries>
-							<Automatic-Module-Name>com.sshtools.forker.daemon</Automatic-Module-Name>
+							<Automatic-Module-Name>com.sshtools.forker.updater</Automatic-Module-Name>
 						</manifestEntries>
 					</archive>
 				</configuration>
 			</plugin>
-			
 		</plugins>
 
 	</build>
@@ -58,7 +57,7 @@
 	<dependencies>
 		<dependency>
 			<groupId>${project.groupId}</groupId>
-			<artifactId>forker-common</artifactId>
+			<artifactId>forker-wrapper</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>

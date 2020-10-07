@@ -19,7 +19,7 @@ import java.net.Socket;
  * <p>
  * How the client gets the cookie in the first place depends on how the daemon
  * was started.
- * <h1>Isolated Mode</h1>
+ * <p><strong>Isolated Mode</strong></p>
  * <p>
  * This is the safest method and recommended for most uses. In this case, the
  * client application is usually responsible for launching the daemon (possibly

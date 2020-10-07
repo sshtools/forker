@@ -1,4 +1,4 @@
-package com.sshtools.forker.common;
+
 /**
  * Contains the <i>Forker Daemon</i>, used to run processes from a separate
  * (smaller JVM) and provide other features, such as the PTY plugin that
@@ -8,3 +8,4 @@ package com.sshtools.forker.common;
  * about either directly running or configuring the daemon, it is all handled
  * more or less automatically.
  */
+package com.sshtools.forker.common;

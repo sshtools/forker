@@ -22,7 +22,6 @@ import com.pty4j.windows.WinPty;
 import com.pty4j.windows.WinPtyProcess;
 import com.sshtools.forker.common.Command;
 import com.sshtools.forker.common.IO;
-import com.sshtools.forker.common.IO.DefaultIO;
 import com.sshtools.forker.common.States;
 import com.sshtools.forker.daemon.CommandExecutor;
 import com.sshtools.forker.daemon.ExecuteCheckResult;
@@ -42,12 +41,6 @@ import com.sun.jna.Platform;
  *
  */
 public class PTYExecutor implements CommandExecutor {
-
-	public final static class PTYIO extends DefaultIO {
-		public PTYIO() {
-			super("PTY", false, true, true, true);
-		}
-	}
 
 	public final static IO PTY = new PTYIO();
 
