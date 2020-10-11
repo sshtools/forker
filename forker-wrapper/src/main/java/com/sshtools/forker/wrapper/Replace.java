@@ -1,4 +1,4 @@
-package com.sshtools.forker.updater;
+package com.sshtools.forker.wrapper;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -6,10 +6,11 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class Replace {
+public class Replace { 
 	public static final String DEFAULT_VARIABLE_REPLACEMENT = "\\$\\{[^\\]]*\\}";
 
 	public interface ExceptionHandler {
@@ -125,6 +126,19 @@ public class Replace {
 			}
 		}
 		m.appendTail(work);
+	}
+
+	public static String replaceSystemProperties(String value) {
+		Replace replace = new Replace();
+		replace.pattern("\\$\\{(.*?)\\}",
+				(p, m, r) -> System.getProperty(m.group().substring(2, m.group().length() - 1)));
+		return replace.replace(value);
+	}
+
+	public static String replaceProperties(String value, Map<String, String> props) {
+		Replace replace = new Replace();
+		replace.pattern("\\$\\{(.*?)\\}", (p, m, r) -> props.get(m.group().substring(2, m.group().length() - 1)));
+		return replace.replace(value);
 	}
 
 	public static String escapeForRegexpReplacement(String repl) {

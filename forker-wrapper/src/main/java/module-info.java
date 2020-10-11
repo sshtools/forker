@@ -9,7 +9,7 @@ module com.sshtools.forker.wrapper {
 	requires java.management;
 	requires transitive com.sshtools.forker.daemon;
 	requires transitive commons.cli;
-
+	requires transitive jdk.attach;
 	exports com.sshtools.forker.wrapper;
 
 	provides com.sshtools.forker.client.ForkerProcessFactory with com.sshtools.forker.wrapper.WrapperProcessFactory;

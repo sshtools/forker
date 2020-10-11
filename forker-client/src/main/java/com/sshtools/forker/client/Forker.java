@@ -639,6 +639,7 @@ public class Forker {
 			setDaemon(true);
 		}
 
+		@SuppressWarnings("resource")
 		public void run() {
 			String javaExe = OS.getJavaPath();
 			/*

@@ -9,11 +9,11 @@ import java.util.Collection;
 import java.util.List;
 
 import com.sshtools.forker.updater.AppManifest.Entry;
+import com.sshtools.forker.updater.AppManifest.Section;
 
 public class UpdateSession {
 
 	private AppManifest manifest;
-	private List<Entry> updates;
 	private Updater updater;
 	private Path localDir = Paths.get(System.getProperty("user.dir"));
 	private List<String> appArgs;
@@ -54,25 +54,47 @@ public class UpdateSession {
 		return !getUpdates().isEmpty();
 	}
 
+	public boolean requiresBootstrapUpdate() throws IOException {
+		return !doGetUpdates(manifest.entries(Section.BOOTSTRAP)).isEmpty();
+	}
+
+	public boolean requiresAppUpdate() throws IOException {
+		return !doGetUpdates(manifest.entries(Section.APP)).isEmpty();
+	}
+
 	public Collection<? extends Entry> getUpdates() throws IOException {
-		if (updates == null) {
-			updates = new ArrayList<>();
-			for (Entry entry : manifest.entries()) {
-				Path local = localDir.resolve(entry.path());
-				boolean update = false;
-				if (Files.exists(local)) {
-					long localLen = Files.size(local);
-					if (localLen != entry.size())
-						update = true;
-					else {
-						if (entry.checksum() != AppManifest.checksum(local))
-							update = true;
-					}
-				} else
+		return doGetUpdates(manifest.entries());
+	}
+
+	protected Collection<? extends Entry> doGetUpdates(List<Entry> entries) throws IOException {
+		List<Entry> updates = new ArrayList<>();
+		for (Entry entry : entries) {
+			Path local = entry.section() == Section.APP ? entry.resolve(localDir, manifest.path())
+					: entry.resolve(localDir);
+			boolean update = false;
+			if (Files.isSymbolicLink(local)) {
+				if (!entry.isLink())
 					update = true;
-				if (update) {
-					updates.add(entry);
+				else if (!Files.readSymbolicLink(local).equals(entry.target()))
+					update = true;
+			} else if (Files.exists(local)) {
+				if (entry.isLink())
+					update = true;
+				else {
+					long localLen = Files.size(local);
+					if (localLen != entry.size()) {
+						update = true;
+					} else {
+						if (entry.checksum() != AppManifest.checksum(local)) {
+							update = true;
+						}
+					}
 				}
+			} else {
+				update = true;
+			}
+			if (update) {
+				updates.add(entry);
 			}
 		}
 		return updates;

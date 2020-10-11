@@ -21,9 +21,9 @@ public interface UpdateHandler {
 
 	void doneDownloadFile(Entry file) throws Exception;
 
-	void updateDownloadFileProgress(Entry file, float frac) throws Exception;
+	void updateDownloadFileProgress(Entry file, float progress) throws Exception;
 
-	void updateDownloadProgress(float frac) throws Exception;
+	void updateDownloadProgress(float progress) throws Exception;
 
 	void startDownloadFile(Entry file) throws Exception;
 

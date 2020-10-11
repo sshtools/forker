@@ -7,4 +7,5 @@ module com.sshtools.forker.updater {
 	requires transitive commons.cli;
 	exports com.sshtools.forker.updater;
 	uses com.sshtools.forker.updater.UpdateHandler;
+	uses com.sshtools.forker.updater.InstallHandler;
 }

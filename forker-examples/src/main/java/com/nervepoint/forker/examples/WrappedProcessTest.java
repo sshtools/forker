@@ -5,7 +5,7 @@ import org.apache.commons.lang3.SystemUtils;
 
 import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.wrapper.ForkerWrapper;
-import com.sshtools.forker.wrapper.ForkerWrapper.KeyValuePair;
+import com.sshtools.forker.wrapper.KeyValuePair;
 import com.sshtools.forker.wrapper.WrapperIO;
 import com.sshtools.forker.wrapper.WrapperProcessFactory;
 

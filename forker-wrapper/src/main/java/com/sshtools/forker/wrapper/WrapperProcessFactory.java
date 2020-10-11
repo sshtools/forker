@@ -15,7 +15,6 @@ import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.client.ForkerProcessFactory;
 import com.sshtools.forker.client.ForkerProcessListener;
 import com.sshtools.forker.common.Util;
-import com.sshtools.forker.wrapper.ForkerWrapper.KeyValuePair;
 
 /**
  * {@link WrapperProcessFactory} implementation that allows the construction of
@@ -200,10 +199,10 @@ public class WrapperProcessFactory implements ForkerProcessFactory {
 
 				ForkerWrapper wrapper = new ForkerWrapper();
 				for (KeyValuePair opt : options) {
-					wrapper.getProperties().add(opt);
+					wrapper.getConfiguration().getProperties().add(opt);
 				}
-				wrapper.setClassname(allArgs.remove(0));
-				wrapper.setArguments(allArgs.toArray(new String[0]));
+				wrapper.getWrappedApplication().setClassname(allArgs.remove(0));
+				wrapper.getWrappedApplication().setArguments(allArgs.toArray(new String[0]));
 				WrapperProcessImpl wrapperProcessImpl = new WrapperProcessImpl(wrapper, builder.redirectErrorStream());
 				wrapperProcessImpl.start();
 				return wrapperProcessImpl;

@@ -13,9 +13,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
+import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List;
@@ -56,6 +58,7 @@ import org.eclipse.aether.resolution.ArtifactResult;
 
 import com.sshtools.forker.updater.AppManifest;
 import com.sshtools.forker.updater.AppManifest.Entry;
+import com.sshtools.forker.updater.AppManifest.Section;
 import com.sshtools.forker.updater.AppManifest.Type;
 
 @Mojo(name = "updates", defaultPhase = LifecyclePhase.PACKAGE, requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME)
@@ -154,6 +157,12 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 	private List<String> forkerArgs;
 
 	@Parameter
+	private List<BootstrapFile> bootstrapFiles;
+
+	@Parameter
+	private List<AppFile> appFiles;
+
+	@Parameter
 	private Map<String, String> properties;
 
 	@Parameter(defaultValue = "true", property = "noHeaderFiles")
@@ -161,6 +170,9 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 
 	@Parameter(defaultValue = "true", property = "noManPages")
 	private boolean noManPages;
+
+	@Parameter(defaultValue = "true", property = "updateableBootstrap")
+	private boolean updateableBootstrap;
 
 	@Parameter(defaultValue = "false", property = "forkerDaemon")
 	private boolean forkerDaemon;
@@ -183,17 +195,17 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 	@Parameter(defaultValue = "true", property = "image")
 	private boolean image;
 
+	@Parameter(defaultValue = "${project.artifactId}", property = "id", required = true)
+	private String id;
+
 	@Parameter(defaultValue = "false", property = "remotesFromOriginalSource")
 	private boolean remotesFromOriginalSource;
 
 	@Parameter(defaultValue = "true", property = "includeForkerUpdaterRuntimeModules")
 	private boolean includeForkerUpdaterRuntimeModules = true;
 
-	/**
-	 * Location of the modulepath jars.
-	 */
-	@Parameter(defaultValue = "app/updater", property = "updaterpath", required = true)
-	private String updaterPath;
+	@Parameter(defaultValue = "${project.version}-${timestamp}", property = "version")
+	private String version;
 
 	/**
 	 * The maven project.
@@ -231,18 +243,30 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 
 	public void execute() throws MojoExecutionException {
 		AppManifest manifest = new AppManifest();
+		manifest.id(id);
 		try {
 			manifest.baseUri(new URI(remoteBase));
 		} catch (URISyntaxException e1) {
 			throw new MojoExecutionException("Invalid remote base.", e1);
 		}
-		manifest.path(Paths.get(appPath));
+		if (!version.equals(""))
+			manifest.version(version.replace("${timestamp}", String.valueOf(
+					new SimpleDateFormat("yyyyMMddHHmmss").format(new Date(manifest.timestamp().toEpochMilli())))));
+		Path appPathObj = Paths.get(appPath);
+		manifest.path(appPathObj);
+
 		Path imagePath = imageDirectory.toPath();
+		Path classPathObj = imagePath.resolve(classPath);
+		Path modulePathObj = imagePath.resolve(modulePath);
+		Path relModulePath = imagePath.relativize(modulePathObj);
+		Path relClassPath = imagePath.relativize(classPathObj);
+		Path repositoryPath = repositoryDirectory.toPath();
+
 		List<String> allBootstrapModules = new ArrayList<>();
 		List<String> allBootstrapOnlyModules = new ArrayList<>();
 		if (includeForkerUpdaterRuntimeModules) {
 			allBootstrapModules.addAll(Arrays.asList("forker-common", "forker-client", "forker-updater", "commons-cli",
-					"jna", "jna-platform", "commons-lang3", "commons-io"));
+					"jna", "jna-platform", "commons-lang3", "commons-io", "forker-wrapped"));
 			allBootstrapOnlyModules.addAll(Arrays.asList("forker-wrapper", "forker-daemon"));
 		}
 		if (bootstrapModules != null)
@@ -278,7 +302,6 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 			}
 
 			Set<Artifact> artifacts = project.getArtifacts();
-			String updaterModulePath = null;
 			for (Artifact a : artifacts) {
 				String artifactId = a.getArtifactId();
 				org.eclipse.aether.artifact.Artifact aetherArtifact = new DefaultArtifact(a.getGroupId(),
@@ -303,33 +326,86 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 
 				if ((bootstrapClasspath != null && bootstrapClasspath.contains(artifactName))
 						|| (bootstrapOnlyClasspath != null && bootstrapOnlyClasspath.contains(artifactName))) {
-					copy(a.getFile().toPath(), checkDir(imagePath.resolve(classPath)).resolve(getFileName(a)),
-							manifest.timestamp());
+					copy(a.getFile().toPath(), checkDir(classPathObj).resolve(getFileName(a)), manifest.timestamp());
 				} else if ((allBootstrapModules.contains(artifactName))
 						|| (allBootstrapOnlyModules.contains(artifactName))) {
-					copy(a.getFile().toPath(), checkDir(imagePath.resolve(modulePath)).resolve(getFileName(a)),
-							manifest.timestamp());
+					copy(a.getFile().toPath(), checkDir(modulePathObj).resolve(getFileName(a)), manifest.timestamp());
 				}
 
-				if (isUpdate4J(a)) {
-					updaterModulePath = updaterPath + "/" + getFileName(a);
-					copy(a.getFile().toPath(), imagePath.resolve(updaterModulePath), manifest.timestamp());
-				} else {
-					if ((bootstrapOnlyClasspath == null || !bootstrapOnlyClasspath.contains(artifactName))
-							&& (!allBootstrapOnlyModules.contains(artifactName))) {
-						if (classpathJars != null && classpathJars.contains(artifactName))
-							classpath(manifest, a, resolutionResult, file);
-						else if (isModule(a) || (automaticModules != null && automaticModules.contains(artifactName))) {
-							module(manifest, a, resolutionResult, file);
-						} else {
-							classpath(manifest, a, resolutionResult, file);
-						}
+				if ((bootstrapOnlyClasspath == null || !bootstrapOnlyClasspath.contains(artifactName))
+						&& (!allBootstrapOnlyModules.contains(artifactName))) {
+					if (classpathJars != null && classpathJars.contains(artifactName))
+						classpath(manifest, a, resolutionResult, file);
+					else if (isModule(a) || (automaticModules != null && automaticModules.contains(artifactName))) {
+						module(manifest, a, resolutionResult, file);
+					} else {
+						classpath(manifest, a, resolutionResult, file);
 					}
 				}
 			}
 
-			if (updaterModulePath == null)
-				throw new MojoExecutionException("Update4J must be an included dependency.");
+			if (bootstrapFiles != null) {
+				for (BootstrapFile file : bootstrapFiles) {
+					Path path = Paths.get(file.source);
+					Path target = imagePath
+							.resolve(file.target.equals(".") ? imagePath : imagePath.resolve(file.target))
+							.resolve(path.getFileName());
+					copy(path, target, manifest.timestamp());
+					if (updateableBootstrap) {
+						manifest.entries()
+								.add(new Entry(target).section(Section.BOOTSTRAP).path(imagePath.relativize(target))
+										.uri(new URI(resolveUrl(remoteBase, imagePath.relativize(target).toString())))
+										.type(Type.OTHER));
+						target = repositoryPath
+								.resolve(file.target.equals(".") ? repositoryPath : repositoryPath.resolve(file.target))
+								.resolve(path.getFileName());
+						copy(path, target, manifest.timestamp());
+					}
+				}
+			}
+
+			if (appFiles != null) {
+				for (AppFile file : appFiles) {
+					Path path = Paths.get(file.source);
+					Path target = imagePath
+							.resolve(file.target.equals(".") ? appPathObj : appPathObj.resolve(file.target))
+							.resolve(path.getFileName());
+					Path relTarget = imagePath.relativize(target);
+					copy(path, target, manifest.timestamp());
+					manifest.entries().add(new Entry(target).section(Section.APP).path(relTarget)
+							.uri(new URI(resolveUrl(remoteBase, relTarget.toString()))).type(Type.OTHER));
+				}
+			}
+
+			/* Anything thats not in the app base is a boostrap entry */
+			Path mf = imagePath.resolve("manifest.xml");
+			if (updateableBootstrap) {
+				Files.walk(imagePath).forEach(s -> {
+					if (Files.isRegularFile(s) && !mf.equals(s)) {
+						Path relPath = imagePath.relativize(s);
+						if (!relPath.startsWith(relModulePath) && !relPath.startsWith(relClassPath)
+								&& !manifest.hasPath(relPath)) {
+							try {
+								manifest.entries().add(new Entry(s).section(Section.BOOTSTRAP).type(Type.OTHER)
+										.path(relPath).uri(new URI(resolveUrl(remoteBase, relPath.toString()))));
+							} catch (IOException | URISyntaxException e) {
+								throw new IllegalStateException("Failed to construct bootstrap manifest entry.", e);
+							}
+							if (repository) {
+								if (!Files.isSymbolicLink(s)) {
+									Path t = checkFilesDir(repositoryPath.resolve(relPath));
+									try {
+										copy(s, t, manifest.timestamp());
+									} catch (IOException e) {
+										throw new IllegalStateException(
+												String.format("Failed to copy bootstrap file %s to %s.", s, t));
+									}
+								}
+							}
+						}
+					}
+				});
+			}
 
 			manifest.getProperties().put("maven.central", MAVEN_BASE);
 			manifest.getProperties().put("main", mainClass);
@@ -339,120 +415,156 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 				}
 			}
 
-			try (Writer out = Files.newBufferedWriter(checkDir(imagePath).resolve("manifest.xml"))) {
-				manifest.save(out);
-			}
-			if (repository) {
-				try (Writer out = Files
-						.newBufferedWriter(checkDir(repositoryDirectory.toPath()).resolve("manifest.xml"))) {
-					manifest.save(out);
-				}
-			}
-
 			if (launcherScriptName == null || launcherScriptName.equals("")) {
 				launcherScriptName = project.getArtifactId();
 			}
 
 			Path appCfgPath = imagePath.resolve("app.cfg");
 			checkDir(imagePath.resolve("app.cfg.d"));
-			writeAppCfg(manifest, appCfgPath);
+			writeAppCfg(manifest, appCfgPath, imagePath);
 			manifest.entries()
-					.add(new Entry(appCfgPath).type(Type.OTHER).path(Paths.get("/app.cfg")).uri(new URI("app.cfg")));
+					.add(new Entry(appCfgPath).section(Section.BOOTSTRAP).path(imagePath.relativize(appCfgPath))
+							.uri(new URI(resolveUrl(remoteBase, imagePath.relativize(appCfgPath).toString())))
+							.type(Type.OTHER));
 			if (repository) {
-				Path repositoryAppCfgPath = repositoryDirectory.toPath().resolve("app.cfg");
-				writeAppCfg(manifest, repositoryAppCfgPath);
+				Path repositoryAppCfgPath = repositoryPath.resolve("app.cfg");
+				writeAppCfg(manifest, repositoryAppCfgPath, imagePath);
 			}
 
 			Path scriptPath = imagePath.resolve("bin").resolve(launcherScriptName);
-			boolean useForkerModules = false;
-			try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(scriptPath), true)) {
-				out.println("#!/bin/sh");
-				out.println("cd `dirname $0`/..");
+			writeScript(imagePath, classPathObj, modulePathObj, scriptPath);
+			if (updateableBootstrap) {
+				writeScript(imagePath, classPathObj, modulePathObj,
+						repositoryPath.resolve("bin").resolve(launcherScriptName));
+			}
 
-				StringBuilder vmopts = new StringBuilder();
-				List<String> modulePaths = new ArrayList<>();
-				Path dir = imagePath.resolve(modulePath);
-				if (Files.exists(dir)) {
-					for (File f : dir.toFile().listFiles()) {
-						modulePaths.add(modulePath + "/" + f.getName());
-					}
-				}
-				dir = imagePath.resolve(updaterPath);
-				if (Files.exists(dir)) {
-					for (File f : dir.toFile().listFiles()) {
-						if (f.getName().startsWith("forker-updater")) {
-							useForkerModules = true;
-						}
-						modulePaths.add(updaterPath + "/" + f.getName());
-					}
-				}
-				dir = imagePath.resolve(classPath);
-				List<String> classPaths = new ArrayList<>();
-				if (Files.exists(dir)) {
-					for (File f : dir.toFile().listFiles()) {
-						classPaths.add(classPath + "/" + f.getName());
-					}
-				}
-				if (!modulePaths.isEmpty()) {
-					vmopts.append("-p ");
-					vmopts.append(String.join(":", modulePaths));
-					vmopts.append(" ");
-				}
-				if (!classPaths.isEmpty()) {
-					vmopts.append("-cp ");
-					vmopts.append(String.join(":", classPaths));
-					vmopts.append(" ");
-				}
+			if (updateableBootstrap) {
+				manifest.entries()
+						.add(new Entry(scriptPath).section(Section.BOOTSTRAP).path(imagePath.relativize(scriptPath))
+								.uri(new URI(resolveUrl(remoteBase, imagePath.relativize(scriptPath).toString())))
+								.type(Type.OTHER));
+			}
 
-				if (systemModules != null && systemModules.size() > 0)
-					vmopts.append(" --add-modules " + String.join(",", systemModules));
-				vmopts.append(" -Dforker.remoteManifest=" + remoteBase);
-				if (vmArgs != null) {
-					for (String vmArg : vmArgs) {
-						vmopts.append(" " + vmArg);
+			try (Writer out = Files.newBufferedWriter(checkDir(imagePath).resolve("manifest.xml"))) {
+				manifest.save(out);
+			}
+			if (repository) {
+				try (Writer out = Files.newBufferedWriter(checkDir(repositoryPath).resolve("manifest.xml"))) {
+					manifest.save(out);
+				}
+			}
+		} catch (IOException | URISyntaxException e) {
+			throw new MojoExecutionException("Failed to write configuration.", e);
+		}
+	}
+
+	private void writeScript(Path imagePath, Path classPathObj, Path modulePathObj, Path scriptPath)
+			throws IOException {
+		boolean useForkerModules = false;
+		try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(scriptPath), true)) {
+			out.println("#!/bin/sh");
+			out.println("cd `dirname $0`/..");
+
+			StringBuilder vmopts = new StringBuilder();
+			List<String> modulePaths = new ArrayList<>();
+			Path dir = modulePathObj;
+			if (Files.exists(dir)) {
+				for (File f : dir.toFile().listFiles()) {
+					modulePaths.add(modulePath + "/" + f.getName());
+					if (f.getName().startsWith("forker-updater")) {
+						useForkerModules = true;
 					}
 				}
-				out.println(String.format("VM_OPTIONS=\"%s\"", vmopts.toString()));
-
-				StringBuilder updaterArgs = new StringBuilder();
-				updaterArgs.append("--configuration ");
-				updaterArgs.append("app.cfg");
-				if (this.updaterArgs != null) {
-					for (String arg : this.updaterArgs) {
-						updaterArgs.append(" ");
-						updaterArgs.append(escapeSpaces(arg));
-					}
+			}
+			dir = classPathObj;
+			List<String> classPaths = new ArrayList<>();
+			if (Files.exists(dir)) {
+				for (File f : dir.toFile().listFiles()) {
+					classPaths.add(classPath + "/" + f.getName());
 				}
+			}
+			if (!modulePaths.isEmpty()) {
+				vmopts.append("-p ");
+				vmopts.append(String.join(":", modulePaths));
+				vmopts.append(" ");
+			}
+			if (!classPaths.isEmpty()) {
+				vmopts.append("-cp ");
+				vmopts.append(String.join(":", classPaths));
+				vmopts.append(" ");
+			}
 
-				out.println(String.format("APP_ARGS=\"%s\"", updaterArgs.toString()));
+			if (systemModules != null && systemModules.size() > 0)
+				vmopts.append(" --add-modules " + String.join(",", systemModules));
+			vmopts.append(" -Dforker.remoteManifest=" + remoteBase);
+			if (vmArgs != null) {
+				for (String vmArg : vmArgs) {
+					vmopts.append(" " + vmArg);
+				}
+			}
+			out.println(String.format("VM_OPTIONS=\"%s\"", vmopts.toString()));
+
+			StringBuilder updaterArgs = new StringBuilder();
+			updaterArgs.append("--configuration ");
+			updaterArgs.append("app.cfg");
+			if (this.updaterArgs != null) {
+				for (String arg : this.updaterArgs) {
+					updaterArgs.append(" ");
+					updaterArgs.append(escapeSpaces(arg));
+				}
+			}
+
+			out.println(String.format("APP_ARGS=\"%s\"", updaterArgs.toString()));
+			if (updateableBootstrap) {
+				out.println("while : ; do");
+				if (useForkerModules)
+					out.println(
+							"    bin/java $VM_OPTIONS -m com.sshtools.forker.updater/com.sshtools.forker.updater.Updater $APP_ARGS $@");
+				else
+					out.println("    bin/java $VM_OPTIONS com.sshtools.forker.updater.Updater $APP_ARGS $@");
+				out.println("    ret=$?");
+				out.println("    if [ \"${ret}\" != 9 -o ! -d .updates ]; then");
+				out.println("        exit $ret");
+				out.println("    else");
+				out.println("        echo Updating bootstrap ....");
+				out.println("        cd .updates");
+				out.println("        if ! find . -type d -exec mkdir -p ../\\{} \\; ; then");
+				out.println("            echo \"$0: Failed to recreate directory structure.\" >&2");
+				out.println("            exit 2");
+				out.println("        fi");
+				out.println("        if ! find . -type f -exec mv -f \\{} ../\\{} \\; ; then");
+				out.println("            echo \"$0: Failed to copy bootstrap update files.\" >&2");
+				out.println("            exit 2");
+				out.println("        fi");
+				out.println("        cd ..");
+				out.println("        rm -fr .updates");
+				out.println("    fi");
+				out.println("done");
+			} else {
 				if (useForkerModules)
 					out.println(
 							"bin/java $VM_OPTIONS -m com.sshtools.forker.updater/com.sshtools.forker.updater.Updater $APP_ARGS $@");
 				else
 					out.println("bin/java $VM_OPTIONS com.sshtools.forker.updater.Updater $APP_ARGS $@");
 			}
-
-			scriptPath.toFile().setExecutable(true);
-
-		} catch (IOException | URISyntaxException e) {
-			throw new MojoExecutionException("Failed to write configuration.", e);
 		}
+		scriptPath.toFile().setExecutable(true);
 	}
 
-	private void writeAppCfg(AppManifest manifest, Path appCfgPath) throws IOException {
+	private void writeAppCfg(AppManifest manifest, Path appCfgPath, Path imagePath) throws IOException {
 		try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(appCfgPath), true)) {
 			out.println("configuration-directory app.cfg.d");
 			out.println("local-manifest manifest.xml");
 			out.println("remote-manifest " + remoteBase + "/manifest.xml");
 			List<String> cp = new ArrayList<>();
 			List<String> mp = new ArrayList<>();
-			for (Entry entry : manifest.entries()) {
+			for (Entry entry : manifest.entries(Section.APP)) {
 				switch (entry.type()) {
 				case CLASSPATH:
-					cp.add(Paths.get(appPath).resolve(entry.path()).toString());
+					cp.add(entry.resolve(manifest.path()).toString());
 					break;
 				case MODULEPATH:
-					mp.add(Paths.get(appPath).resolve(entry.path()).toString());
+					mp.add(entry.resolve(manifest.path()).toString());
 					break;
 				default:
 					break;
@@ -464,13 +576,18 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 			if (mp.size() > 0) {
 				out.println("modulepath " + String.join(File.pathSeparator, mp));
 			}
-			if(!forkerDaemon) 
+			if (!forkerDaemon)
 				out.println("no-forker-daemon");
-			if(forkerArgs != null) {
-				for(String forkerArg : forkerArgs)
+			if (forkerArgs != null) {
+				for (String forkerArg : forkerArgs)
 					out.println(forkerArg);
 			}
 		}
+	}
+
+	private Path checkFilesDir(Path resolve) {
+		checkDir(resolve.getParent());
+		return resolve;
 	}
 
 	private Path checkDir(Path resolve) {
@@ -501,22 +618,24 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		String remoteUrl = mavenUrl(resolutionResult);
 		if (repository) {
 			if (remotesFromOriginalSource) {
-				if (!isRemote(remoteUrl)) {
+				if (!isRemote(remoteUrl) && !Files.isSymbolicLink(file.toPath())) {
 					copy(a.getFile().toPath(), repositoryDirectory.toPath().resolve(finalClassPath),
 							manifest.timestamp());
 				}
 				if (remoteUrl == null)
 					remoteUrl = repositoryUrl(resolutionResult);
-				manifest.entries().add(new Entry(file.toPath()).path(Paths.get(getFileName(a))).uri(new URI(remoteUrl))
-						.type(Type.CLASSPATH));
+				manifest.entries().add(new Entry(file.toPath()).section(Section.APP).path(Paths.get(getFileName(a)))
+						.uri(new URI(remoteUrl)).type(Type.CLASSPATH));
 			} else {
-				manifest.entries().add(new Entry(file.toPath()).path(Paths.get(getFileName(a)))
+				manifest.entries().add(new Entry(file.toPath()).section(Section.APP).path(Paths.get(getFileName(a)))
 						.uri(new URI(repositoryUrl(resolutionResult))).type(Type.CLASSPATH));
-				copy(a.getFile().toPath(), repositoryDirectory.toPath().resolve(finalClassPath), manifest.timestamp());
+				if (!Files.isSymbolicLink(file.toPath()))
+					copy(file.toPath(), repositoryDirectory.toPath().resolve(finalClassPath),
+							manifest.timestamp());
 			}
 		} else
-			manifest.entries().add(new Entry(file.toPath()).path(Paths.get(getFileName(a))).uri(new URI(remoteUrl))
-					.type(Type.CLASSPATH));
+			manifest.entries().add(new Entry(file.toPath()).section(Section.APP).path(Paths.get(getFileName(a)))
+					.uri(new URI(remoteUrl)).type(Type.CLASSPATH));
 	}
 
 	private void module(AppManifest manifest, Artifact a, ArtifactResult resolutionResult, File file)
@@ -524,26 +643,26 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		String finalModulePath = appPath + "/" + getFileName(a);
 		getLog().info(String.format("Adding %s module jar %s to updater config.", a.getFile(), finalModulePath));
 		if (image)
-			copy(a.getFile().toPath(), imageDirectory.toPath().resolve(finalModulePath), manifest.timestamp());
+			copy(file.toPath(), imageDirectory.toPath().resolve(finalModulePath), manifest.timestamp());
 		String remoteUrl = mavenUrl(resolutionResult);
 		if (repository) {
 			if (remotesFromOriginalSource) {
 				if (!isRemote(remoteUrl)) {
-					copy(a.getFile().toPath(), repositoryDirectory.toPath().resolve(finalModulePath),
+					copy(file.toPath(), repositoryDirectory.toPath().resolve(finalModulePath),
 							manifest.timestamp());
 				}
 				if (remoteUrl == null)
 					remoteUrl = repositoryUrl(resolutionResult);
-				manifest.entries().add(new Entry(file.toPath()).path(Paths.get(getFileName(a))).uri(new URI(remoteUrl))
-						.type(Type.MODULEPATH));
+				manifest.entries().add(new Entry(file.toPath()).section(Section.APP).path(Paths.get(getFileName(a)))
+						.uri(new URI(remoteUrl)).type(Type.MODULEPATH));
 			} else {
-				manifest.entries().add(new Entry(file.toPath()).path(Paths.get(getFileName(a)))
+				manifest.entries().add(new Entry(file.toPath()).section(Section.APP).path(Paths.get(getFileName(a)))
 						.uri(new URI(repositoryUrl(resolutionResult))).type(Type.MODULEPATH));
 				copy(a.getFile().toPath(), repositoryDirectory.toPath().resolve(finalModulePath), manifest.timestamp());
 			}
 		} else {
-			manifest.entries().add(new Entry(file.toPath()).path(Paths.get(getFileName(a))).uri(new URI(remoteUrl))
-					.type(Type.MODULEPATH));
+			manifest.entries().add(new Entry(file.toPath()).section(Section.APP).path(Paths.get(getFileName(a)))
+					.uri(new URI(remoteUrl)).type(Type.MODULEPATH));
 		}
 	}
 
@@ -678,8 +797,12 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 
 	private void copy(Path p1, Path p2, Instant mod) throws IOException {
 		Files.createDirectories(p2.getParent());
-		try (OutputStream out = Files.newOutputStream(p2)) {
-			Files.copy(p1, out);
+		if (Files.isSymbolicLink(p1)) {
+			Files.createSymbolicLink(p2, Files.readSymbolicLink(p1));
+		} else {
+			try (OutputStream out = Files.newOutputStream(p2)) {
+				Files.copy(p1, out);
+			}
 		}
 		Files.setLastModifiedTime(p2, FileTime.from(mod));
 	}
@@ -708,7 +831,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		return fn.toString();
 	}
 
-	private boolean isUpdate4J(Artifact a) throws IOException {
+	private boolean isForkerUpdater(Artifact a) throws IOException {
 		return a.getArtifactId().equals("forker-updater");
 	}
 
@@ -775,8 +898,12 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		return null;
 	}
 
+	private String repositoryUrl(String path) {
+		return resolveUrl(resolveUrl(remoteBase, appPath), path);
+	}
+
 	private String repositoryUrl(ArtifactResult result) {
-		return resolveUrl(resolveUrl(remoteBase, appPath), getFileName(result.getArtifact()));
+		return repositoryUrl(getFileName(result.getArtifact()));
 	}
 
 	private boolean isRemote(String path) {

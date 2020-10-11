@@ -12,10 +12,10 @@ public class WrapperTest {
 
 		// fw.setProperty("quiet", true);
 		// fw.setProperty("level", "SEVERE");
-		
-		fw.setClassname(WrappedTest.class.getName());
-		fw.setArguments("arg1");
-		
+
+		fw.getWrappedApplication().setClassname(WrappedTest.class.getName());
+		fw.getWrappedApplication().setArguments("arg1");
+
 		// Start and wait for wrapper to exit
 		System.out.println("Wrapped process returned: " + fw.start());
 	}
