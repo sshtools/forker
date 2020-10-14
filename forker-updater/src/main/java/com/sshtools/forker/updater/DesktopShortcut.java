@@ -10,7 +10,7 @@ import java.util.Map;
 public class DesktopShortcut {
 
 	public enum Type {
-		APPLICATION, AUTOSTART;
+		APPLICATION, AUTOSTART, LINK, DIRECTORY;
 	}
 
 	private final String id;

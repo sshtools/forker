@@ -91,12 +91,26 @@ public abstract class AbstractSession {
 			if (!shortcut.categories().isEmpty())
 				pw.println("Categories=" + String.join(";", shortcut.categories()));
 			pw.println("StartupNotify=false"); // TODO never in Java unless native/jna etc
-			if (shortcut.type() != Type.AUTOSTART)
-				pw.println("Type=" + shortcut.type());
-			pw.println("Keywords=razer;snake;mamba;chroma;deathadder");
-			if (shortcut.type() == Type.AUTOSTART) {
-				pw.println("X-GNOME-Autostart-enabled=" + shortcut.autoStart());
+			if (shortcut.type() != Type.AUTOSTART) {
+				switch(shortcut.type()) {
+				case APPLICATION:
+					pw.println("Type=Application");
+					break;
+				case LINK:
+					pw.println("Type=Link");
+					break;
+				case DIRECTORY:
+					pw.println("Type=Directory");
+					break;
+				case AUTOSTART:
+					pw.println("Type=Application");
+					pw.println("X-GNOME-Autostart-enabled=" + shortcut.autoStart());
+					break;
+				default:
+					break;
+				}
 			}
+			pw.println("Keywords=razer;snake;mamba;chroma;deathadder");
 		}
 	}
 
