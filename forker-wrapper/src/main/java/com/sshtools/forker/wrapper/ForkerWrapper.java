@@ -1,5 +1,5 @@
 package com.sshtools.forker.wrapper;
-
+ 
 import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.File;
@@ -116,6 +116,13 @@ import com.sun.tools.attach.VirtualMachineDescriptor;
  */
 @MXBean
 public class ForkerWrapper implements ForkerWrapperMXBean {
+
+	public final static int CONTINUE_UPGRADE = Integer.MIN_VALUE;
+	public final static int USER_INTERACTION = Integer.MIN_VALUE + 2;
+	public final static int EXIT_AFTER_UPGRADE = Integer.MIN_VALUE + 1;
+	public final static int EXIT_OK = 0;
+	public final static int EXIT_ERROR = 1;
+	public final static int EXIT_ARGUMENT_SYNTAX = 2;
 
 	public final static String WRAPPED_MODULE_NAME = "com.sshtools.forker.wrapped";
 	public final static String WRAPPED_CLASS_NAME = "com.sshtools.forker.wrapped.Wrapped";

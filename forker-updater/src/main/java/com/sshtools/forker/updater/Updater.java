@@ -325,12 +325,12 @@ public class Updater extends ForkerWrapper {
 				Path d = checkFilesDir(dest.resolve(cwd().relativize(s)));
 				logger.log(Level.FINE, String.format("Installing %s to %s.", s, d));
 				handler.installFile(s, d);
+				Files.deleteIfExists(d);
 				if (Files.isSymbolicLink(s)) {
 					logger.log(Level.INFO, String.format("Creating link %s.", s));
 					Files.createSymbolicLink(d, Files.readSymbolicLink(s));
 				} else {
 					long fileSize = Files.size(s);
-					Files.deleteIfExists(d);
 					logger.log(Level.INFO, String.format("Creating linkfile %s.", s));
 					try (InputStream in = Files.newInputStream(s)) {
 						try (OutputStream out = Files.newOutputStream(d)) {
