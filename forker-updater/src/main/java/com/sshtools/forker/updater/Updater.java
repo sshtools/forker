@@ -23,10 +23,10 @@ import java.util.logging.Level;
 
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.SystemUtils;
 
 import com.sshtools.forker.common.OS;
+import com.sshtools.forker.common.Util;
 import com.sshtools.forker.updater.AppManifest.Entry;
 import com.sshtools.forker.updater.AppManifest.Section;
 import com.sshtools.forker.wrapper.ForkerWrapper;
@@ -174,6 +174,24 @@ public class Updater extends ForkerWrapper {
 	}
 
 	protected boolean update(Callable<Void> task) {
+		Path userCwd = null;
+		if (!Files.isWritable(cwd())) {
+			userCwd = new File(System.getProperty("user.home") + File.separator + ".cache" + File.separator
+					+ "snake" + File.separator + "app").toPath();
+			try {
+				logger.log(Level.FINE, String.format(
+						"Current directory %s is unwriteable, so treating this is a system wide install and switching the actual installation directory to %s.",
+						cwd(), userCwd));
+				Files.createDirectories(userCwd);
+				
+				/* TODO: really we should copy the app system wide files to the cache rather than downloading them again.
+				 * This will mean doing something less brutal than changing the CWD  */
+				getConfiguration().setProperty("cwd", userCwd.toString());
+			} catch (IOException ioe) {
+				throw new IllegalStateException(String.format("Failed to create user cache directory %s", userCwd));
+			}
+		}
+
 		String remoteManifestLocation = getConfiguration().getOptionValue("remote-manifest", null);
 		if (remoteManifestLocation == null || remoteManifestLocation.equals(""))
 			throw new IllegalStateException(
@@ -191,6 +209,9 @@ public class Updater extends ForkerWrapper {
 			AppManifest manifest = new AppManifest();
 			UpdateHandler handler = getUpdateHandler();
 			UpdateSession session = new UpdateSession(manifest, this);
+			if(userCwd != null)
+				session.systemWideBootstrapInstall(true);
+			
 			session.localDir(cwd());
 			session.appArgs(getCmd().getArgList());
 			handler.init(session);
@@ -211,6 +232,7 @@ public class Updater extends ForkerWrapper {
 							localManifest.version(), localManifest.timestamp(), localManifest.id()));
 				}
 			} catch (IOException ioe) {
+				logger.log(Level.FINE, String.format("No local manifest at %s.", localManifestPath));
 			}
 			handler.completedManifestLoad(url);
 
@@ -303,7 +325,7 @@ public class Updater extends ForkerWrapper {
 			return false;
 		installTo(session, destination);
 		boolean ret = update(task);
-		if(!getConfiguration().getSwitch("run-on-install", false))
+		if (!getConfiguration().getSwitch("run-on-install", false))
 			return false;
 		return ret;
 	}
@@ -480,7 +502,7 @@ public class Updater extends ForkerWrapper {
 					logger.log(Level.INFO,
 							String.format("Removing directory with no manifiest entry %s from app base path %s.", path,
 									session.manifest().path()));
-					FileUtils.deleteDirectory(path.toFile());
+					Util.deleteRecursiveIfExists(path.toFile());
 				} else if (!Files.isDirectory(path) && !session.manifest().hasPath(path.getFileName())) {
 					logger.log(Level.INFO,
 							String.format("Removing file with no manifiest entry %s from app base path %s.", path,

@@ -15,11 +15,21 @@ public class UpdateSession extends AbstractSession {
 
 	private Path localDir = Paths.get(System.getProperty("user.dir"));
 	private List<String> appArgs;
+	private boolean systemWideBootstrapInstall;
 
 	UpdateSession(AppManifest manifiest, Updater updater) {
 		super();
 		manifest(manifiest);
 		updater(updater);
+	}
+
+	public boolean systemWideBootstrapInstall() {
+		return systemWideBootstrapInstall;
+	}
+
+	public UpdateSession systemWideBootstrapInstall(boolean systemWideBootstrapInstall) {
+		this.systemWideBootstrapInstall = systemWideBootstrapInstall;
+		return this;
 	}
 
 	public List<String> appArgs() {
@@ -61,6 +71,10 @@ public class UpdateSession extends AbstractSession {
 		for (Entry entry : entries) {
 			Path local = entry.section() == Section.APP ? entry.resolve(localDir, manifest().path())
 					: entry.resolve(localDir);
+			
+			if(systemWideBootstrapInstall && entry.section() == Section.BOOTSTRAP)
+				continue;
+			
 			boolean update = false;
 			if (Files.isSymbolicLink(local)) {
 				if (!entry.isLink())

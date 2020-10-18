@@ -2,6 +2,7 @@ package com.sshtools.forker.common;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -12,7 +13,25 @@ import org.apache.commons.lang3.SystemUtils;
  * Other utilities.
  */
 public class Util {
-
+	/**
+	 * Recursively deletes `item`, which may be a directory.
+	 * Symbolic links will be deleted instead of their referents.
+	 * Returns a boolean indicating whether `item` still exists.
+	 * http://stackoverflow.com/questions/8666420
+	 * 
+	 * @param item file to delete
+	 * @return deleted OK
+	 */
+	public static boolean deleteRecursiveIfExists(File item) {
+	    if (!item.exists()) return true;
+	    if (!Files.isSymbolicLink(item.toPath()) && item.isDirectory()) {
+	        File[] subitems = item.listFiles();
+	        for (File subitem : subitems)
+	            if (!deleteRecursiveIfExists(subitem)) return false;
+	    }
+	    return item.delete();
+	}
+	
 	/**
 	 * Parse a space separated string into a list, treating portions quotes with
 	 * single quotes as a single element. Single quotes themselves and spaces

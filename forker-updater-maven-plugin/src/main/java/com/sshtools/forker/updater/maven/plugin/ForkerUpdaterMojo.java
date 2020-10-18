@@ -56,6 +56,7 @@ import org.eclipse.aether.resolution.ArtifactRequest;
 import org.eclipse.aether.resolution.ArtifactResolutionException;
 import org.eclipse.aether.resolution.ArtifactResult;
 
+import com.sshtools.forker.common.Util;
 import com.sshtools.forker.updater.AppManifest;
 import com.sshtools.forker.updater.AppManifest.Entry;
 import com.sshtools.forker.updater.AppManifest.Section;
@@ -195,6 +196,9 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 	@Parameter(defaultValue = "true", property = "image")
 	private boolean image;
 
+	@Parameter(defaultValue = "true", property = "link")
+	private boolean link;
+
 	@Parameter(defaultValue = "${project.artifactId}", property = "id", required = true)
 	private String id;
 
@@ -206,6 +210,9 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 
 	@Parameter(defaultValue = "${project.version}-${timestamp}", property = "version")
 	private String version;
+
+	@Parameter(defaultValue = "true", property = "removeImageBeforeLink")
+	private boolean removeImageBeforeLink = true;
 
 	/**
 	 * The maven project.
@@ -273,33 +280,41 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 			allBootstrapModules.addAll(bootstrapModules);
 		if (bootstrapOnlyModules != null)
 			allBootstrapOnlyModules.addAll(bootstrapOnlyModules);
-		try {
 
-			ProcessBuilder pb = new ProcessBuilder(getJLinkExecutable());
-			if (systemModules != null) {
-				pb.command().add("--add-modules");
-				pb.command().add(String.join(",", systemModules));
+		try {
+			
+			if(link) {
+				if(removeImageBeforeLink) {
+					getLog().info("Clearing jlink directory '" + imageDirectory + "'");
+					Util.deleteRecursiveIfExists(imageDirectory);
+				}
+				ProcessBuilder pb = new ProcessBuilder(getJLinkExecutable());
+				if (systemModules != null) {
+					pb.command().add("--add-modules");
+					pb.command().add(String.join(",", systemModules));
+				}
+				pb.command().add("--output");
+				pb.command().add(imageDirectory.getPath());
+				pb.redirectErrorStream(true);
+				if (noHeaderFiles)
+					pb.command().add("--no-header-files");
+				if (noManPages)
+					pb.command().add("--no-man-pages");
+				pb.command().add("--compress=" + compress);
+				getLog().info("Running jlink '" + String.join(" ", pb.command()) + "'");
+				Process p = pb.start();
+				try (InputStream in = p.getInputStream()) {
+					IOUtil.copy(in, System.out);
+				}
+				try {
+					if (p.waitFor() != 0)
+						throw new MojoExecutionException(String.format("The command '%s' failed with exit value %d",
+								String.join(" ", pb.command()), p.exitValue()));
+				} catch (InterruptedException e) {
+					throw new RuntimeException("Interrupted.", e);
+				}
 			}
-			pb.command().add("--output");
-			pb.command().add(imageDirectory.getPath());
-			pb.redirectErrorStream(true);
-			if (noHeaderFiles)
-				pb.command().add("--no-header-files");
-			if (noManPages)
-				pb.command().add("--no-man-pages");
-			pb.command().add("--compress=" + compress);
-			getLog().info("Running jlink '" + String.join(" ", pb.command()) + "'");
-			Process p = pb.start();
-			try (InputStream in = p.getInputStream()) {
-				IOUtil.copy(in, System.out);
-			}
-			try {
-				if (p.waitFor() != 0)
-					throw new MojoExecutionException(String.format("The command '%s' failed with exit value %d",
-							String.join(" ", pb.command()), p.exitValue()));
-			} catch (InterruptedException e) {
-				throw new RuntimeException("Interrupted.", e);
-			}
+			checkDir(imagePath);
 
 			Set<Artifact> artifacts = project.getArtifacts();
 			for (Artifact a : artifacts) {
@@ -431,11 +446,11 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 				writeAppCfg(manifest, repositoryAppCfgPath, imagePath);
 			}
 
-			Path scriptPath = imagePath.resolve("bin").resolve(launcherScriptName);
+			Path scriptPath = checkDir(imagePath.resolve("bin")).resolve(launcherScriptName);
 			writeScript(imagePath, classPathObj, modulePathObj, scriptPath);
 			if (updateableBootstrap) {
 				writeScript(imagePath, classPathObj, modulePathObj,
-						repositoryPath.resolve("bin").resolve(launcherScriptName));
+						checkDir(repositoryPath.resolve("bin")).resolve(launcherScriptName));
 			}
 
 			if (updateableBootstrap) {
@@ -463,7 +478,9 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		boolean useForkerModules = false;
 		try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(scriptPath), true)) {
 			out.println("#!/bin/sh");
-			out.println("cd `dirname $0`/..");
+			out.println("realpath=$(readlink \"$0\")");
+			out.println("if [ -z \"${realpath}\" ] ; then realpath=\"$0\" ; fi");
+			out.println("cd $(dirname ${realpath})/..");
 
 			StringBuilder vmopts = new StringBuilder();
 			List<String> modulePaths = new ArrayList<>();
@@ -513,15 +530,26 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 					updaterArgs.append(escapeSpaces(arg));
 				}
 			}
+			
+			if(link) {
+				out.println("JAVA_EXE=bin/java");
+			}
+			else {
+				out.println(String.format("if [ -n \"${JAVA_HOME}\" ] ; then "));
+				out.println("    JAVA_EXE=${JAVA_HOME}/bin/java");
+				out.println("else");
+				out.println("    JAVA_EXE=java");
+				out.println("fi");
+			}
 
 			out.println(String.format("APP_ARGS=\"%s\"", updaterArgs.toString()));
 			if (updateableBootstrap) {
 				out.println("while : ; do");
 				if (useForkerModules)
 					out.println(
-							"    bin/java $VM_OPTIONS -m com.sshtools.forker.updater/com.sshtools.forker.updater.Updater $APP_ARGS $@");
+							"    ${JAVA_EXE} ${VM_OPTIONS} -m com.sshtools.forker.updater/com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
 				else
-					out.println("    bin/java $VM_OPTIONS com.sshtools.forker.updater.Updater $APP_ARGS $@");
+					out.println("    ${JAVA_EXE} ${VM_OPTIONS} com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
 				out.println("    ret=$?");
 				out.println("    if [ \"${ret}\" != 9 -o ! -d .updates ]; then");
 				out.println("        exit $ret");
@@ -533,7 +561,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 				out.println("            exit 2");
 				out.println("        fi");
 				out.println("        if ! find . -type f -exec mv -f \\{} ../\\{} \\; ; then");
-				out.println("            echo \"$0: Failed to copy bootstrap update files.\" >&2");
+				out.println("            echo \"$0: Failed to copy update files.\" >&2");
 				out.println("            exit 2");
 				out.println("        fi");
 				out.println("        cd ..");
@@ -543,9 +571,9 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 			} else {
 				if (useForkerModules)
 					out.println(
-							"bin/java $VM_OPTIONS -m com.sshtools.forker.updater/com.sshtools.forker.updater.Updater $APP_ARGS $@");
+							"${JAVA_EXE} ${VM_OPTIONS} -m com.sshtools.forker.updater/com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
 				else
-					out.println("bin/java $VM_OPTIONS com.sshtools.forker.updater.Updater $APP_ARGS $@");
+					out.println("${JAVA_EXE} ${VM_OPTIONS} com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
 			}
 		}
 		scriptPath.toFile().setExecutable(true);
@@ -580,7 +608,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 				out.println("no-forker-daemon");
 			if (forkerArgs != null) {
 				for (String forkerArg : forkerArgs)
-					out.println(forkerArg);
+					out.println(forkerArg.trim());
 			}
 		}
 	}
