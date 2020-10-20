@@ -42,6 +42,7 @@ public class Updater extends ForkerWrapper {
 		opts.addOption(new Option(null, "update-on-exit", true,
 				"Update when hosted application returns this exit status. The hosted application can also detect if there is an update by examining the system property forker.updateAvailable or then environment variable FORKER_UPDATE_AVAILABLE."));
 		opts.addOption(new Option(null, "local-manifest", true, "The location of the local manifest."));
+		opts.addOption(new Option(null, "offline", false, "Do not check for updates at all."));
 		opts.addOption(new Option(null, "remote-manifest", true, "The location of the remote manifest."));
 		opts.addOption(new Option(null, "update-exit", true,
 				"This is the exit code update will exit with if the bootstrap itself needs updating. The files are downloaded to .bootstrap-updates in the cwd. If not present, the default value of '9' will be used."));
@@ -176,16 +177,19 @@ public class Updater extends ForkerWrapper {
 	protected boolean update(Callable<Void> task) {
 		Path userCwd = null;
 		if (!Files.isWritable(cwd())) {
-			userCwd = new File(System.getProperty("user.home") + File.separator + ".cache" + File.separator
-					+ "snake" + File.separator + "app").toPath();
+			userCwd = new File(System.getProperty("user.home") + File.separator + ".cache" + File.separator + "snake"
+					+ File.separator + "app").toPath();
 			try {
 				logger.log(Level.FINE, String.format(
 						"Current directory %s is unwriteable, so treating this is a system wide install and switching the actual installation directory to %s.",
 						cwd(), userCwd));
 				Files.createDirectories(userCwd);
-				
-				/* TODO: really we should copy the app system wide files to the cache rather than downloading them again.
-				 * This will mean doing something less brutal than changing the CWD  */
+
+				/*
+				 * TODO: really we should copy the app system wide files to the cache rather
+				 * than downloading them again. This will mean doing something less brutal than
+				 * changing the CWD
+				 */
 				getConfiguration().setProperty("cwd", userCwd.toString());
 			} catch (IOException ioe) {
 				throw new IllegalStateException(String.format("Failed to create user cache directory %s", userCwd));
@@ -209,9 +213,9 @@ public class Updater extends ForkerWrapper {
 			AppManifest manifest = new AppManifest();
 			UpdateHandler handler = getUpdateHandler();
 			UpdateSession session = new UpdateSession(manifest, this);
-			if(userCwd != null)
+			if (userCwd != null)
 				session.systemWideBootstrapInstall(true);
-			
+
 			session.localDir(cwd());
 			session.appArgs(getCmd().getArgList());
 			handler.init(session);
@@ -239,38 +243,48 @@ public class Updater extends ForkerWrapper {
 			url = new URL(remoteManifestLocation);
 			logger.log(Level.FINE, String.format("Get remote manifest from %s.", remoteManifestLocation));
 			handler.startingManifestLoad(url);
-			try (Reader in = new InputStreamReader(url.openStream(), StandardCharsets.UTF_8)) {
-				manifest.load(in);
-				if (manifest.hasVersion()) {
-					logger.log(Level.FINE, String.format("Version %s (timestamp %s) is available for app %s.",
-							manifest.version(), manifest.timestamp(), manifest.id()));
-					getConfiguration().addProperty("jvmarg", "-Dforker.availableVersion=" + manifest.version());
-				}
-				continueProcessing = manifest(task, manifest, handler, session, url, in);
-
-			} catch (IOException e) {
-				// Could not load remote config, falling back to local.
-				logger.log(Level.FINE, String.format("Failed to get remote manifest, falling back to local from %s.",
-						localManifestPath), e);
-
+			boolean haveRemote = false;
+			if (getConfiguration().getSwitch("offline", false)) {
 				url = localManifestPath.toUri().toURL();
 				try (Reader in = Files.newBufferedReader(localManifestPath)) {
 					continueProcessing = manifest(task, localManifest, handler, session, url, in);
+				}
+			} else {
+				try (Reader in = new InputStreamReader(url.openStream(), StandardCharsets.UTF_8)) {
+					manifest.load(in);
+					haveRemote = true;
+					if (manifest.hasVersion()) {
+						logger.log(Level.FINE, String.format("Version %s (timestamp %s) is available for app %s.",
+								manifest.version(), manifest.timestamp(), manifest.id()));
+						getConfiguration().addProperty("jvmarg", "-Dforker.availableVersion=" + manifest.version());
+					}
+					continueProcessing = manifest(task, manifest, handler, session, url, in);
+
+				} catch (IOException e) {
+					// Could not load remote config, falling back to local.
+					logger.log(Level.FINE, String.format(
+							"Failed to get remote manifest, falling back to local from %s.", localManifestPath), e);
+
+					url = localManifestPath.toUri().toURL();
+					try (Reader in = Files.newBufferedReader(localManifestPath)) {
+						continueProcessing = manifest(task, localManifest, handler, session, url, in);
+					}
 				}
 			}
 			handler.completedManifestLoad(url);
 
 			/* Now update the local manifest */
-			logger.log(Level.FINE, String.format("Saving new local manifest to %s with version %s.",
-					remoteManifestLocation, manifest.version()));
-			try (OutputStream localManifestOut = Files.newOutputStream(localManifestPath)) {
-				manifest.save(localManifestOut);
+			if (haveRemote) {
+				logger.log(Level.FINE, String.format("Saving new local manifest to %s with version %s.",
+						localManifestPath, manifest.version()));
+				try (OutputStream localManifestOut = Files.newOutputStream(localManifestPath)) {
+					manifest.save(localManifestOut);
+				}
 			}
 
 			getUpdateHandler().complete();
 
 		} catch (Exception e) {
-			e.printStackTrace();
 			getUpdateHandler().failed(e);
 			continueProcessing = false;
 		} finally {
@@ -310,7 +324,11 @@ public class Updater extends ForkerWrapper {
 
 				/* Continue starting up the next bootphase, the updater */
 				if (update(task)) {
-					task.call();
+
+					if (!getConfiguration().getSwitch("run-on-install", false))
+						System.exit(0);
+					else
+						task.call();
 				}
 
 				return null;
@@ -326,7 +344,7 @@ public class Updater extends ForkerWrapper {
 		installTo(session, destination);
 		boolean ret = update(task);
 		if (!getConfiguration().getSwitch("run-on-install", false))
-			return false;
+			return true;
 		return ret;
 	}
 
