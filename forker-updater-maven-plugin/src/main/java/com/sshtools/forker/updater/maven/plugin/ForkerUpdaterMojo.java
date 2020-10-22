@@ -583,7 +583,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(appCfgPath), true)) {
 			out.println("configuration-directory app.cfg.d");
 			out.println("local-manifest manifest.xml");
-			out.println("remote-manifest " + remoteBase + "/manifest.xml");
+			out.println("default-remote-manifest " + remoteBase + "/manifest.xml");
 			List<String> cp = new ArrayList<>();
 			List<String> mp = new ArrayList<>();
 			for (Entry entry : manifest.entries(Section.APP)) {

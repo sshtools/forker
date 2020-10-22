@@ -57,11 +57,12 @@ public class Configuration {
 
 	public String getProperty(String key) {
 		synchronized (cfgLock) {
+			String val = null;
 			for (KeyValuePair nvp : properties) {
 				if (nvp.getName().equals(key))
-					return nvp.getValue();
+					val = nvp.getValue();
 			}
-			return null;
+			return val;
 		}
 	}
 

@@ -43,7 +43,8 @@ public class Updater extends ForkerWrapper {
 				"Update when hosted application returns this exit status. The hosted application can also detect if there is an update by examining the system property forker.updateAvailable or then environment variable FORKER_UPDATE_AVAILABLE."));
 		opts.addOption(new Option(null, "local-manifest", true, "The location of the local manifest."));
 		opts.addOption(new Option(null, "offline", false, "Do not check for updates at all."));
-		opts.addOption(new Option(null, "remote-manifest", true, "The location of the remote manifest."));
+		opts.addOption(new Option(null, "default-remote-manifest", true, "The default location of the remote manifest. Can be override by remote-manifest"));
+		opts.addOption(new Option(null, "remote-manifest", true, "The location of the remote manifest. Overrides default-remote-manifest"));
 		opts.addOption(new Option(null, "update-exit", true,
 				"This is the exit code update will exit with if the bootstrap itself needs updating. The files are downloaded to .bootstrap-updates in the cwd. If not present, the default value of '9' will be used."));
 		opts.addOption(new Option(null, "install", false,
@@ -197,9 +198,13 @@ public class Updater extends ForkerWrapper {
 		}
 
 		String remoteManifestLocation = getConfiguration().getOptionValue("remote-manifest", null);
-		if (remoteManifestLocation == null || remoteManifestLocation.equals(""))
-			throw new IllegalStateException(
-					"A remote-manifest option must be provided, with a URL pointing to remote XML manifest.");
+		if (remoteManifestLocation == null || remoteManifestLocation.equals("")) {
+			remoteManifestLocation = getConfiguration().getOptionValue("default-remote-manifest", null);
+			if (remoteManifestLocation == null || remoteManifestLocation.equals("")) {
+				throw new IllegalStateException(
+						"A remote-manifest option must be provided, with a URL pointing to remote XML manifest.");
+			}
+		}
 
 		String localManifestLocation = getConfiguration().getOptionValue("local-manifest", null);
 		if (localManifestLocation == null || remoteManifestLocation.equals(""))
