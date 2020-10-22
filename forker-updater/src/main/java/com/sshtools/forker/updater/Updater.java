@@ -326,7 +326,7 @@ public class Updater extends ForkerWrapper {
 				if (update(task)) {
 
 					if (!getConfiguration().getSwitch("run-on-install", false))
-						System.exit(0);
+						return null;
 					else
 						task.call();
 				}
