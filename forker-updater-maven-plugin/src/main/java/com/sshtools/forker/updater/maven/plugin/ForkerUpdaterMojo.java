@@ -208,7 +208,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 	@Parameter(defaultValue = "true", property = "includeForkerUpdaterRuntimeModules")
 	private boolean includeForkerUpdaterRuntimeModules = true;
 
-	@Parameter(defaultValue = "${project.version}-${timestamp}", property = "version")
+	@Parameter(defaultValue = "${project.version}-${timestamp}",  property = "appVersion")
 	private String version;
 
 	@Parameter(defaultValue = "true", property = "removeImageBeforeLink")
