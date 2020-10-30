@@ -662,9 +662,15 @@ public class Forker {
 			 */
 			String forkerClasspath = (daemonClasspath == null ? System.getProperty("java.class.path", "") : daemonClasspath);
 			String classpath = getForkerClasspath(forkerClasspath);
-			ForkerBuilder fb = new ForkerBuilder(javaExe, "-Xmx" + System.getProperty("forker.daemon.maxMemory", "8m"),
-					"-Djava.library.path=" + System.getProperty("java.library.path", ""), "-classpath", classpath,
-					"com.sshtools.forker.daemon.Forker");
+			ForkerBuilder fb = new ForkerBuilder();
+			fb.command().add(javaExe);
+			if(System.getProperty("forker.cookie.file") != null)
+				fb.command().add("-Dforker.cookie.file=" + System.getProperty("forker.cookie.file"));
+			fb.command().add("-Xmx" + System.getProperty("forker.daemon.maxMemory", "8m"));
+			fb.command().add("-Djava.library.path=" + System.getProperty("java.library.path", ""));
+			fb.command().add("-classpath");
+			fb.command().add(classpath);
+			fb.command().add("com.sshtools.forker.daemon.Forker");
 			if (effectiveUser != null) {
 				fb.effectiveUser(effectiveUser);
 			}
