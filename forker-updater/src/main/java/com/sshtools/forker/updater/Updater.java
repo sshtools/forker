@@ -420,13 +420,15 @@ public class Updater extends ForkerWrapper {
 		}
 		long readTotal = 0;
 		Path tempBootstrapPath = null;
+		boolean upgradeError = false;
 
 		for (Entry entry : updates) {
 			handler.startDownloadFile(entry);
+			Path manifestFolderPath = entry.resolve(session.localDir(), session.manifest().path());
 			Path path;
 			Path outPath = null;
 			if (entry.section() == Section.APP) {
-				path = entry.resolve(session.localDir(), session.manifest().path());
+				path = manifestFolderPath;
 				if (entry.isLink())
 					outPath = path;
 				else
@@ -445,20 +447,24 @@ public class Updater extends ForkerWrapper {
 					Path target = entry.target();
 					if (target == null)
 						throw new IOException("Found an entry that has no uri, and it is not a symbolic link.");
-
-					logger.log(Level.INFO, String.format("REMOVEME %s EXISTS = %s", outPath, Files.exists(outPath)));
-					if (Files.exists(outPath) || Files.isSymbolicLink(outPath)) {
-						logger.log(Level.INFO, String.format("Removing existing file %s", outPath));
+					
+					if(tempBootstrapPath != null) {
+						/* If we are in the temporary bootstrap, then we must test for the existence of 
+						 * the link cdc jdk
+						 */
 					}
+
 					Files.deleteIfExists(outPath);
 
 					logger.log(Level.INFO, String.format("Creating link file %s targeting  %s from %s in %s section.",
 							outPath, target, entry.path(), entry.section()));
 					Files.createSymbolicLink(checkFilesDir(outPath), target);
+
 				} else {
 					URL url = AppManifest.concat(session.manifest().baseUri(), entry.uri()).toURL();
 					logger.log(Level.INFO, String.format("Updating file %s from %s in %s section.", entry.path(), url,
 							entry.section()));
+					
 					try (InputStream in = url.openStream()) {
 						try (OutputStream out = Files.newOutputStream(checkFilesDir(outPath))) {
 							byte[] buf = new byte[65536];
@@ -498,6 +504,10 @@ public class Updater extends ForkerWrapper {
 			} finally {
 				handler.doneDownloadFile(entry);
 			}
+		}
+		
+		if(upgradeError) {
+			throw new IOException("This upgrade must be manually restarted to continue.");
 		}
 
 		/*

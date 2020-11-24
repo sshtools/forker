@@ -561,7 +561,11 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 				out.println("            exit 2");
 				out.println("        fi");
 				out.println("        if ! find . -type f -exec mv -f \\{} ../\\{} \\; ; then");
-				out.println("            echo \"$0: Failed to copy update files.\" >&2");
+				out.println("            echo \"$0: Failed to move update files.\" >&2");
+				out.println("            exit 2");
+				out.println("        fi");
+				out.println("        if ! find . -type l -exec mv -f \\{} ../\\{} \\; ; then");
+				out.println("            echo \"$0: Failed to move link files.\" >&2");
 				out.println("            exit 2");
 				out.println("        fi");
 				out.println("        cd ..");
@@ -883,7 +887,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 			}
 			while (enumOfJar.hasMoreElements()) {
 				JarEntry entry = enumOfJar.nextElement();
-				if (entry.getName().equals("module-info.class")) {
+				if (entry.getName().equals("module-info.class") || entry.getName().matches("META-INF/versions/.*/module-info.class")) {
 					return true;
 				}
 			}
