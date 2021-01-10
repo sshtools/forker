@@ -20,8 +20,8 @@ import java.nio.ByteBuffer;
 import org.apache.commons.io.IOUtils;
 
 import com.sshtools.forker.client.DefaultNonBlockingProcessListener;
+import com.sshtools.forker.client.NonBlockingProcess;
 import com.sshtools.forker.client.ShellBuilder;
-import com.sshtools.forker.client.impl.nonblocking.NonBlockingProcess;
 import com.sshtools.forker.common.IO;
 import com.sshtools.forker.common.OS;
 

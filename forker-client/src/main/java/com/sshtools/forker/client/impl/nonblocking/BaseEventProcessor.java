@@ -21,6 +21,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.sshtools.forker.client.IEventProcessor;
+import com.sshtools.forker.client.NonBlockingProcessFactory;
 import com.sshtools.forker.client.impl.jna.posix.LibC;
 import com.sun.jna.ptr.IntByReference;
 

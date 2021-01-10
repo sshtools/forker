@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
+import com.sshtools.forker.client.NonBlockingProcess;
+import com.sshtools.forker.client.NonBlockingProcessFactory;
 import com.sshtools.forker.client.impl.jna.posix.LibC;
 import com.sshtools.forker.client.impl.jna.posix.LibEpoll;
 import com.sun.jna.Native;

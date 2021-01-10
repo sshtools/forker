@@ -5,7 +5,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
-import com.sshtools.forker.client.impl.nonblocking.NonBlockingProcess;
 import com.sshtools.forker.common.IO;
 
 /**

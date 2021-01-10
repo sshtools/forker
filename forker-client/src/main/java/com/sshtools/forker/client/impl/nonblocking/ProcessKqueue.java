@@ -27,6 +27,8 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
+import com.sshtools.forker.client.NonBlockingProcess;
+import com.sshtools.forker.client.NonBlockingProcessFactory;
 import com.sshtools.forker.client.impl.jna.osx.LibKevent;
 import com.sshtools.forker.client.impl.jna.osx.LibKevent.Kevent;
 import com.sshtools.forker.client.impl.jna.osx.LibKevent.TimeSpec;

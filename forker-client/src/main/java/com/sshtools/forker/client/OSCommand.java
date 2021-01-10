@@ -15,8 +15,10 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -535,8 +537,29 @@ public class OSCommand {
 	 * @throws IOException on error
 	 */
 	public static boolean elevateApp(String[] args) throws IOException {
+		return elevateApp(args, (Set<String>)null);
+	}
+
+	/**
+	 * Run this Java application as an administrator if not already any
+	 * administrator.
+	 * <p>
+	 * This is achieved by trying to reconstruct the java command that was used to
+	 * launch this application from system properties and arguments.
+	 * <p>
+	 * NOTE: MUST must called from the callers main() method (as
+	 * the stack is examined to determine the main class to load). If you are
+	 * calling from elsewhere, use the alternative version of the method that takes
+	 * a main classname argument.
+	 * 
+	 * @param args application arguments
+	 * @param systemPropertiesToPassOn which system properties to pass on
+	 * @return elevated app launched
+	 * @throws IOException on error
+	 */
+	public static boolean elevateApp(String[] args, Set<String> systemPropertiesToPassOn) throws IOException {
 		StackTraceElement[] els = Thread.currentThread().getStackTrace();
-		return elevateApp(args, els[2].getClassName());
+		return elevateApp(args, els[2].getClassName(), systemPropertiesToPassOn);
 	}
 
 	/**
@@ -556,6 +579,27 @@ public class OSCommand {
 	 * @throws IOException on error
 	 */
 	public static boolean elevateApp(String[] args, String mainClassName) throws IOException {
+		return elevateApp(args, mainClassName, null);
+	}
+
+	/**
+	 * Run this Java application as an administrator if not already any
+	 * administrator.
+	 * <p>
+	 * This is achieved by trying to reconstruct the java command that was used to
+	 * launch this application from system properties and arguments.
+	 * <p>
+	 * This should be ideally called at the very start of the application. If
+	 * <code>true</code> is returned then the caller should immediately
+	 * System.exit() as an elevated copy should be starting.
+	 * 
+	 * @param args          application arguments
+	 * @param mainClassName main class name
+	 * @param systemPropertiesToPassOn which system properties to pass on
+	 * @return elevated app launched
+	 * @throws IOException on error
+	 */
+	public static boolean elevateApp(String[] args, String mainClassName, Set<String> systemPropertiesToPassOn) throws IOException {
 		if (OS.isAdministrator())
 			return false;
 		else {
@@ -568,7 +612,12 @@ public class OSCommand {
 					vargs.add("-classpath");
 					vargs.add(cp);
 				}
-				for (String s : Arrays.asList("java.library.path", "jna.library.path")) {
+				Set<String> p = new LinkedHashSet<>();
+				if(systemPropertiesToPassOn != null) {
+					systemPropertiesToPassOn.addAll(systemPropertiesToPassOn);
+				}
+				p.addAll(Arrays.asList("java.library.path", "jna.library.path", "java.security.policy"));
+				for (String s : p) {
 					if (System.getProperty(s) != null)
 						vargs.add("-D" + s + "=" + System.getProperty(s));
 				}

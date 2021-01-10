@@ -6,7 +6,7 @@ import org.apache.commons.lang3.SystemUtils;
 
 import com.sshtools.forker.client.DefaultNonBlockingProcessListener;
 import com.sshtools.forker.client.ForkerBuilder;
-import com.sshtools.forker.client.impl.nonblocking.NonBlockingProcess;
+import com.sshtools.forker.client.NonBlockingProcess;
 import com.sshtools.forker.common.IO;
 
 /**

@@ -208,11 +208,14 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 	@Parameter(defaultValue = "true", property = "includeForkerUpdaterRuntimeModules")
 	private boolean includeForkerUpdaterRuntimeModules = true;
 
-	@Parameter(defaultValue = "${project.version}-${timestamp}",  property = "appVersion")
+	@Parameter(defaultValue = "${project.version}-${timestamp}", property = "appVersion")
 	private String version;
 
 	@Parameter(defaultValue = "true", property = "removeImageBeforeLink")
 	private boolean removeImageBeforeLink = true;
+
+	@Parameter(defaultValue = "true", property = "useArgfile")
+	private boolean useArgfile = true;
 
 	/**
 	 * The maven project.
@@ -282,9 +285,9 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 			allBootstrapOnlyModules.addAll(bootstrapOnlyModules);
 
 		try {
-			
-			if(link) {
-				if(removeImageBeforeLink) {
+
+			if (link) {
+				if (removeImageBeforeLink) {
 					getLog().info("Clearing jlink directory '" + imageDirectory + "'");
 					Util.deleteRecursiveIfExists(imageDirectory);
 				}
@@ -447,17 +450,23 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 			}
 
 			Path scriptPath = checkDir(imagePath.resolve("bin")).resolve(launcherScriptName);
-			writeScript(imagePath, classPathObj, modulePathObj, scriptPath);
+			Path argsPath = useArgfile ? checkDir(imagePath).resolve(launcherScriptName + ".args") : null;
+			writeScript(imagePath, classPathObj, modulePathObj, scriptPath, argsPath);
 			if (updateableBootstrap) {
-				writeScript(imagePath, classPathObj, modulePathObj,
-						checkDir(repositoryPath.resolve("bin")).resolve(launcherScriptName));
-			}
-
-			if (updateableBootstrap) {
+				argsPath = useArgfile ? checkDir(repositoryPath).resolve(launcherScriptName + ".args") : null;
+				scriptPath = checkDir(repositoryPath.resolve("bin")).resolve(launcherScriptName);
+				writeScript(imagePath, classPathObj, modulePathObj, scriptPath, argsPath);
 				manifest.entries()
-						.add(new Entry(scriptPath).section(Section.BOOTSTRAP).path(imagePath.relativize(scriptPath))
-								.uri(new URI(resolveUrl(remoteBase, imagePath.relativize(scriptPath).toString())))
+						.add(new Entry(scriptPath).section(Section.BOOTSTRAP)
+								.path(repositoryPath.relativize(scriptPath))
+								.uri(new URI(resolveUrl(remoteBase, repositoryPath.relativize(scriptPath).toString())))
 								.type(Type.OTHER));
+				if (useArgfile) {
+					manifest.entries().add(new Entry(argsPath).section(Section.BOOTSTRAP)
+							.path(repositoryPath.relativize(argsPath))
+							.uri(new URI(resolveUrl(remoteBase, repositoryPath.relativize(argsPath).toString())))
+							.type(Type.OTHER));
+				}
 			}
 
 			try (Writer out = Files.newBufferedWriter(checkDir(imagePath).resolve("manifest.xml"))) {
@@ -473,7 +482,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		}
 	}
 
-	private void writeScript(Path imagePath, Path classPathObj, Path modulePathObj, Path scriptPath)
+	private void writeScript(Path imagePath, Path classPathObj, Path modulePathObj, Path scriptPath, Path argsPath)
 			throws IOException {
 		boolean useForkerModules = false;
 		try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(scriptPath), true)) {
@@ -482,8 +491,8 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 			out.println("if [ -z \"${realpath}\" ] ; then realpath=\"$0\" ; fi");
 			out.println("cd $(dirname ${realpath})/..");
 
-			StringBuilder vmopts = new StringBuilder();
 			List<String> modulePaths = new ArrayList<>();
+			List<String> vmopts = new ArrayList<>();
 			Path dir = modulePathObj;
 			if (Files.exists(dir)) {
 				for (File f : dir.toFile().listFiles()) {
@@ -501,25 +510,34 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 				}
 			}
 			if (!modulePaths.isEmpty()) {
-				vmopts.append("-p ");
-				vmopts.append(String.join(":", modulePaths));
-				vmopts.append(" ");
+				vmopts.add("-p");
+				vmopts.add(String.join(":", modulePaths));
 			}
 			if (!classPaths.isEmpty()) {
-				vmopts.append("-cp ");
-				vmopts.append(String.join(":", classPaths));
-				vmopts.append(" ");
+				vmopts.add("-cp");
+				vmopts.add(String.join(":", classPaths));
 			}
 
-			if (systemModules != null && systemModules.size() > 0)
-				vmopts.append(" --add-modules " + String.join(",", systemModules));
-			vmopts.append(" -Dforker.remoteManifest=" + remoteBase);
+			if (systemModules != null && systemModules.size() > 0) {
+				vmopts.add("--add-modules");
+				vmopts.add(String.join(",", systemModules));
+			}
+			vmopts.add("-Dforker.remoteManifest=" + remoteBase);
 			if (vmArgs != null) {
 				for (String vmArg : vmArgs) {
-					vmopts.append(" " + vmArg);
+					vmopts.add(vmArg);
 				}
 			}
-			out.println(String.format("VM_OPTIONS=\"%s\"", vmopts.toString()));
+
+			if (argsPath != null) {
+				try (PrintWriter pw = new PrintWriter(Files.newBufferedWriter(argsPath))) {
+					for (String vmopt : vmopts) {
+						pw.println(vmopt);
+					}
+				}
+				out.println(String.format("VM_OPTIONS=\"@%s\"", argsPath.getFileName().toString()));
+			} else
+				out.println(String.format("VM_OPTIONS=\"%s\"", String.join(" ", vmopts)));
 
 			StringBuilder updaterArgs = new StringBuilder();
 			updaterArgs.append("--configuration ");
@@ -530,11 +548,10 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 					updaterArgs.append(escapeSpaces(arg));
 				}
 			}
-			
-			if(link) {
+
+			if (link) {
 				out.println("JAVA_EXE=bin/java");
-			}
-			else {
+			} else {
 				out.println(String.format("if [ -n \"${JAVA_HOME}\" ] ; then "));
 				out.println("    JAVA_EXE=${JAVA_HOME}/bin/java");
 				out.println("else");
@@ -662,8 +679,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 				manifest.entries().add(new Entry(file.toPath()).section(Section.APP).path(Paths.get(getFileName(a)))
 						.uri(new URI(repositoryUrl(resolutionResult))).type(Type.CLASSPATH));
 				if (!Files.isSymbolicLink(file.toPath()))
-					copy(file.toPath(), repositoryDirectory.toPath().resolve(finalClassPath),
-							manifest.timestamp());
+					copy(file.toPath(), repositoryDirectory.toPath().resolve(finalClassPath), manifest.timestamp());
 			}
 		} else
 			manifest.entries().add(new Entry(file.toPath()).section(Section.APP).path(Paths.get(getFileName(a)))
@@ -680,8 +696,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		if (repository) {
 			if (remotesFromOriginalSource) {
 				if (!isRemote(remoteUrl)) {
-					copy(file.toPath(), repositoryDirectory.toPath().resolve(finalModulePath),
-							manifest.timestamp());
+					copy(file.toPath(), repositoryDirectory.toPath().resolve(finalModulePath), manifest.timestamp());
 				}
 				if (remoteUrl == null)
 					remoteUrl = repositoryUrl(resolutionResult);
@@ -887,7 +902,8 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 			}
 			while (enumOfJar.hasMoreElements()) {
 				JarEntry entry = enumOfJar.nextElement();
-				if (entry.getName().equals("module-info.class") || entry.getName().matches("META-INF/versions/.*/module-info.class")) {
+				if (entry.getName().equals("module-info.class")
+						|| entry.getName().matches("META-INF/versions/.*/module-info.class")) {
 					return true;
 				}
 			}

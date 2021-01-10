@@ -9,7 +9,6 @@ import com.sshtools.forker.client.impl.ForkerDaemonProcessFactory;
 import com.sshtools.forker.client.impl.LocalProcessFactory;
 import com.sshtools.forker.client.impl.POpenProcessFactory;
 import com.sshtools.forker.client.impl.SystemProcessFactory;
-import com.sshtools.forker.client.impl.nonblocking.NonBlockingProcessFactory;
 
 /**
  * Holds the list of {@link ForkerProcessFactory} instances that a

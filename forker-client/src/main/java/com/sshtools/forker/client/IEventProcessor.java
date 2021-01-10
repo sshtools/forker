@@ -13,9 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.sshtools.forker.client.impl.nonblocking;
+package com.sshtools.forker.client;
 
 import java.util.concurrent.CyclicBarrier;
+
+import com.sshtools.forker.client.impl.nonblocking.NonBlockingBasePosixProcess;
 
 /**
  * This class is internal.

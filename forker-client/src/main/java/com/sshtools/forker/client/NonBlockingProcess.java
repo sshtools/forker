@@ -1,4 +1,4 @@
-package com.sshtools.forker.client.impl.nonblocking;
+package com.sshtools.forker.client;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
@@ -11,11 +11,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import com.sshtools.forker.client.AbstractOSProcess;
-import com.sshtools.forker.client.ForkerBuilder;
-import com.sshtools.forker.client.ForkerProcess;
-import com.sshtools.forker.client.NonBlockingProcessListener;
 
 /**
  * Non-blocking implementation of {@link AbstractOSProcess}. Uses JNA.

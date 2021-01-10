@@ -1,4 +1,4 @@
-package com.sshtools.forker.client.impl.nonblocking;
+package com.sshtools.forker.client;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -7,11 +7,9 @@ import java.util.List;
 
 import org.apache.commons.lang3.SystemUtils;
 
-import com.sshtools.forker.client.ForkerBuilder;
-import com.sshtools.forker.client.ForkerProcess;
-import com.sshtools.forker.client.ForkerProcessFactory;
-import com.sshtools.forker.client.ForkerProcessListener;
-import com.sshtools.forker.client.NonBlockingProcessListener;
+import com.sshtools.forker.client.impl.nonblocking.NonBlockingLinuxProcess;
+import com.sshtools.forker.client.impl.nonblocking.NonBlockingOsxProcess;
+import com.sshtools.forker.client.impl.nonblocking.NonBlockingWindowsProcess;
 import com.sshtools.forker.common.IO;
 
 /**

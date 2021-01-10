@@ -1,11 +1,12 @@
 package com.sshtools.forker.wrapper;
- 
+
 import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileOutputStream;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -291,8 +292,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		 */
 		FileLock lock = null;
 		FileChannel lockChannel = null;
-		File lockFile = new File(new File(System.getProperty("java.io.tmpdir")),
-				"forker-wrapper-" + app.getClassname() + ".lock");
+		File lockFile = getLockFile();
 		addShutdownHook(useDaemon);
 		try {
 			if (isSingleInstance()) {
@@ -397,6 +397,15 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
+	protected File getLockFile() {
+		if (isSingleInstancePerUser())
+			return new File(new File(System.getProperty("java.io.tmpdir")),
+					"forker-wrapper-" + app.getClassname() + "-" + System.getProperty("user.name") + ".lock");
+		else
+			return new File(new File(System.getProperty("java.io.tmpdir")),
+					"forker-wrapper-" + app.getClassname() + ".lock");
+	}
+
 	private Object executeJmxCommandInApp(String method, Object... args)
 			throws MalformedObjectNameException, AttachNotSupportedException, IOException, MalformedURLException,
 			InstanceNotFoundException, MBeanException, ReflectionException {
@@ -487,6 +496,10 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 	public ArgMode getArgMode() {
 		return ArgMode.valueOf(configuration.getOptionValue("argmode", ArgMode.DEFAULT.name()));
+	}
+
+	public ArgfileMode getArgfileMode() {
+		return ArgfileMode.valueOf(configuration.getOptionValue("argfilemode", ArgfileMode.COMPACT.name()));
 	}
 
 	public static String getAppName() {
@@ -805,6 +818,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		options.addOption(new Option("S", "single-instance", false,
 				"Only allow one instance of the wrapped application to be active at any one time. "
 						+ "This is achieved through locked files."));
+		options.addOption(new Option(null, "single-instance-per-user", false,
+				"When single-instance is installed, by default it means a single instance on the entire local system. Adding "
+						+ "this flag allows a single instance per username."));
 		options.addOption(new Option("s", "setenv", false,
 				"Set an environment on the wrapped process. This is in the format NAME=VALUE. The option may be "
 						+ "specified multiple times to specify multiple environment variables."));
@@ -841,6 +857,14 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 						+ "path with '+' to add it to the end of the existing classpath, or '-' to add it to the start. Use of a jvmarg that starts with '-Xbootclasspath' will "
 						+ "override this setting."));
 		options.addOption(new Option("u", "run-as", true, "The user to run the application as."));
+		options.addOption(new Option(null, "argfile", true,
+				"By default, the wrapper will try and create the argfile in the working directory. If this is "
+						+ "not possible, the system temporary directory is used. This option forces a particular file path to be used."));
+		options.addOption(new Option(null, "argfilemode", true,
+				"Specifies how arguments will be provided to the java command. Possible values are 'COMPACT', "
+						+ "(all arguments except for the classname and it's arguments are placed in an @argfile), "
+						+ "'ARGFILE' (all arguments including classname and it's arguments in place in an @argfile), 'EXPANDED' ("
+						+ "an @argfile is not used, all argumentes are part of the command). "));
 		options.addOption(new Option("a", "administrator", false, "Run as administrator."));
 		options.addOption(new Option("p", "pidfile", true, "A filename to write the process ID to. May be used "
 				+ "by external application to obtain the PID to send signals to."));
@@ -1553,7 +1577,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	}
 
 	private boolean isSingleInstance() {
-		return configuration.getSwitch("single-instance", false);
+		return configuration.getSwitch("single-instance", false) || isSingleInstancePerUser();
+	}
+
+	private boolean isSingleInstancePerUser() {
+		return configuration.getSwitch("single-instance-per-user", false);
 	}
 
 	protected Boolean onMaybeRestart(int retval, int lastRetVal) throws Exception {
@@ -1701,22 +1729,36 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		File cwd = resolveCwd();
 		boolean isUsingWrappedOnClasspath = false;
 		boolean isUsingWrappedOnModulepath = false;
+
+		/*
+		 * ArgfileMode determines which arguments are placed in @argfile, and which are
+		 * passed directly (tail args).
+		 * 
+		 * Native launching always is effectively EXPANDED
+		 */
+		ArgfileMode argfileMode = getArgfileMode();
+		logger.log(Level.INFO, String.format("Argfile mode is %s", argfileMode));
+		List<String> tail = new ArrayList<>();
+		List<String> head = new ArrayList<>();
+		List<String> command = new ArrayList<>();
+
 		if (!nativeMain) {
+
 			/* This is launching a Java class, so construct the classpath */
-			appBuilder.command().add(javaExe);
+			head.add(javaExe);
 			logger.log(Level.INFO, "Building classpath");
 			String classpath = buildPath(cwd, isNoForkerClasspath() ? null : forkerClasspath, wrapperClasspath, true);
 			if (classpath != null && !classpath.equals("")) {
-				appBuilder.command().add("-classpath");
-				appBuilder.command().add(classpath);
+				command.add("-classpath");
+				command.add(classpath);
 				isUsingWrappedOnClasspath = isUsingWrapped(classpath);
 			}
 
 			logger.log(Level.INFO, "Building modulepath");
 			modulepath = buildPath(cwd, isNoForkerClasspath() ? null : forkerModulepath, wrapperModulePath, true);
 			if (modulepath != null && !modulepath.equals("")) {
-				appBuilder.command().add("-p");
-				appBuilder.command().add(modulepath);
+				command.add("-p");
+				command.add(modulepath);
 				isUsingWrappedOnModulepath = isUsingWrapped(modulepath);
 			}
 
@@ -1724,7 +1766,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			for (String val : configuration.getOptionValues("jvmarg")) {
 				if (val.startsWith("-Xbootclasspath"))
 					hasBootCp = true;
-				appBuilder.command().add(val);
+				command.add(val);
 			}
 			if (!hasBootCp) {
 				String bootcp = buildPath(cwd, null, bootClasspath, false);
@@ -1734,17 +1776,20 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					 * for it
 					 */
 					if (bootClasspath != null && bootClasspath.startsWith("+"))
-						appBuilder.command().add("-Xbootclasspath/a:" + bootcp);
+						command.add("-Xbootclasspath/a:" + bootcp);
 					else if (bootClasspath != null && bootClasspath.startsWith("-"))
-						appBuilder.command().add("-Xbootclasspath/p:" + bootcp);
+						command.add("-Xbootclasspath/p:" + bootcp);
 					else
-						appBuilder.command().add("-Xbootclasspath:" + bootcp);
+						command.add("-Xbootclasspath:" + bootcp);
 				}
 			}
 
 			if (StringUtils.isBlank(app.getClassname()))
 				throw new IllegalArgumentException(
 						"Must provide a 'main' property to specify the class that contains the main() method that is your applications entry point.");
+		} else {
+			argfileMode = ArgfileMode.EXPANDED;
+			tail = command;
 		}
 
 		/*
@@ -1757,9 +1802,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				appBuilder.environment().put("FORKER_INFO_ATTEMPTS", String.valueOf(times));
 			} else {
 				if (lastRetVal > -1) {
-					appBuilder.command().add(String.format("-Dforker.info.lastExitCode=%d", lastRetVal));
+					command.add(String.format("-Dforker.info.lastExitCode=%d", lastRetVal));
 				}
-				appBuilder.command().add(String.format("-Dforker.info.attempts=%d", times));
+				command.add(String.format("-Dforker.info.attempts=%d", times));
 			}
 		}
 
@@ -1771,53 +1816,83 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		if (useDaemon) {
 			if (isUsingWrappedOnModulepath) {
 				if (modulepath != null && isUsingClient(modulepath)) {
-					appBuilder.command().add("--add-modules");
-					appBuilder.command().add(com.sshtools.forker.client.Forker.class.getPackageName());
+					command.add("--add-modules");
+					command.add(com.sshtools.forker.client.Forker.class.getPackageName());
 				}
-				appBuilder.command().add(WRAPPED_MODULE_NAME + "/" + WRAPPED_CLASS_NAME);
-				appBuilder.command().add(com.sshtools.forker.client.Forker.class.getName());
+				command.add(WRAPPED_MODULE_NAME + "/" + WRAPPED_CLASS_NAME);
+				command.add(com.sshtools.forker.client.Forker.class.getName());
 
 			} else if (isUsingWrappedOnClasspath) {
-				appBuilder.command().add(WRAPPED_CLASS_NAME);
-				appBuilder.command().add(com.sshtools.forker.client.Forker.class.getName());
+				command.add(WRAPPED_CLASS_NAME);
+				command.add(com.sshtools.forker.client.Forker.class.getName());
 			} else {
 				if (modulepath != null && isUsingClient(modulepath)) {
-					appBuilder.command().add("-m");
-					appBuilder.command().add(com.sshtools.forker.client.Forker.class.getPackageName() + "/"
+					command.add("-m");
+					command.add(com.sshtools.forker.client.Forker.class.getPackageName() + "/"
 							+ com.sshtools.forker.client.Forker.class.getName());
 				} else
-					appBuilder.command().add(com.sshtools.forker.client.Forker.class.getName());
+					command.add(com.sshtools.forker.client.Forker.class.getName());
 			}
-			appBuilder.command().add(String.valueOf(OS.isAdministrator()));
-			appBuilder.command().add(app.getClassname());
+			command.add(String.valueOf(OS.isAdministrator()));
+			tail.add(app.getClassname());
 			if (app.hasArguments())
-				appBuilder.command().addAll(Arrays.asList(app.getArguments()));
+				tail.addAll(Arrays.asList(app.getArguments()));
 		} else {
 			/*
 			 * Otherwise we are just running the application directly or via Wrapped
 			 */
 			if (modulepath != null && StringUtils.isNotBlank(app.getModule())) {
-				appBuilder.command().add("--add-modules");
-				appBuilder.command().add(app.getModule());
+				command.add("--add-modules");
+				command.add(app.getModule());
 			}
 
 			if (isUsingWrappedOnModulepath) {
-				appBuilder.command().add("-m");
-				appBuilder.command().add(WRAPPED_MODULE_NAME + "/" + WRAPPED_CLASS_NAME);
-				appBuilder.command().add(app.getClassname());
+				command.add("-m");
+				command.add(WRAPPED_MODULE_NAME + "/" + WRAPPED_CLASS_NAME);
+				tail.add(app.getClassname());
 			} else if (isUsingWrappedOnClasspath) {
-				appBuilder.command().add(WRAPPED_CLASS_NAME);
-				appBuilder.command().add(app.getClassname());
+				command.add(WRAPPED_CLASS_NAME);
+				tail.add(app.getClassname());
 			} else {
 				if (StringUtils.isNotBlank(app.getModule())) {
-					appBuilder.command().add("-m");
-					appBuilder.command().add(app.fullClassAndModule());
+					command.add("-m");
+					tail.add(app.fullClassAndModule());
 				} else
-					appBuilder.command().add(app.getClassname());
+					tail.add(app.getClassname());
 			}
 			if (app.hasArguments())
-				appBuilder.command().addAll(Arrays.asList(app.getArguments()));
+				tail.addAll(Arrays.asList(app.getArguments()));
 		}
+
+		appBuilder.command().addAll(head);
+		if (argfileMode.equals(ArgfileMode.ARGFILE) || argfileMode.equals(ArgfileMode.COMPACT)) {
+			String argfilePath = configuration.getOptionValue("argfile", "");
+			if (argfilePath.equals("")) {
+				try (PrintWriter w = new PrintWriter(new FileWriter("app.args"), true)) {
+					for (String arg : command) {
+						w.println(arg);
+					}
+					argfilePath = "app.args";
+				} catch (IOException ioe) {
+					argfilePath = File.createTempFile("app", "args").getAbsolutePath();
+					try (PrintWriter w = new PrintWriter(new FileWriter(argfilePath), true)) {
+						for (String arg : command) {
+							w.println(arg);
+						}
+					}
+				}
+			} else {
+				try (PrintWriter w = new PrintWriter(new FileWriter(argfilePath), true)) {
+					for (String arg : command) {
+						w.println(arg);
+					}
+				}
+			}
+			appBuilder.command().add("@" + argfilePath);
+		} else {
+			appBuilder.command().addAll(command);
+		}
+		appBuilder.command().addAll(tail);
 
 		/* Process priority */
 		String priStr = configuration.getOptionValue("priority", null);

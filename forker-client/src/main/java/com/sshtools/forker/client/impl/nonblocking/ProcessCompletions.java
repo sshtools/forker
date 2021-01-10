@@ -27,6 +27,9 @@ import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.sshtools.forker.client.IEventProcessor;
+import com.sshtools.forker.client.NonBlockingProcess;
+import com.sshtools.forker.client.NonBlockingProcessFactory;
 import com.sshtools.forker.client.impl.jna.win32.Kernel32;
 import com.sshtools.forker.client.impl.nonblocking.NonBlockingWindowsProcess.PipeBundle;
 import com.sun.jna.Native;
