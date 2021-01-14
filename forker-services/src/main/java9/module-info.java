@@ -7,7 +7,7 @@ module com.sshtools.forker.services {
 	requires java.logging;
 	requires transitive java.desktop;
 	requires transitive org.freedesktop.dbus;
-	requires transitive java.systemd;
+	requires transitive de.thjom.java.systemd;
 	exports com.sshtools.forker.services;
 
 }
