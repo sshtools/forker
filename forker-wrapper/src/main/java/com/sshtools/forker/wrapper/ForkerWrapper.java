@@ -1813,27 +1813,28 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		 * classpath and execute the application via that, passing the forker daemon
 		 * cookie via stdin. *
 		 */
+		List<String> headArgs = new ArrayList<>();
 		if (useDaemon) {
 			if (isUsingWrappedOnModulepath) {
 				if (modulepath != null && isUsingClient(modulepath)) {
 					command.add("--add-modules");
 					command.add(com.sshtools.forker.client.Forker.class.getPackageName());
 				}
-				command.add(WRAPPED_MODULE_NAME + "/" + WRAPPED_CLASS_NAME);
-				command.add(com.sshtools.forker.client.Forker.class.getName());
+				headArgs.add(WRAPPED_MODULE_NAME + "/" + WRAPPED_CLASS_NAME);
+				headArgs.add(com.sshtools.forker.client.Forker.class.getName());
 
 			} else if (isUsingWrappedOnClasspath) {
-				command.add(WRAPPED_CLASS_NAME);
-				command.add(com.sshtools.forker.client.Forker.class.getName());
+				headArgs.add(WRAPPED_CLASS_NAME);
+				headArgs.add(com.sshtools.forker.client.Forker.class.getName());
 			} else {
 				if (modulepath != null && isUsingClient(modulepath)) {
-					command.add("-m");
-					command.add(com.sshtools.forker.client.Forker.class.getPackageName() + "/"
+					headArgs.add("-m");
+					headArgs.add(com.sshtools.forker.client.Forker.class.getPackageName() + "/"
 							+ com.sshtools.forker.client.Forker.class.getName());
 				} else
-					command.add(com.sshtools.forker.client.Forker.class.getName());
+					headArgs.add(com.sshtools.forker.client.Forker.class.getName());
 			}
-			command.add(String.valueOf(OS.isAdministrator()));
+			headArgs.add(String.valueOf(OS.isAdministrator()));
 			tail.add(app.getClassname());
 			if (app.hasArguments())
 				tail.addAll(Arrays.asList(app.getArguments()));
@@ -1847,15 +1848,15 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			}
 
 			if (isUsingWrappedOnModulepath) {
-				command.add("-m");
-				command.add(WRAPPED_MODULE_NAME + "/" + WRAPPED_CLASS_NAME);
+				headArgs.add("-m");
+				headArgs.add(WRAPPED_MODULE_NAME + "/" + WRAPPED_CLASS_NAME);
 				tail.add(app.getClassname());
 			} else if (isUsingWrappedOnClasspath) {
-				command.add(WRAPPED_CLASS_NAME);
+				headArgs.add(WRAPPED_CLASS_NAME);
 				tail.add(app.getClassname());
 			} else {
 				if (StringUtils.isNotBlank(app.getModule())) {
-					command.add("-m");
+					headArgs.add("-m");
 					tail.add(app.fullClassAndModule());
 				} else
 					tail.add(app.getClassname());
@@ -1892,6 +1893,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		} else {
 			appBuilder.command().addAll(command);
 		}
+		appBuilder.command().addAll(headArgs);
 		appBuilder.command().addAll(tail);
 
 		/* Process priority */
