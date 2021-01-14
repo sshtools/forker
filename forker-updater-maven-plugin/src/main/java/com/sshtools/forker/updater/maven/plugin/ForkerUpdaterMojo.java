@@ -81,7 +81,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 	/**
 	 * Location of the classpath jars.
 	 */
-	@Parameter(defaultValue = "app/business", property = "apppath", required = true)
+	@Parameter(defaultValue = "app/business", property = "appath", required = true)
 	private String appPath;
 
 	/**
