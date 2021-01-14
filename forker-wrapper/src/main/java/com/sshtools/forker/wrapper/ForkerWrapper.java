@@ -1868,7 +1868,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		if (argfileMode.equals(ArgfileMode.ARGFILE) || argfileMode.equals(ArgfileMode.COMPACT)) {
 			String argfilePath = configuration.getOptionValue("argfile", "");
 			if (argfilePath.equals("")) {
-				try (PrintWriter w = new PrintWriter(new FileWriter("app.args"), true)) {
+				try (PrintWriter w = new PrintWriter(new FileWriter(new File(cwd, "app.args")), true)) {
 					for (String arg : command) {
 						w.println(arg);
 					}
