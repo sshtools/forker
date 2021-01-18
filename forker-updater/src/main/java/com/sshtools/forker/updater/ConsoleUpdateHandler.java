@@ -1,8 +1,6 @@
 
 package com.sshtools.forker.updater;
 
-import com.sshtools.forker.updater.AppManifest.Entry;
-
 public class ConsoleUpdateHandler extends AbstractHandler implements UpdateHandler {
 
 	private UpdateSession context;

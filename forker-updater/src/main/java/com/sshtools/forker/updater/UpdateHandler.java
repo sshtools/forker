@@ -3,8 +3,6 @@ package com.sshtools.forker.updater;
 import java.net.URL;
 import java.util.concurrent.Callable;
 
-import com.sshtools.forker.updater.AppManifest.Entry;
-
 public interface UpdateHandler {
 
 	void init(UpdateSession updater);

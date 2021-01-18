@@ -58,9 +58,9 @@ import org.eclipse.aether.resolution.ArtifactResult;
 
 import com.sshtools.forker.common.Util;
 import com.sshtools.forker.updater.AppManifest;
-import com.sshtools.forker.updater.AppManifest.Entry;
 import com.sshtools.forker.updater.AppManifest.Section;
 import com.sshtools.forker.updater.AppManifest.Type;
+import com.sshtools.forker.updater.Entry;
 
 @Mojo(name = "updates", defaultPhase = LifecyclePhase.PACKAGE, requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME)
 public class ForkerUpdaterMojo extends AbstractMojo {

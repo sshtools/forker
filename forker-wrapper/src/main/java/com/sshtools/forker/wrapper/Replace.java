@@ -128,13 +128,6 @@ public class Replace {
 		m.appendTail(work);
 	}
 
-	public static String replaceSystemProperties(String value) {
-		Replace replace = new Replace();
-		replace.pattern("\\$\\{(.*?)\\}",
-				(p, m, r) -> System.getProperty(m.group().substring(2, m.group().length() - 1)));
-		return replace.replace(value);
-	}
-
 	public static String replaceProperties(String value, Map<String, String> props) {
 		Replace replace = new Replace();
 		replace.pattern("\\$\\{(.*?)\\}", (p, m, r) -> props.get(m.group().substring(2, m.group().length() - 1)));

@@ -75,6 +75,7 @@
 		<module>forker-client</module>
 		<module>forker-examples</module>
 		<module>forker-wrapper</module>
+        	<module>forker-wrapper-plugin-scripts</module>
 		<module>forker-wrapped</module>
 		<module>forker-pty</module>
 		<module>forker-services</module>

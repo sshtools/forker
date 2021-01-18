@@ -15,10 +15,8 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.Adler32;
@@ -33,7 +31,6 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
-import org.apache.commons.lang3.StringUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -45,6 +42,10 @@ import com.sshtools.forker.wrapper.Replace;
 import com.sshtools.forker.wrapper.Replace.Replacer;
 
 public class AppManifest {
+	
+	public enum ManifestVersion {
+		V1, V2
+	}
 
 	public static String APP_TAG = "app";
 	public static String APP_FILE_TAG = "appFile";
@@ -63,193 +64,6 @@ public class AppManifest {
 		APP, BOOTSTRAP, OTHER
 	}
 
-	public static class Entry {
-		private URI uri;
-		private Path path;
-		private long size;
-		private long checksum;
-		private Type type;
-		private Section section = Section.APP;
-		private Set<PosixFilePermission> permissions;
-		private boolean write;
-		private boolean execute;
-		private boolean read;
-		private Path target;
-
-		public Entry(Path file) throws IOException {
-			size = Files.size(file);
-			checksum = AppManifest.checksum(file);
-			read = Files.isReadable(file);
-			write = Files.isWritable(file);
-			execute = Files.isExecutable(file);
-			try {
-				permissions = Files.getPosixFilePermissions(path);
-			} catch (Exception e) {
-			}
-			if(Files.isSymbolicLink(file))
-				target = Files.readSymbolicLink(file); 
-		}
-		
-		Entry(Section section, Replace replace, Node file, AppManifest manifest)
-				throws IOException, URISyntaxException {
-			this.section = section;
-			path = Paths.get(getRequiredAttribute(replace, file, "path"));
-			String targetStr = getAttribute(replace, file, "target");
-			if(StringUtils.isNotBlank(targetStr)) {
-				target = Paths.get(targetStr);
-			}
-			else {
-				uri = new URI(getRequiredAttribute(replace, file, "uri"));
-				size = Long.parseLong(getRequiredAttribute(replace, file, "size"));
-				checksum = Long.parseLong(getRequiredAttribute(replace, file, "checksum"), 16);
-				write = !"false".equals(getAttribute(replace, file, "write"));
-				execute = !"false".equals(getAttribute(replace, file, "execute"));
-				read = !"false".equals(getAttribute(replace, file, "read"));
-				String permString = getAttribute(replace, file, "permissions");
-				if (permString != null) {
-					String[] perms = permString.split(",");
-					permissions = new LinkedHashSet<>();
-					for (String s : perms) {
-						try {
-							permissions.add(PosixFilePermission.valueOf(s));
-						} catch (Exception e) {
-						}
-					}
-				}
-			}
-			if ("true".equals(getAttribute(replace, file, "modulepath"))) {
-				type = Type.MODULEPATH;
-			} else if ("true".equals(getAttribute(replace, file, "classpath"))) {
-				type = Type.CLASSPATH;
-			} else {
-				type = Type.OTHER;
-			}
-		}
-		
-		public boolean isLink() {
-			return target != null;
-		}
-
-		public Path target() {
-			return target;
-		}
-
-		public Entry target(Path target) {
-			this.target = target;
-			return this;
-		}
-
-		public boolean write() {
-			return write;
-		}
-
-		public Entry write(boolean write) {
-			this.write = write;
-			return this;
-		}
-
-		public boolean execute() {
-			return execute;
-		}
-
-		public Entry execute(boolean execute) {
-			this.execute = execute;
-			return this;
-		}
-
-		public boolean read() {
-			return read;
-		}
-
-		public Entry read(boolean read) {
-			this.read = read;
-			return this;
-		}
-
-		public Set<PosixFilePermission> permissions() {
-			return permissions;
-		}
-
-		public Entry permissions(Set<PosixFilePermission> permissions) {
-			this.permissions = permissions;
-			return this;
-		}
-
-		public URI uri() {
-			return uri;
-		}
-
-		public Entry uri(URI uri) {
-			this.uri = uri;
-			return this;
-		}
-
-		public Section section() {
-			return section;
-		}
-
-		public Entry section(Section section) {
-			this.section = section;
-			return this;
-		}
-
-		public Path path() {
-			return path;
-		}
-
-		public Entry path(Path path) {
-			this.path = path;
-			return this;
-		}
-
-		public long size() {
-			return size;
-		}
-
-		public Entry size(long size) {
-			this.size = size;
-			return this;
-		}
-
-		public long checksum() {
-			return checksum;
-		}
-
-		public Entry checksum(long checksum) {
-			this.checksum = checksum;
-			return this;
-		}
-
-		public Type type() {
-			return type;
-		}
-
-		public Entry type(Type type) {
-			this.type = type;
-			return this;
-		}
-
-		public Path resolve(Path localDir) {
-			return resolve(localDir, null);
-		}
-
-		public Path resolve(Path localDir, Path basePath) {
-			if (path.isAbsolute())
-				return localDir.resolve(path.toString().substring(1));
-			else if (basePath == null)
-				return localDir.resolve(path);
-			else
-				return localDir.resolve(basePath).resolve(path.toString());
-		}
-
-		@Override
-		public String toString() {
-			return "Entry [uri=" + uri + ", path=" + path + ", size=" + size + ", checksum=" + checksum + ", type="
-					+ type + ", section=" + section + "]";
-		}
-
-	}
-
 	private Instant timestamp = Instant.now();
 	private URI baseUri;
 	private Map<String, String> properties = new HashMap<>();
@@ -257,6 +71,8 @@ public class AppManifest {
 	private List<Entry> entries = new ArrayList<>();
 	private String version;
 	private String id;
+	private Map<String, Launcher> launchers = new HashMap<>();
+	private ManifestVersion manifestVersion = ManifestVersion.V2;
 
 	public AppManifest() {
 	}
@@ -265,6 +81,10 @@ public class AppManifest {
 		try (Reader reader = Files.newBufferedReader(path)) {
 			load(reader);
 		}
+	}
+	
+	public ManifestVersion manfifestVersion() {
+		return manifestVersion;
 	}
 
 	public void load(InputStream in) throws IOException {
@@ -305,6 +125,16 @@ public class AppManifest {
 			timestamp = Instant.parse(getRequiredAttribute(replace, root, "timestamp"));
 			version = getAttribute(replace, root, "version");
 			id = getRequiredAttribute(replace, root, "id");
+			String manififestVerString = getAttribute(replace, root, "manifest");
+			if(manififestVerString != null && manififestVerString.length() > 0) {
+				try {
+					manifestVersion = ManifestVersion.valueOf("V_" + manififestVerString);
+				}
+				catch(Exception e) {
+					/* Assume default */
+					manifestVersion  = ManifestVersion.values()[ManifestVersion.values().length - 1];
+				}
+			}
 
 			/* Properties */
 			NodeList properties = document.getElementsByTagName(PROPERTIES_TAG);
@@ -368,14 +198,14 @@ public class AppManifest {
 		}
 	}
 
-	private static String getRequiredAttribute(Replace replace, Node item, String name) throws IOException {
+	static String getRequiredAttribute(Replace replace, Node item, String name) throws IOException {
 		String val = getAttribute(replace, item, name);
 		if (val == null)
 			throw new IOException(String.format("Attribute %s is required.", name));
 		return val;
 	}
 
-	private static String getAttribute(Replace replace, Node item, String name) {
+	static String getAttribute(Replace replace, Node item, String name) {
 		Node attr = item.getAttributes().getNamedItem(name);
 		return attr == null ? null : replace.replace(attr.getNodeValue());
 	}
@@ -473,6 +303,7 @@ public class AppManifest {
 			rootElement.setAttribute("id", id);
 			if (version != null && !version.equals(""))
 				rootElement.setAttribute("version", version);
+			rootElement.setAttribute("manifest", manifestVersion.name().substring(2));
 
 			Element baseElement = doc.createElement(BASE_TAG);
 			if (baseUri != null)
@@ -529,11 +360,11 @@ public class AppManifest {
 		if(e.target() != null)
 			fileElement.setAttribute("target", e.target().toString());
 		else {
-			fileElement.setAttribute("uri", baseUri.relativize(e.uri).toString());
+			fileElement.setAttribute("uri", baseUri.relativize(e.uri()).toString());
 			fileElement.setAttribute("size", String.valueOf(e.size()));
-			if (!e.read)
+			if (!e.read())
 				fileElement.setAttribute("read", "false");
-			fileElement.setAttribute("write", String.valueOf(e.write));
+			fileElement.setAttribute("write", String.valueOf(e.write()));
 			if (e.permissions() != null) {
 				StringBuilder b = new StringBuilder();
 				for (PosixFilePermission p : e.permissions()) {
@@ -543,7 +374,7 @@ public class AppManifest {
 				}
 				fileElement.setAttribute("permissions", b.toString());
 			}
-			fileElement.setAttribute("execute", String.valueOf(e.execute));
+			fileElement.setAttribute("execute", String.valueOf(e.execute()));
 			fileElement.setAttribute("checksum", Long.toHexString(e.checksum()));
 		}
 		filesElement.appendChild(fileElement);
@@ -587,7 +418,7 @@ public class AppManifest {
 
 	public boolean hasPath(Path fileName) {
 		for (Entry e : entries)
-			if (e.path.equals(fileName))
+			if (e.path().equals(fileName))
 				return true;
 		return false;
 	}

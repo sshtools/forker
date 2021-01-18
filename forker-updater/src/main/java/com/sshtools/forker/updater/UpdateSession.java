@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import com.sshtools.forker.updater.AppManifest.Entry;
 import com.sshtools.forker.updater.AppManifest.Section;
 
 public class UpdateSession extends AbstractSession {

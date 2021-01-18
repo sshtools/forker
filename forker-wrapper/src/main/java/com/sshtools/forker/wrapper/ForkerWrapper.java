@@ -33,8 +33,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
+import java.util.Properties;
+import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
@@ -54,10 +55,6 @@ import javax.management.ObjectName;
 import javax.management.ReflectionException;
 import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
-import javax.script.Bindings;
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-import javax.script.ScriptException;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -153,17 +150,25 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	private InputStream defaultIn = System.in;
 	private boolean stopping = false;
 	private boolean preventRestart = false;
-	private ScriptEngine engine;
 	private Set<File> files = new LinkedHashSet<>();
 	private ScheduledExecutorService configChange;
 	private ScheduledFuture<?> changeTask;
 	private Thread monitorThread;
 	private Thread fileMonThread;
+	private List<WrapperPlugin> plugins = new ArrayList<>();
+	private Properties systemProperties = new Properties();
 
 	protected Logger logger = Logger.getGlobal();
 
 	{
 		reconfigureLogging();
+		for(WrapperPlugin p : ServiceLoader.load(WrapperPlugin.class)) {
+			plugins.add(p);
+		}
+	}
+	
+	public Properties getSystemProperties() {
+		return systemProperties;
 	}
 
 	public CommandLine getCmd() {
@@ -249,6 +254,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	public int start() throws IOException, InterruptedException {
 		if (!inited)
 			init(null);
+		
+		for(WrapperPlugin plugin : plugins) {
+			plugin.start();
+		}
+		
 		/*
 		 * Calculate CWD. All file paths from this point are calculated relative to the
 		 * CWD
@@ -354,6 +364,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				/* Build the command to launch the application itself */
 				ForkerBuilder appBuilder = buildCommand(javaExe, forkerClasspath, forkerModulepath, wrapperClasspath,
 						wrapperModulepath, bootClasspath, nativeMain, useDaemon, times, lastRetVal);
+				for(WrapperPlugin plugin : plugins) {
+					if(plugin.buildCommand(appBuilder))
+						break;
+				}
+				
 				daemon = null;
 				cookie = null;
 				if (useDaemon) {
@@ -632,6 +647,13 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		if (!inited) {
 			configuration.init(cmd);
 			reconfigureLogging();
+			for(WrapperPlugin p : plugins) {
+				try {
+					p.init(this);
+				} catch (Exception e) {
+					logger.log(Level.SEVERE, "Failed to load plugin.", e);
+				}
+			}
 			inited = true;
 		}
 	}
@@ -639,6 +661,10 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	@Override
 	public void setLogLevel(String lvl) {
 		setLogLevel(Level.parse(lvl));
+	}
+
+	public Logger getLogger() {
+		return logger;
 	}
 
 	public void setLogLevel(Level lvl) {
@@ -732,6 +758,12 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				handlerArgs.set(i, handlerArgs.get(i).replace("%%", "%"));
 			}
 			String cmd = handlerArgs.remove(0);
+			for(WrapperPlugin plugin : plugins) {
+				if(plugin.event(name, cmd, args)) {
+					return;
+				}
+			}
+			
 			try {
 				if (!cmd.contains("."))
 					throw new Exception("Not a class");
@@ -765,6 +797,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	}
 
 	protected void addOptions(Options options) {
+		for(WrapperPlugin plugin : plugins) {
+			plugin.addOptions(options);
+		}
 		for (String event : EVENT_NAMES) {
 			options.addOption(Option.builder().longOpt("on-" + event).hasArg(true).argName("command-or-classname")
 					.desc("Executes a script or a Java class (that must be on wrappers own classpath) "
@@ -1319,50 +1354,15 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				logger.info(String.format("Loading configuration file %s", file));
 				files.add(file);
 			}
-
-			//
-			// TODO restart app and/or adjust other configuration on reload
-			// TODO it shouldnt reload one at a time, it should wait a short while for
-			// all changes, then reload all configuration files in the same order
-			// 'properties' should
-			// be cleared before all are reloaded.
-
-			if (file.getName().endsWith(".js")) {
-				if (engine == null) {
-					ScriptEngineManager engineManager = new ScriptEngineManager();
-					engine = engineManager.getEngineByName("nashorn");
-					Bindings bindings = engine.createBindings();
-					bindings.put("wrapper", this);
-					bindings.put("log", logger);
-					if (engine == null)
-						throw new IOException("Cannot find JavaScript engine. Are you on at least Java 8?");
-				}
-				FileReader r = new FileReader(file);
-				try {
-					@SuppressWarnings("unchecked")
-					Map<String, Object> o = (Map<String, Object>) engine.eval(r);
-					for (Map.Entry<String, Object> en : o.entrySet()) {
-						if (en.getValue() instanceof Map) {
-							@SuppressWarnings("unchecked")
-							Map<String, Object> m = (Map<String, Object>) en.getValue();
-							for (Map.Entry<String, Object> men : m.entrySet()) {
-								properties.add(new KeyValuePair(en.getKey(),
-										men.getValue() == null ? null : String.valueOf(men.getValue())));
-							}
-						} else
-							properties.add(new KeyValuePair(en.getKey(),
-									en.getValue() == null ? null : String.valueOf(en.getValue())));
-					}
-				} catch (ScriptException e) {
-					throw new IOException("Failed to evaluate configuration script.", e);
-				}
+			for(WrapperPlugin plugin : plugins) {
+				plugin.readConfigFile(file, properties);
 			}
 			BufferedReader fin = new BufferedReader(new FileReader(file));
 			try {
 				String line = null;
 				while ((line = fin.readLine()) != null) {
 					if (!line.trim().startsWith("#") && !line.trim().equals("")) {
-						properties.add(new KeyValuePair(Replace.replaceSystemProperties(line)));
+						properties.add(new KeyValuePair(replaceProperties(file, line)));
 					}
 				}
 			} finally {
@@ -1371,6 +1371,26 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			app.set(configuration.getOptionValue("main", null), configuration.getOptionValue("jar", null));
 			reconfigureLogging();
 		}
+	}
+
+	protected String replaceProperties(File file, String line) {
+		Replace replace = new Replace();
+		replace.pattern("\\$\\{(.*?)\\}",
+				(p, m, r) -> {
+					String key = m.group().substring(2, m.group().length() - 1);
+					if(key.equals("cwd")) {
+						return resolveCwd().getPath();
+					}
+					else if(key.equals("file")) {
+						return file.getPath();
+					}
+					else if(key.equals("directory")) {
+						return file.getParentFile().getPath();
+					}
+					else
+						return System.getProperty(key);
+				});
+		return replace.replace(line);
 	}
 
 	protected boolean onBeforeProcess(Callable<Void> task) {
@@ -1455,6 +1475,10 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	}
 
 	protected int process(Callable<Integer> task) throws Exception {
+		for(WrapperPlugin plugin : plugins) {
+			plugin.beforeProcess();
+		}
+		
 		if (onBeforeProcess(() -> {
 			continueProcessing();
 			System.exit(task.call());
@@ -1590,6 +1614,12 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 	private int maybeRestart(int retval, int lastRetVal) throws IOException, InterruptedException {
 
+		for(WrapperPlugin plugin : plugins) {
+			int retVal  = plugin.maybeRestart(retval, lastRetVal);
+			if(retVal != Integer.MIN_VALUE)
+				return retVal;
+		}
+		
 		List<String> restartValues = Arrays.asList(configuration.getOptionValue("restart-on", "").split(","));
 		List<String> dontRestartValues = new ArrayList<String>(
 				Arrays.asList(configuration.getOptionValue("dont-restart-on", "0,1,2").split(",")));
@@ -1767,6 +1797,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				if (val.startsWith("-Xbootclasspath"))
 					hasBootCp = true;
 				command.add(val);
+			}
+			for(Object key : systemProperties.keySet()) {
+				command.add("-D" + key + "=\"" + systemProperties.getProperty((String)key) + "\"");
 			}
 			if (!hasBootCp) {
 				String bootcp = buildPath(cwd, null, bootClasspath, false);

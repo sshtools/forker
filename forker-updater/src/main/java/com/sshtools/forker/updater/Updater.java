@@ -27,7 +27,6 @@ import org.apache.commons.lang3.SystemUtils;
 
 import com.sshtools.forker.common.OS;
 import com.sshtools.forker.common.Util;
-import com.sshtools.forker.updater.AppManifest.Entry;
 import com.sshtools.forker.updater.AppManifest.Section;
 import com.sshtools.forker.wrapper.ForkerWrapper;
 import com.sshtools.forker.wrapper.Replace;
