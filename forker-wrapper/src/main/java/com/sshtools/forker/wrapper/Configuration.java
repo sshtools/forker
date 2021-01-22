@@ -100,7 +100,7 @@ public class Configuration {
 		}
 	}
 
-	protected List<String> getOptionValues(String key) {
+	public List<String> getOptionValues(String key) {
 		synchronized (cfgLock) {
 			String os = getOsPrefix();
 			String[] vals = cmd == null ? null : cmd.getOptionValues(key);
@@ -145,7 +145,7 @@ public class Configuration {
 		}
 	}
 
-	protected String getOsPrefix() {
+	public String getOsPrefix() {
 		if (SystemUtils.IS_OS_WINDOWS)
 			return "windows";
 		else if (SystemUtils.IS_OS_MAC_OSX)
