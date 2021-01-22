@@ -31,8 +31,10 @@ import java.nio.file.WatchService;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.ServiceLoader;
@@ -108,6 +110,7 @@ import com.sun.tools.attach.VirtualMachineDescriptor;
  * <li>Forker Daemon integration</li>
  * <li>Wildcard classpaths</li>
  * <li>Automatic reconfiguration when configuration files change.</li>
+ * <li>Easy configuration of remote debugging</li>
  * <li>.. and more</li>
  * </ul>
  *
@@ -162,11 +165,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 	{
 		reconfigureLogging();
-		for(WrapperPlugin p : ServiceLoader.load(WrapperPlugin.class)) {
+		for (WrapperPlugin p : ServiceLoader.load(WrapperPlugin.class)) {
 			plugins.add(p);
 		}
 	}
-	
+
 	public Properties getSystemProperties() {
 		return systemProperties;
 	}
@@ -254,11 +257,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	public int start() throws IOException, InterruptedException {
 		if (!inited)
 			init(null);
-		
-		for(WrapperPlugin plugin : plugins) {
+
+		for (WrapperPlugin plugin : plugins) {
 			plugin.start();
 		}
-		
+
 		/*
 		 * Calculate CWD. All file paths from this point are calculated relative to the
 		 * CWD
@@ -364,11 +367,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				/* Build the command to launch the application itself */
 				ForkerBuilder appBuilder = buildCommand(javaExe, forkerClasspath, forkerModulepath, wrapperClasspath,
 						wrapperModulepath, bootClasspath, nativeMain, useDaemon, times, lastRetVal);
-				for(WrapperPlugin plugin : plugins) {
-					if(plugin.buildCommand(appBuilder))
+				for (WrapperPlugin plugin : plugins) {
+					if (plugin.buildCommand(appBuilder))
 						break;
 				}
-				
+
 				daemon = null;
 				cookie = null;
 				if (useDaemon) {
@@ -647,7 +650,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		if (!inited) {
 			configuration.init(cmd);
 			reconfigureLogging();
-			for(WrapperPlugin p : plugins) {
+			for (WrapperPlugin p : plugins) {
 				try {
 					p.init(this);
 				} catch (Exception e) {
@@ -758,12 +761,12 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				handlerArgs.set(i, handlerArgs.get(i).replace("%%", "%"));
 			}
 			String cmd = handlerArgs.remove(0);
-			for(WrapperPlugin plugin : plugins) {
-				if(plugin.event(name, cmd, args)) {
+			for (WrapperPlugin plugin : plugins) {
+				if (plugin.event(name, cmd, args)) {
 					return;
 				}
 			}
-			
+
 			try {
 				if (!cmd.contains("."))
 					throw new Exception("Not a class");
@@ -797,7 +800,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	}
 
 	protected void addOptions(Options options) {
-		for(WrapperPlugin plugin : plugins) {
+		for (WrapperPlugin plugin : plugins) {
 			plugin.addOptions(options);
 		}
 		for (String event : EVENT_NAMES) {
@@ -944,6 +947,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				"Copy file(s) to the named temporary folder. Supports glob syntax for final part of the path."));
 		options.addOption(new Option("G", "service-mode", true,
 				"When enabled, 'start', 'stop', 'restart' and 'status' arguments can be passed which act in the same way as service control commands on Linux and similar operating systems."));
+		options.addOption(new Option("U", "debug", true,
+				"Adds default neccessary properties for remote debugging. If an argument is provided, that will be used as the port number. SSL and authentication is disabled."));
+
 	}
 
 	protected String buildPath(File cwd, String defaultClasspath, String classpath, boolean appendByDefault)
@@ -1354,7 +1360,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				logger.info(String.format("Loading configuration file %s", file));
 				files.add(file);
 			}
-			for(WrapperPlugin plugin : plugins) {
+			for (WrapperPlugin plugin : plugins) {
 				plugin.readConfigFile(file, properties);
 			}
 			BufferedReader fin = new BufferedReader(new FileReader(file));
@@ -1375,21 +1381,17 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 	protected String replaceProperties(File file, String line) {
 		Replace replace = new Replace();
-		replace.pattern("\\$\\{(.*?)\\}",
-				(p, m, r) -> {
-					String key = m.group().substring(2, m.group().length() - 1);
-					if(key.equals("cwd")) {
-						return resolveCwd().getPath();
-					}
-					else if(key.equals("file")) {
-						return file.getPath();
-					}
-					else if(key.equals("directory")) {
-						return file.getParentFile().getPath();
-					}
-					else
-						return System.getProperty(key);
-				});
+		replace.pattern("\\$\\{(.*?)\\}", (p, m, r) -> {
+			String key = m.group().substring(2, m.group().length() - 1);
+			if (key.equals("cwd")) {
+				return resolveCwd().getPath();
+			} else if (key.equals("file")) {
+				return file.getPath();
+			} else if (key.equals("directory")) {
+				return file.getParentFile().getPath();
+			} else
+				return System.getProperty(key);
+		});
 		return replace.replace(line);
 	}
 
@@ -1475,10 +1477,10 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	}
 
 	protected int process(Callable<Integer> task) throws Exception {
-		for(WrapperPlugin plugin : plugins) {
+		for (WrapperPlugin plugin : plugins) {
 			plugin.beforeProcess();
 		}
-		
+
 		if (onBeforeProcess(() -> {
 			continueProcessing();
 			System.exit(task.call());
@@ -1614,12 +1616,12 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 	private int maybeRestart(int retval, int lastRetVal) throws IOException, InterruptedException {
 
-		for(WrapperPlugin plugin : plugins) {
-			int retVal  = plugin.maybeRestart(retval, lastRetVal);
-			if(retVal != Integer.MIN_VALUE)
+		for (WrapperPlugin plugin : plugins) {
+			int retVal = plugin.maybeRestart(retval, lastRetVal);
+			if (retVal != Integer.MIN_VALUE)
 				return retVal;
 		}
-		
+
 		List<String> restartValues = Arrays.asList(configuration.getOptionValue("restart-on", "").split(","));
 		List<String> dontRestartValues = new ArrayList<String>(
 				Arrays.asList(configuration.getOptionValue("dont-restart-on", "0,1,2").split(",")));
@@ -1798,9 +1800,14 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					hasBootCp = true;
 				command.add(val);
 			}
-			for(Object key : systemProperties.keySet()) {
-				command.add("-D" + key + "=\"" + systemProperties.getProperty((String)key) + "\"");
+			for (Object key : systemProperties.keySet()) {
+				command.add("-D" + key + "=\"" + systemProperties.getProperty((String) key) + "\"");
 			}
+
+			if (configuration.getSwitch("debug", false)) {
+				addDebugOptions(command);
+			}
+
 			if (!hasBootCp) {
 				String bootcp = buildPath(cwd, null, bootClasspath, false);
 				if (bootcp != null && !bootcp.equals("")) {
@@ -1972,6 +1979,43 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			}
 		}
 		return appBuilder;
+	}
+
+	private void addDebugOptions(List<String> command) {
+		String spec = configuration.getOptionValue("debug", "").trim();
+		Map<String, String> debugProperties = new LinkedHashMap<>();
+		debugProperties.put("server", "y");
+		debugProperties.put("transport", "dt_socket");
+		debugProperties.put("address", "1044");
+		debugProperties.put("suspend", "y");
+		if (spec.length() > 0) {
+			for (String prop : spec.split(",")) {
+				String propName = prop;
+				String propValue = "";
+				int idx = propName.indexOf("=");
+				if (idx > -1) {
+					propValue = propName.substring(idx + 1);
+					propName = propName.substring(0, idx);
+				}
+				debugProperties.put(propName, propValue);
+			}
+		}
+		StringBuilder propStr = new StringBuilder();
+		for (Map.Entry<String, String> en : debugProperties.entrySet()) {
+			if (propStr.length() > 0)
+				propStr.append(",");
+			propStr.append(en.getKey());
+			propStr.append("=");
+			propStr.append(en.getValue());
+		}
+		command.add("-Xrunjdwp:" + propStr.toString());
+		logger.log(Level.WARNING,
+				String.format("Remote debugging enabled on port %s", debugProperties.get("address")));
+		if ("y".equals(debugProperties.get("suspend"))) {
+			logger.log(Level.WARNING,
+					String.format("Suspend is enabled, so the application will not start until a debugging connects."));
+		}
+
 	}
 
 	private boolean isUsingClient(String path) {
