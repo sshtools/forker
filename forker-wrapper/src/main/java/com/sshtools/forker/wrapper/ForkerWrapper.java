@@ -632,30 +632,31 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					String.valueOf(lastRetVal));
 			logger.info(String.format("Executing: %s %s", app.getClassname(), String.join(" ", allArgs)));
 
-			AtomicInteger exitCode = new AtomicInteger(Integer.MIN_VALUE);
-			SecurityManager exitDefeat = new SecurityManager() {
-				@Override
-				public void checkExit(int status) {
-					exitCode.set(status);
-					Set<Thread> remaining = getAppThreads(threads);
-					for (Thread t : remaining) {
-						if (t != Thread.currentThread())
-							t.interrupt();
-					}
-					throw new SecurityException();
-				}
-
-				@Override
-				public void checkPermission(Permission perm) {
-					// Allow other activities by default
-					// TODO delegate to previous manager if there is one
-				}
-			};
-			System.setSecurityManager(exitDefeat);
+//			AtomicInteger exitCode = new AtomicInteger(Integer.MIN_VALUE);
+//			SecurityManager exitDefeat = new SecurityManager() {
+//				@Override
+//				public void checkExit(int status) {
+//					exitCode.set(status);
+//					Set<Thread> remaining = getAppThreads(threads);
+//					for (Thread t : remaining) {
+//						if (t != Thread.currentThread())
+//							t.interrupt();
+//					}
+//					throw new SecurityException();
+//				}
+//
+//				@Override
+//				public void checkPermission(Permission perm) {
+//					// Allow other activities by default
+//					// TODO delegate to previous manager if there is one
+//				}
+//			};
+//			System.setSecurityManager(exitDefeat);
 
 			main.invoke(null, new Object[] { allArgs.toArray(new String[0]) });
 			event(STARTED_APPLICATION, app.fullClassAndModule());
-			while (exitCode.get() != Integer.MIN_VALUE) {
+			//while (exitCode.get() != Integer.MIN_VALUE) {
+			while (true) {
 				Set<Thread> remaining = getAppThreads(threads);
 				if (remaining.isEmpty())
 					break;
