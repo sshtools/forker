@@ -37,12 +37,15 @@ public class Configuration {
 	}
 
 	public boolean getSwitch(String key, boolean defaultValue) {
+		String optionValue = getOptionValue(key, null);
+		if(optionValue != null)
+			return !"false".equals(optionValue);
 		if (cmd != null && cmd.hasOption(key))
 			return true;
 		if (isBool(key)) {
 			return true;
 		}
-		return !"false".equals(getOptionValue(key, String.valueOf(defaultValue)));
+		return false;
 	}
 
 	public boolean isBool(String key) {
@@ -161,12 +164,11 @@ public class Configuration {
 	public String getOptionValue(String key, String defaultValue) {
 		String os = getOsPrefix();
 		/* Look for OS specific options in preference */
-		String val = cmd == null ? null : cmd.getOptionValue(os + "-" + key);
-		if (val == null)
-			val = cmd == null ? null : cmd.getOptionValue(key);
+		String val = System.getProperty("forkerwrapper." + key.replace("-", "."),
+				System.getProperty("forkerwrapper." + (os + "." + key).replace("-", ".")));
 		if (val == null) {
 			val = System.getProperty("forkerwrapper." + key.replace("-", "."),
-					System.getProperty("forkerwrapper." + (os + "." + key).replace("-", ".")));
+					System.getProperty("forkerwrapper." + (key.replace("-", "."))));
 			if (val == null) {
 				val = System.getenv("FORKER_" + (os + "-" + key).replace("-", "_").toUpperCase());
 				if (val == null) {
@@ -175,13 +177,21 @@ public class Configuration {
 						val = getProperty(os + "-" + key);
 						if (val == null) {
 							val = getProperty(key);
-							if (val == null)
-								val = defaultValue;
 						}
 					}
 				}
 			}
 		}
+
+		if (val == null) {
+			val = cmd == null ? null : cmd.getOptionValue(os + "-" + key);
+			if (val == null)
+				val = cmd == null ? null : cmd.getOptionValue(key);
+		}
+		
+		if (val == null)
+			val = defaultValue;
+		
 		return val;
 	}
 

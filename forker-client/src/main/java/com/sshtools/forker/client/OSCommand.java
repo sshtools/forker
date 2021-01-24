@@ -56,6 +56,7 @@ public class OSCommand {
 	private static ThreadLocal<Map<String, String>> environment = new ThreadLocal<Map<String, String>>();
 	private static ThreadLocal<IO> io = new ThreadLocal<IO>();
 	private static char[] sudoPassword = null;
+	private static final Map<String, Boolean> commandCache = new HashMap<>();
 
 	/**
 	 * A very simplistic mechanism for restarting an application as an administrator
@@ -716,6 +717,22 @@ public class OSCommand {
 	 * @return command exists on path
 	 */
 	public static boolean hasCommand(String command) {
+		if("false".equals(System.getProperty("forker.noCommandExistenceCache", "false"))) {
+			synchronized(commandCache) {
+				Boolean val = commandCache.get(command); 
+				if(val == null) {
+					boolean exists = doHasCommand(command);
+					commandCache.put(command, exists);
+					return exists;
+				}
+				return val;
+			}
+		}
+		else
+			return doHasCommand(command);
+	}
+
+	protected static boolean doHasCommand(String command) {
 		if (SystemUtils.IS_OS_LINUX) {
 			boolean el = OSCommand.restrict();
 			try {

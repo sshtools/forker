@@ -37,4 +37,7 @@ public interface WrapperPlugin {
 	default void start() throws IOException {
 	}
 
+	default void beforeLaunch() throws IOException {
+	}
+
 }
