@@ -5,11 +5,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import javax.management.InstanceAlreadyExistsException;
-import javax.management.MBeanRegistrationException;
 import javax.management.MBeanServer;
-import javax.management.MalformedObjectNameException;
-import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectName;
 
 public class Wrapped implements WrappedMXBean {
@@ -27,6 +23,10 @@ public class Wrapped implements WrappedMXBean {
 
 	private final List<LaunchListener> launchListeners = new ArrayList<>();
 	private final List<ShutdownListener> shutdownListeners = new ArrayList<>();
+	private long lastPing;
+	private Thread monitor;
+	private boolean runMonitor = true;
+	private Object monitorLock = new Object();
 
 	public static Wrapped get() {
 		return instance;
@@ -60,24 +60,56 @@ public class Wrapped implements WrappedMXBean {
 	}
 
 	void init(String[] args) throws Exception {
-		try {
-			ObjectName objectName = new ObjectName(String.format("%s:type=basic,name=%s",
-					WrappedMXBean.class.getPackageName(), WrappedMXBean.class.getSimpleName()));
-			MBeanServer server = ManagementFactory.getPlatformMBeanServer();
-			server.registerMBean(this, objectName);
-		} catch (MalformedObjectNameException | InstanceAlreadyExistsException | MBeanRegistrationException
-				| NotCompliantMBeanException e) {
-			// handle exceptions
-			e.printStackTrace();
-		}
+		ObjectName objectName = new ObjectName(String.format("%s:type=basic,name=%s",
+				WrappedMXBean.class.getPackageName(), WrappedMXBean.class.getSimpleName()));
+		MBeanServer server = ManagementFactory.getPlatformMBeanServer();
 
+		/* Expose the wrapped application */
+		server.registerMBean(this, objectName);
 		List<String> argList = new ArrayList<String>(Arrays.asList(args));
 		if (argList.isEmpty()) {
 			throw new IllegalArgumentException("First argument must be the class to actually run.");
 		}
 		String classname = argList.remove(0);
-		Class<?> clazz = Class.forName(classname);
+		ClassLoader loader = Thread.currentThread().getContextClassLoader();
+		if (loader == null)
+			loader = Wrapped.class.getClassLoader();
+		Class<?> clazz = loader.loadClass(classname);
+
+		/* Launch */
 		clazz.getMethod("main", String[].class).invoke(null, new Object[] { argList.toArray(new String[0]) });
+	}
+
+	protected void startMonitor() {
+		/*
+		 * Start a thread. If no ping has been received in the last 5 seconds, then the
+		 * wrapper has died and we should shutdown as well.
+		 * 
+		 * This is a workaround for the fact that if the wrapper is killed without it's
+		 * shutdown hooks getting run (e.g. kill -9, or even just running from Eclipse),
+		 * then the wrapped application might continue running.
+		 */
+		monitor = new Thread("PingMonitorThread") {
+			long previousPing = 0;
+
+			public void run() {
+				try {
+					while (runMonitor) {
+						Thread.sleep(5000);
+						if (previousPing != 0 && lastPing == previousPing) {
+							shutdown();
+							break;
+						}
+						previousPing = lastPing;
+					}
+				} catch (InterruptedException ie) {
+					// Stopped monitoring
+				}
+
+			}
+		};
+		monitor.setDaemon(true);
+		monitor.start();
 	}
 
 	public static void main(String[] args) throws Exception {
@@ -127,14 +159,30 @@ public class Wrapped implements WrappedMXBean {
 
 	@Override
 	public int shutdown() {
+		synchronized (monitorLock) {
+			if (monitor != null) {
+				runMonitor = false;
+				monitor.interrupt();
+			}
+		}
 		for (int i = shutdownListeners.size() - 1; i >= 0; i--) {
 			int ret = shutdownListeners.get(i).shutdown();
 			if (ret != Integer.MIN_VALUE)
 				return ret;
 		}
-		if(shutdownListeners.size() == 0)
+		if (shutdownListeners.size() == 0)
 			System.exit(0);
 		return 0;
+	}
+
+	@Override
+	public void ping() {
+		synchronized (monitorLock) {
+			if (monitor == null) {
+				startMonitor();
+			}
+			lastPing = System.currentTimeMillis();
+		}
 	}
 
 }

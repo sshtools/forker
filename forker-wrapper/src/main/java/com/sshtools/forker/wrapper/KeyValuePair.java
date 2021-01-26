@@ -13,7 +13,7 @@ public class KeyValuePair {
 			idx = spcidx;
 		}
 		if (idx != -1) {
-			value = line.substring(idx + 1);
+			value = line.substring(idx + 1).trim();
 			key = line.substring(0, idx);
 		} else {
 			bool = true;

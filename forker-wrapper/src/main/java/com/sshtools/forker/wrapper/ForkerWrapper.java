@@ -35,7 +35,6 @@ import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.security.Permission;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -53,7 +52,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -172,12 +170,21 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	private Properties systemProperties = new Properties();
 
 	protected Logger logger = Logger.getGlobal();
+	private boolean usingWrapped;
+	private MBeanServerConnection jmxConnectionToWrapped;
+	private ObjectName jmxObjectName;
 
 	{
 		reconfigureLogging();
 		for (WrapperPlugin p : ServiceLoader.load(WrapperPlugin.class)) {
 			plugins.add(p);
 		}
+	}
+
+	@Override
+	public void ping() {
+		if (logger.isLoggable(Level.FINE))
+			logger.log(Level.FINE, "Ping from JMX client.");
 	}
 
 	public Properties getSystemProperties() {
@@ -328,16 +335,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					lockFile.deleteOnExit();
 				} catch (OverlappingFileLockException ofle) {
 					if (configuration.getSwitch("stop", false)) {
-						try {
-							return (Integer) executeJmxCommandInApp("shutdown");
-						} catch (Exception e) {
-							if (e.getCause() instanceof EOFException) {
-								return 0;
-							} else {
-								logger.log(Level.SEVERE, "Failed to send stop command.", e);
-								return 1;
-							}
-						}
+						return shutdownWrapped();
 					} else {
 						/*
 						 * Try and connect to the MBean service in the hosted app. If this succeeds,
@@ -355,8 +353,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				}
 			}
 
-			monitorConfigurationFiles();
-			monitorWrappedApplication();
 
 			int retval = 2;
 			int times = 0;
@@ -416,6 +412,19 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
+	protected int shutdownWrapped() {
+		try {
+			return (Integer) executeJmxCommandInApp("shutdown");
+		} catch (Exception e) {
+			if (e.getCause() instanceof EOFException) {
+				return 0;
+			} else {
+				logger.log(Level.SEVERE, "Failed to send stop command.", e);
+				return 1;
+			}
+		}
+	}
+
 	protected int forked(String javaExe, String wrapperClasspath, String wrapperModulepath, String forkerClasspath,
 			String forkerModulepath, String bootClasspath, final boolean nativeMain, final boolean useDaemon,
 			boolean daemonize, int times, int lastRetVal, boolean quietStdErr, boolean quietStdOut,
@@ -434,9 +443,15 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		if (useDaemon) {
 			startForkerDaemon();
 		}
+
+		monitorConfigurationFiles();
+		monitorWrappedApplication();
+		monitorWrappedJMXApplication();
+		
 		event(STARTING_APPLICATION, String.valueOf(times), resolveCwd().getAbsolutePath(), app.fullClassAndModule(),
 				String.valueOf(lastRetVal));
-		logger.info(String.format("Executing: %s", String.join(" ", appBuilder.command())));
+		logger.info(
+				String.format("Executing in %s: %s", appBuilder.directory(), String.join(" ", appBuilder.command())));
 		process = appBuilder.start();
 		event(STARTED_APPLICATION, app.fullClassAndModule());
 
@@ -565,6 +580,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		allArgs.addAll(headArgs);
 		allArgs.addAll(tail);
 
+		usingWrapped = isUsingWrappedOnClasspath; // TODO || isUsingWrappedOnModulepath
+
 		/* Directory and IO */
 		// appBuilder.directory(cwd);
 
@@ -652,10 +669,12 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 //				}
 //			};
 //			System.setSecurityManager(exitDefeat);
+			
+			monitorConfigurationFiles();
 
 			main.invoke(null, new Object[] { allArgs.toArray(new String[0]) });
 			event(STARTED_APPLICATION, app.fullClassAndModule());
-			//while (exitCode.get() != Integer.MIN_VALUE) {
+			// while (exitCode.get() != Integer.MIN_VALUE) {
 			while (true) {
 				Set<Thread> remaining = getAppThreads(threads);
 				if (remaining.isEmpty())
@@ -701,38 +720,48 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					"forker-wrapper-" + app.getClassname() + ".lock");
 	}
 
-	private Object executeJmxCommandInApp(String method, Object... args)
+	protected Object executeJmxCommandInApp(String method, Object... args)
 			throws MalformedObjectNameException, AttachNotSupportedException, IOException, MalformedURLException,
 			InstanceNotFoundException, MBeanException, ReflectionException {
-		List<VirtualMachineDescriptor> vms = VirtualMachine.list();
 		logger.log(Level.FINE,
 				String.format("Executing %s in remote app with arguments %s", method, Arrays.asList(args)));
-		for (VirtualMachineDescriptor desc : vms) {
-			List<String> dn = Arrays.asList(desc.displayName().split(" "));
-			if (dn.contains(WRAPPED_MODULE_NAME + "/" + WRAPPED_CLASS_NAME) || dn.contains(WRAPPED_CLASS_NAME)) {
-				ObjectName objectName = new ObjectName(
-						String.format("%s:type=basic,name=%s", WRAPPED_MODULE_NAME, WRAPPED_MX_BEAN_NAME));
-				VirtualMachine vm = desc.provider().attachVirtualMachine(desc);
-				String connectorAddress = vm.getAgentProperties()
-						.getProperty("com.sun.management.jmxremote.localConnectorAddress", null);
-				if (connectorAddress == null) {
-					vm.startLocalManagementAgent();
-					connectorAddress = vm.getAgentProperties()
-							.getProperty("com.sun.management.jmxremote.localConnectorAddress", null);
-					if (connectorAddress == null) {
-						throw new IllegalStateException("Could not start local management agent.");
-					}
-				}
-				JMXServiceURL jmxUrl = new JMXServiceURL(connectorAddress);
-				MBeanServerConnection s = JMXConnectorFactory.connect(jmxUrl).getMBeanServerConnection();
-				String[] classNames = new String[args.length];
-				for (int i = 0; i < args.length; i++)
-					classNames[i] = args[i].getClass().getName();
-				return s.invoke(objectName, method, args, classNames);
-
-			}
+		checkJMXConnectionToWrapped();
+		if (jmxConnectionToWrapped != null) {
+			String[] classNames = new String[args.length];
+			for (int i = 0; i < args.length; i++)
+				classNames[i] = args[i].getClass().getName();
+			return jmxConnectionToWrapped.invoke(jmxObjectName, method, args, classNames);
 		}
 		throw new IllegalArgumentException("Could not find remote app.");
+	}
+
+	protected void checkJMXConnectionToWrapped()
+			throws MalformedObjectNameException, AttachNotSupportedException, IOException, MalformedURLException {
+		if (jmxConnectionToWrapped == null) {
+			List<VirtualMachineDescriptor> vms = VirtualMachine.list();
+			for (VirtualMachineDescriptor desc : vms) {
+				List<String> dn = Arrays.asList(desc.displayName().split(" "));
+				if (dn.contains(WRAPPED_MODULE_NAME + "/" + WRAPPED_CLASS_NAME) || dn.contains(WRAPPED_CLASS_NAME)) {
+					jmxObjectName = new ObjectName(
+							String.format("%s:type=basic,name=%s", WRAPPED_MODULE_NAME, WRAPPED_MX_BEAN_NAME));
+					VirtualMachine vm = desc.provider().attachVirtualMachine(desc);
+					String connectorAddress = vm.getAgentProperties()
+							.getProperty("com.sun.management.jmxremote.localConnectorAddress", null);
+					if (connectorAddress == null) {
+						vm.startLocalManagementAgent();
+						connectorAddress = vm.getAgentProperties()
+								.getProperty("com.sun.management.jmxremote.localConnectorAddress", null);
+						if (connectorAddress == null) {
+							throw new IllegalStateException("Could not start local management agent.");
+						}
+					}
+					JMXServiceURL jmxUrl = new JMXServiceURL(connectorAddress);
+					jmxConnectionToWrapped = JMXConnectorFactory.connect(jmxUrl).getMBeanServerConnection();
+					break;
+
+				}
+			}
+		}
 	}
 
 	private boolean isLogOverwrite() {
@@ -1088,7 +1117,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					.build());
 		}
 		options.addOption(new Option(null, "stop", false,
-				"If single-instance mode is enabled, and the wrapped application includes the forker-wrapper module,"
+				"If single-instance mode is enabled, and the wrapped application includes the forker-wrapped module,"
 						+ "then a stop command is sent. It is up to app whether or not to exit the runtime through the use of "
 						+ "the 'ShutdownListener' registered on the 'Wrapped' instance. If it is happy to stop, it should do it's "
 						+ "own clean up, then System.exit(). "));
@@ -1228,8 +1257,10 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				"Copy file(s) to the named temporary folder. Supports glob syntax for final part of the path."));
 		options.addOption(new Option("G", "service-mode", true,
 				"When enabled, 'start', 'stop', 'restart' and 'status' arguments can be passed which act in the same way as service control commands on Linux and similar operating systems."));
-		options.addOption(new Option("U", "debug", true,
-				"Adds default neccessary properties for remote debugging. If an argument is provided, is should either be true,false, or a list of comma separated name=value pairs of any parameters to pass to the debugger agent."));
+		Option opt = new Option("U", "debug", false,
+				"Adds default neccessary properties for remote debugging. If an argument is provided, is should either be true,false, or a list of comma separated name=value pairs of any parameters to pass to the debugger agent.");
+		opt.setOptionalArg(true);
+		options.addOption(opt);
 
 	}
 
@@ -1413,9 +1444,15 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					event(EXITING_WRAPPER);
 				} catch (IOException e1) {
 				}
+
 				logger.info("In Shutdown Hook");
 				Process p = process;
 				Forker f = daemon;
+				if (p != null && usingWrapped) {
+					logger.info("Shutting down via JMX as host applicaction is using the forker-wrapped module.");
+					shutdownWrapped();
+					p = null;
+				}
 				if (p != null && useDaemon && f != null) {
 					/*
 					 * Close the client control connection. This will cause the wrapped process to
@@ -1543,13 +1580,12 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		} else if (!configuration.getSwitch("monitor-configuration", false) && fileMonThread != null) {
 			fileMonThread.interrupt();
 			fileMonThread = null;
-			logger.info("Stoppe monitoring configuration files.");
+			logger.info("Stopped monitoring configuration files.");
 		}
 	}
 
 	protected void monitorWrappedJMXApplication() {
-		if (isSingleInstance() && Integer.parseInt(configuration.getOptionValue("timeout", "60")) > 0
-				&& monitorThread == null) {
+		if (!isNoFork() && usingWrapped && monitorThread == null) {
 			monitorThread = new Thread() {
 				{
 					setName("ForkerWrapperMonitor");
@@ -1558,22 +1594,28 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 				@Override
 				public void run() {
-					logger.info("Monitoring pings from wrapped application");
+					logger.info("Pinging wrapped application");
 					try {
+						int timeout = Integer.parseInt(configuration.getOptionValue("timeout", "60"));
+						long lastPing = 0;
 						while (!stopping) {
-							if (process != null && daemon != null) {
-								WrapperHandler wrapper = daemon.getHandler(WrapperHandler.class);
-								int timeout = Integer.parseInt(configuration.getOptionValue("timeout", "60"));
-								if (wrapper.getLastPing() > 0
-										&& (wrapper.getLastPing() + timeout * 1000) <= System.currentTimeMillis()) {
-									logger.warning(String.format(
-											"Process has not sent a ping in %d seconds, attempting to terminate",
-											timeout));
-									tempRestartOnExit = true;
-									/*
-									 * TODO may need to be more forceful than this, e.g. OS kill
-									 */
-									process.destroy();
+							if (process != null) {
+								try {
+									executeJmxCommandInApp("ping");
+									lastPing = System.currentTimeMillis();
+								}
+								catch(Exception e) {
+									if (lastPing > 0
+											&& (lastPing + timeout * 1000) <= System.currentTimeMillis()) {
+										logger.warning(String.format(
+												"Process has not sent a ping in %d seconds, attempting to terminate",
+												timeout));
+										tempRestartOnExit = true;
+										/*
+										 * TODO may need to be more forceful than this, e.g. OS kill
+										 */
+										process.destroy();
+									}
 								}
 							}
 							Thread.sleep(1000);
@@ -1592,7 +1634,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	}
 
 	protected void monitorWrappedApplication() {
-		if (isUseDaemon() && Integer.parseInt(configuration.getOptionValue("timeout", "60")) > 0
+		if (!usingWrapped && isUseDaemon() && Integer.parseInt(configuration.getOptionValue("timeout", "60")) > 0
 				&& monitorThread == null) {
 			monitorThread = new Thread() {
 				{
@@ -1879,6 +1921,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					} else {
 						logger.info(String.format("The configuration change will adjust the running service."));
 						monitorWrappedApplication();
+						monitorWrappedJMXApplication();
 						monitorConfigurationFiles();
 					}
 				}
@@ -2091,6 +2134,13 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			for (String val : configuration.getOptionValues("jvmarg")) {
 				if (val.startsWith("-Xbootclasspath"))
 					hasBootCp = true;
+				if (val.startsWith("-D")) {
+					int idx = val.indexOf("=");
+					/* Make sure jvmarg's are quoted */
+					if (idx != -1 && !val.substring(idx + 1).startsWith("\"")) {
+						val = val.substring(0, idx) + "=\"" + val.substring(idx + 1) + "\"";
+					}
+				}
 				command.add(val);
 			}
 			for (Object key : systemProperties.keySet()) {
@@ -2124,6 +2174,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			argfileMode = ArgfileMode.EXPANDED;
 			tail = command;
 		}
+
+		usingWrapped = isUsingWrappedOnClasspath || isUsingWrappedOnModulepath;
 
 		/*
 		 * Pass information to the launched application about the last exit status and
@@ -2332,7 +2384,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		if (path == null)
 			return false;
 		for (String p : path.split(File.pathSeparator)) {
-			if (p.matches(".*forker-wrapped.*\\.jar"))
+			if (p.matches(".*forker-wrapped.*\\.jar") || p.matches(".*/forker-wrapped/target/classes"))
 				return true;
 		}
 		return false;

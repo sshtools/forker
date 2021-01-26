@@ -5,4 +5,6 @@ public interface WrappedMXBean {
 	int launch(String[] args);
 
 	int shutdown();
+
+	void ping();
 }

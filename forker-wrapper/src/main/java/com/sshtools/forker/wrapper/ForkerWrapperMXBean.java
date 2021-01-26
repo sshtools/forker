@@ -17,4 +17,6 @@ public interface ForkerWrapperMXBean {
 	void stop(boolean wait) throws InterruptedException;
 	
 	void setLogLevel(String lvl);
+	
+	void ping();
 }
