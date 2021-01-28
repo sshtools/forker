@@ -205,6 +205,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-javadoc-plugin</artifactId>
+				<version>3.2.0</version>
 				<executions>
 					<execution>
 						<id>release</id>
@@ -215,14 +216,12 @@
 					</execution>
 				</executions>
 				<configuration>
-					<!-- <skip>true</skip> -->
 					<encoding>UTF-8</encoding>
 					<excludePackageNames>**.impl.*</excludePackageNames>
-					<!-- https://stackoverflow.com/questions/49472783/maven-is-unable-to-find-javadoc-command -->
-					<javadocExecutable>${java.home}/bin/javadoc</javadocExecutable>
-
 					<!-- https://bugs.openjdk.java.net/browse/JDK-8212233 -->
+					<detectJavaApiLink>false</detectJavaApiLink>
 					<source>8</source>
+					<additionalparam>-Xdoclint:none</additionalparam>
 				</configuration>
 			</plugin>
 			<plugin>
