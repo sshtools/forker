@@ -34,22 +34,6 @@
 				<version>3.2.3</version>
 				<extensions>true</extensions>
 			</plugin>
-
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-jar-plugin</artifactId>
-				<configuration>
-					<archive>
-						<manifest>
-							<mainClass>com.sshtools.forker.daemon.Forker</mainClass>
-							<addClasspath>true</addClasspath>
-						</manifest>
-						<manifestEntries>
-							<Automatic-Module-Name>com.sshtools.forker.updater</Automatic-Module-Name>
-						</manifestEntries>
-					</archive>
-				</configuration>
-			</plugin>
 		</plugins>
 
 	</build>

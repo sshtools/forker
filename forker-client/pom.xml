@@ -36,22 +36,6 @@ Parts of the non-blocking API are based on NuProcess (https://github.com/brettwo
 				<directory>src/test/resources</directory>
 			</testResource>
 		</testResources>
-		<plugins>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-jar-plugin</artifactId>
-				<configuration>
-					<archive>
-						<manifestEntries>
-							<Automatic-Module-Name>com.sshtools.forker.client</Automatic-Module-Name>
-						</manifestEntries>
-						<manifest>
-							<addClasspath>true</addClasspath>
-						</manifest>
-					</archive>
-				</configuration>
-			</plugin>
-		</plugins>
 	</build>
 
 	<dependencies>

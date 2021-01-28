@@ -21,23 +21,6 @@
 				<directory>src/main/resources</directory>
 			</resource>
 		</resources>
-
-		<plugins>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-jar-plugin</artifactId>
-				<configuration>
-					<archive>
-						<manifestEntries>
-							<Automatic-Module-Name>com.sshtools.forker.pty</Automatic-Module-Name>
-						</manifestEntries>
-						<manifest>
-							<addClasspath>true</addClasspath>
-						</manifest>
-					</archive>
-				</configuration>
-			</plugin>
-		</plugins>
 	</build>
 
 	<dependencies>
