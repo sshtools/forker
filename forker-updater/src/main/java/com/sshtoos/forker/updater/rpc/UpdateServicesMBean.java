@@ -1,4 +1,4 @@
-package com.sshtoos.forker.update.rpc;
+package com.sshtoos.forker.updater.rpc;
 
 public interface UpdateServicesMBean {
 

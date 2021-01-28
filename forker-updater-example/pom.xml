@@ -1,0 +1,100 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<artifactId>forker-updater-example</artifactId>
+	<name>Forker Update Example</name>
+	<description>Example of an updateable application.</description>
+	<parent>
+		<groupId>com.sshtools</groupId>
+		<artifactId>forker</artifactId>
+		<version>1.7-SNAPSHOT</version>
+		<relativePath>..</relativePath>
+	</parent>
+
+	<dependencies>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<version>${project.version}</version>
+			<artifactId>forker-updater-console</artifactId>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<sourceDirectory>src/main/java</sourceDirectory>
+		<testSourceDirectory>src/test/java</testSourceDirectory>
+		<outputDirectory>target/classes</outputDirectory>
+		<testOutputDirectory>target/test-classes</testOutputDirectory>
+		<resources>
+			<resource>
+				<targetPath>.</targetPath>
+				<directory>src/main/resources</directory>
+			</resource>
+		</resources>
+		<testResources>
+			<testResource>
+				<targetPath>.</targetPath>
+				<directory>src/test/resources</directory>
+			</testResource>
+		</testResources>
+
+		<plugins>
+			<plugin>
+				<groupId>com.sshtools</groupId>
+				<artifactId>forker-updater-maven-plugin</artifactId>
+				<version>1.7-SNAPSHOT</version>
+				<executions>
+					<execution>
+						<id>updater</id>
+						<phase>package</phase>
+						<goals>
+							<goal>updates</goal>
+						</goals>
+						<configuration>
+							<!-- Only use file:// URL for testing, usually you'd
+							want a http:// or https:// URL. -->
+							<remoteBase>file://${build.directory}/image</remoteBase>
+							
+							<mainClass>helloworld/helloworld.HelloWorld</mainClass>
+							<systemModules>
+								<systemModule>java.desktop</systemModule>
+								<systemModule>java.management</systemModule>
+								<systemModule>java.logging</systemModule>
+								<systemModule>jdk.attach</systemModule>
+							</systemModules>
+							
+							<bootstrapOnlyModules>
+								<bootstrapOnlyModule>forker-updater-console</bootstrapOnlyModule>
+								<bootstrapOnlyModule>jansi</bootstrapOnlyModule>
+							</bootstrapOnlyModules>
+						</configuration>
+					</execution>
+
+				</executions>
+			</plugin>
+
+			<plugin>
+				<groupId>com.github.hazendaz.maven</groupId>
+				<artifactId>makeself-maven-plugin</artifactId>
+				<version>1.2.0</version>
+				<executions>
+					<execution>
+						<id>package</id>
+						<phase>package</phase>
+						<goals>
+							<goal>makeself</goal>
+						</goals>
+						<configuration>
+							<label>${project.name}</label>
+							<archiveDir>image</archiveDir>
+							<fileName>${project.artifactId}.sh</fileName>
+							<startupScript>bin/${project.artifactId}</startupScript>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+
+
+</project>

@@ -23,7 +23,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 
-public class ConsoleInstallHandler extends AbstractHandler implements InstallHandler {
+public class DefaultConsoleInstallHandler extends AbstractHandler implements InstallHandler {
 
 	private InstallSession session;
 	private Path dest;
@@ -35,21 +35,14 @@ public class ConsoleInstallHandler extends AbstractHandler implements InstallHan
 
 	@Override
 	public void startInstall() throws Exception {
-		total = session.files().size();
-		ordinalWidth = String.valueOf(total).length() * 2 + 1;
-		initProgress();
 	}
 
 	@Override
-	public void installFile(Path file, Path dest) throws Exception {
-		index++;
-		println(renderFilename(file));
-		resetProgress(Files.size(file));
+	public void installFile(Path file, Path dest, int index) throws Exception {
 	}
 
 	@Override
 	public void installFileProgress(Path file, float frac) throws Exception {
-		currentFrac = frac;
 	}
 
 	@Override
@@ -58,18 +51,15 @@ public class ConsoleInstallHandler extends AbstractHandler implements InstallHan
 
 	@Override
 	public void installFileDone(Path file) throws Exception {
-		clear();
 	}
 
 	@Override
 	public void failed(Throwable t) {
-		clearln();
 		t.printStackTrace();
 	}
 
 	@Override
 	public void complete() {
-		stopTimer = true;
 	}
 
 	@Override

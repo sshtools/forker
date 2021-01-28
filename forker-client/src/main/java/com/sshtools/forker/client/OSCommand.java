@@ -456,8 +456,8 @@ public class OSCommand {
 		args = new ArrayList<String>(args);
 		LOG.fine("Running command: " + StringUtils.join(args, " "));
 		ForkerBuilder builder = new ForkerBuilder(args);
-		if (builder.io() == null)
-			builder.io(io.get() == null ? IO.NON_BLOCKING : io.get());
+		if (io.get() != null)
+			builder.io(io.get());
 		checkElevationAndEnvironment(builder);
 		if (cwd != null) {
 			builder.directory(cwd);
@@ -943,8 +943,8 @@ public class OSCommand {
 		LOG.fine("Running command: " + StringUtils.join(args, " "));
 		List<String> largs = new ArrayList<String>(Arrays.asList(args));
 		ForkerBuilder pb = new ForkerBuilder(largs);
-		if (pb.io() == null)
-			pb.io(io.get() == null ? IO.NON_BLOCKING : io.get());
+		if (io.get() != null)
+			pb.io(io.get());
 		checkElevationAndEnvironment(pb);
 		if (cwd != null) {
 			pb.directory(cwd);
@@ -1025,8 +1025,8 @@ public class OSCommand {
 		final List<String> largs = new ArrayList<String>(Arrays.asList(args));
 		LOG.fine("Running command: " + StringUtils.join(largs, " "));
 		ForkerBuilder pb = new ForkerBuilder(largs);
-		if (pb.io() == null)
-			pb.io(io.get() == null ? IO.NON_BLOCKING : io.get());
+		if (io.get() != null)
+			pb.io(io.get());
 		checkElevationAndEnvironment(pb);
 		if (cwd != null) {
 			pb.directory(cwd);

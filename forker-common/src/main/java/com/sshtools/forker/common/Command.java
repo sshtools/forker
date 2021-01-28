@@ -33,7 +33,7 @@ public class Command {
 	private File directory;
 	private Map<String, String> environment;
 	private String runAs = "";
-	private IO io = IO.IO;
+	private IO io = IO.NON_BLOCKING;
 	private Priority priority = null;
 	private List<Integer> affinity = new ArrayList<Integer>();
 

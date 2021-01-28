@@ -12,7 +12,7 @@
 		<relativePath>..</relativePath>
 	</parent>
 	<properties>
-		<swt.version>3.105.2</swt.version>
+		<swt.version>3.115.100</swt.version>
 	</properties>
 
 	<build>
@@ -51,40 +51,47 @@
 		</plugins>
 	</build>
 
-	 <dependencies>
-        <dependency>
-            <groupId>org.eclipse.platform</groupId>
-            <artifactId>org.eclipse.swt.gtk.linux.x86_64</artifactId>
-            <version>3.105.2</version>
-            <scope>provided</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.eclipse.platform</groupId>
-                    <artifactId>org.eclipse.swt.gtk.linux.aarch64</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.eclipse.platform</groupId>
-                    <artifactId>org.eclipse.swt.gtk.linux.arm</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.platform</groupId>
-            <artifactId>org.eclipse.swt</artifactId>
-            <version>3.105.2</version>
-            <scope>provided</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.eclipse.platform</groupId>
-                    <artifactId>org.eclipse.swt.gtk.linux.aarch64</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.eclipse.platform</groupId>
-                    <artifactId>org.eclipse.swt.gtk.linux.arm</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-    </dependencies>
+	<dependencies>
+
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<version>${project.version}</version>
+			<artifactId>forker-updater</artifactId>
+		</dependency>
+		
+		<dependency>
+			<groupId>org.eclipse.platform</groupId>
+			<artifactId>org.eclipse.swt.gtk.linux.x86_64</artifactId>
+			<version>${swt.version}</version>
+			<scope>provided</scope>
+			<exclusions>
+				<exclusion>
+					<groupId>org.eclipse.platform</groupId>
+					<artifactId>org.eclipse.swt.gtk.linux.aarch64</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.eclipse.platform</groupId>
+					<artifactId>org.eclipse.swt.gtk.linux.arm</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.platform</groupId>
+			<artifactId>org.eclipse.swt</artifactId>
+			<version>${swt.version}</version>
+			<scope>provided</scope>
+			<exclusions>
+				<exclusion>
+					<groupId>org.eclipse.platform</groupId>
+					<artifactId>org.eclipse.swt.gtk.linux.aarch64</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.eclipse.platform</groupId>
+					<artifactId>org.eclipse.swt.gtk.linux.arm</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+	</dependencies>
 	<profiles>
 		<profile>
 			<id>mac</id>

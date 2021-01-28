@@ -62,7 +62,7 @@ import com.sshtools.forker.updater.AppManifest.Section;
 import com.sshtools.forker.updater.AppManifest.Type;
 import com.sshtools.forker.updater.Entry;
 
-@Mojo(name = "updates", defaultPhase = LifecyclePhase.PACKAGE, requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME)
+@Mojo(name = "updates", defaultPhase = LifecyclePhase.PACKAGE, requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME, requiresProject = true)
 public class ForkerUpdaterMojo extends AbstractMojo {
 	private static final String MAVEN_BASE = "https://repo1.maven.org/maven2";
 
@@ -175,6 +175,9 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 	@Parameter(defaultValue = "true", property = "updateableBootstrap")
 	private boolean updateableBootstrap;
 
+	@Parameter(defaultValue = "true", property = "include")
+	private boolean includeProject;
+
 	@Parameter(defaultValue = "false", property = "forkerDaemon")
 	private boolean forkerDaemon;
 
@@ -187,8 +190,11 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 	@Parameter(property = "mainClass", required = true)
 	private String mainClass;
 
-	@Parameter(property = "launcherScriptName", required = true)
+	@Parameter(property = "launcherScriptName", defaultValue = "${project.artifactId}", required = true)
 	private String launcherScriptName;
+
+	@Parameter(property = "installLocation", defaultValue = "${installer.home}/${project.artifactId}", required = true)
+	private String installLocation;
 
 	@Parameter(defaultValue = "true", property = "repository")
 	private boolean repository;
@@ -277,7 +283,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		if (includeForkerUpdaterRuntimeModules) {
 			allBootstrapModules.addAll(Arrays.asList("forker-common", "forker-client", "forker-updater", "commons-cli",
 					"jna", "jna-platform", "commons-lang3", "commons-io", "forker-wrapped"));
-			allBootstrapOnlyModules.addAll(Arrays.asList("forker-wrapper", "forker-daemon"));
+			allBootstrapOnlyModules.addAll(Arrays.asList("forker-wrapper", "forker-daemon", "forker-updater"));
 		}
 		if (bootstrapModules != null)
 			allBootstrapModules.addAll(bootstrapModules);
@@ -321,46 +327,12 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 
 			Set<Artifact> artifacts = project.getArtifacts();
 			for (Artifact a : artifacts) {
-				String artifactId = a.getArtifactId();
-				org.eclipse.aether.artifact.Artifact aetherArtifact = new DefaultArtifact(a.getGroupId(),
-						a.getArtifactId(), a.getClassifier(), a.getType(), a.getVersion());
-
-				ArtifactResult resolutionResult = resolveRemoteArtifact(new HashSet<MavenProject>(), project,
-						aetherArtifact, this.repositories);
-				if (resolutionResult == null)
-					throw new MojoExecutionException("Artifact " + aetherArtifact.getGroupId() + ":"
-							+ aetherArtifact.getArtifactId() + " could not be resolved.");
-
-				aetherArtifact = resolutionResult.getArtifact();
-
-				File file = aetherArtifact.getFile();
-				if (file == null || !file.exists()) {
-					getLog().warn("Artifact " + artifactId
-							+ " has no attached file. Its content will not be copied in the target model directory.");
-					continue;
-				}
-
-				String artifactName = getArtifactName(a);
-
-				if ((bootstrapClasspath != null && bootstrapClasspath.contains(artifactName))
-						|| (bootstrapOnlyClasspath != null && bootstrapOnlyClasspath.contains(artifactName))) {
-					copy(a.getFile().toPath(), checkDir(classPathObj).resolve(getFileName(a)), manifest.timestamp());
-				} else if ((allBootstrapModules.contains(artifactName))
-						|| (allBootstrapOnlyModules.contains(artifactName))) {
-					copy(a.getFile().toPath(), checkDir(modulePathObj).resolve(getFileName(a)), manifest.timestamp());
-				}
-
-				if ((bootstrapOnlyClasspath == null || !bootstrapOnlyClasspath.contains(artifactName))
-						&& (!allBootstrapOnlyModules.contains(artifactName))) {
-					if (classpathJars != null && classpathJars.contains(artifactName))
-						classpath(manifest, a, resolutionResult, file);
-					else if (isModule(a) || (automaticModules != null && automaticModules.contains(artifactName))) {
-						module(manifest, a, resolutionResult, file);
-					} else {
-						classpath(manifest, a, resolutionResult, file);
-					}
-				}
+				doArtifact(manifest, classPathObj, modulePathObj, allBootstrapModules,
+						allBootstrapOnlyModules, a);
 			}
+			if(includeProject)
+				doArtifact(manifest, classPathObj, modulePathObj, allBootstrapModules,
+						allBootstrapOnlyModules, project.getArtifact());
 
 			if (bootstrapFiles != null) {
 				for (BootstrapFile file : bootstrapFiles) {
@@ -480,6 +452,51 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		} catch (IOException | URISyntaxException e) {
 			throw new MojoExecutionException("Failed to write configuration.", e);
 		}
+	}
+
+	protected void doArtifact(AppManifest manifest, Path classPathObj, Path modulePathObj,
+			List<String> allBootstrapModules, List<String> allBootstrapOnlyModules, Artifact a)
+			throws MojoExecutionException, IOException, URISyntaxException {
+		String artifactId = a.getArtifactId();
+		org.eclipse.aether.artifact.Artifact aetherArtifact = new DefaultArtifact(a.getGroupId(),
+				a.getArtifactId(), a.getClassifier(), a.getType(), a.getVersion());
+
+		ArtifactResult resolutionResult = resolveRemoteArtifact(new HashSet<MavenProject>(), project,
+				aetherArtifact, this.repositories);
+		if (resolutionResult == null)
+			throw new MojoExecutionException("Artifact " + aetherArtifact.getGroupId() + ":"
+					+ aetherArtifact.getArtifactId() + " could not be resolved.");
+
+		aetherArtifact = resolutionResult.getArtifact();
+
+		File file = aetherArtifact.getFile();
+		if (file == null || !file.exists()) {
+			getLog().warn("Artifact " + artifactId
+					+ " has no attached file. Its content will not be copied in the target model directory.");
+			return;
+		}
+
+		String artifactName = getArtifactName(a);
+
+		if ((bootstrapClasspath != null && bootstrapClasspath.contains(artifactName))
+				|| (bootstrapOnlyClasspath != null && bootstrapOnlyClasspath.contains(artifactName))) {
+			copy(a.getFile().toPath(), checkDir(classPathObj).resolve(getFileName(a)), manifest.timestamp());
+		} else if ((allBootstrapModules.contains(artifactName))
+				|| (allBootstrapOnlyModules.contains(artifactName))) {
+			copy(a.getFile().toPath(), checkDir(modulePathObj).resolve(getFileName(a)), manifest.timestamp());
+		}
+
+		if ((bootstrapOnlyClasspath == null || !bootstrapOnlyClasspath.contains(artifactName))
+				&& (!allBootstrapOnlyModules.contains(artifactName))) {
+			if (classpathJars != null && classpathJars.contains(artifactName))
+				classpath(manifest, a, resolutionResult, file);
+			else if (isModule(a) || (automaticModules != null && automaticModules.contains(artifactName))) {
+				module(manifest, a, resolutionResult, file);
+			} else {
+				classpath(manifest, a, resolutionResult, file);
+			}
+		}
+		return;
 	}
 
 	private void writeScript(Path imagePath, Path classPathObj, Path modulePathObj, Path scriptPath, Path argsPath)
@@ -627,6 +644,8 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 			}
 			if (!forkerDaemon)
 				out.println("no-forker-daemon");
+			if (installLocation != null && !installLocation.equals(""))
+				out.println("install-location " + installLocation);
 			if (forkerArgs != null) {
 				for (String forkerArg : forkerArgs)
 					out.println(forkerArg.trim());
@@ -932,12 +951,16 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		org.eclipse.aether.repository.ArtifactRepository repo = result.getRepository();
 		MavenProject project = this.project;
 		while (project != null) {
-			for (MavenProject p : project.getCollectedProjects()) {
-				for (RemoteRepository r : p.getRemoteProjectRepositories()) {
-					if (r.getId().equals(repo.getId())) {
-						String url = repo == null ? resolveUrl(remoteBase, remoteJars) : r.getUrl();
-						return mavenUrl(url, result.getArtifact().getGroupId(), result.getArtifact().getArtifactId(),
-								result.getArtifact().getVersion(), result.getArtifact().getClassifier());
+			List<MavenProject> collectedProjects = project.getCollectedProjects();
+			if (collectedProjects != null) {
+				for (MavenProject p : collectedProjects) {
+					for (RemoteRepository r : p.getRemoteProjectRepositories()) {
+						if (r.getId().equals(repo.getId())) {
+							String url = repo == null ? resolveUrl(remoteBase, remoteJars) : r.getUrl();
+							return mavenUrl(url, result.getArtifact().getGroupId(),
+									result.getArtifact().getArtifactId(), result.getArtifact().getVersion(),
+									result.getArtifact().getClassifier());
+						}
 					}
 				}
 			}

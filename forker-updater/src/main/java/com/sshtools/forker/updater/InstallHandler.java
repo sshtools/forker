@@ -15,7 +15,7 @@ public interface InstallHandler {
 
 	void installProgress(float frac) throws Exception;
 
-	void installFile(Path file, Path d) throws Exception;
+	void installFile(Path file, Path d, int index) throws Exception;
 
 	void installFileProgress(Path file, float progress) throws Exception;
 

@@ -1,10 +1,10 @@
-package com.sshtools.forker.update.swt;
+package com.sshtools.forker.updater.swt;
 
-import java.awt.Rectangle;
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
 
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.ProgressBar;
 import org.eclipse.swt.widgets.Shell;
@@ -69,7 +69,7 @@ public class SWTInstallHandler implements InstallHandler {
 	}
 
 	@Override
-	public void installFile(Path file, Path d) throws Exception {
+	public void installFile(Path file, Path d, int index) throws Exception {
 		// TODO Auto-generated method stub
 
 	}

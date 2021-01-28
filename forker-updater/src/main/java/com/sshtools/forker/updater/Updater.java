@@ -67,7 +67,7 @@ public class Updater extends ForkerWrapper {
 			if (it.hasNext()) {
 				updateHandler = it.next();
 			} else
-				updateHandler = new ConsoleUpdateHandler();
+				updateHandler = new DefaultConsoleUpdateHandler();
 		}
 		return updateHandler;
 	}
@@ -80,7 +80,7 @@ public class Updater extends ForkerWrapper {
 			if (it.hasNext()) {
 				installHandler = it.next();
 			} else
-				installHandler = new ConsoleInstallHandler();
+				installHandler = new DefaultConsoleInstallHandler();
 		}
 		return installHandler;
 	}
@@ -301,7 +301,7 @@ public class Updater extends ForkerWrapper {
 		InstallSession session = new InstallSession();
 		Files.walk(cwd()).forEach(s -> {
 			if (Files.isRegularFile(s))
-				session.files().add(s);
+				session.addFile(s);
 		});
 		String installLocation = getConfiguration().getOptionValue("install-location", null);
 		if (installLocation == null || installLocation.equals("")) {
@@ -358,24 +358,21 @@ public class Updater extends ForkerWrapper {
 
 		InstallHandler handler = getInstallHandler();
 		handler.startInstall();
-		long sz = 0;
-		for (Path p : session.files()) {
-			sz += Files.size(p);
-		}
-		long grandTotal = sz;
+		long grandTotal = session.size();
 		try {
 			long readTotal = 0;
+			int file = 0;
 			for (Path s : session.files()) {
 				Path d = checkFilesDir(dest.resolve(cwd().relativize(s)));
 				logger.log(Level.FINE, String.format("Installing %s to %s.", s, d));
-				handler.installFile(s, d);
+				handler.installFile(s, d, file);
 				Files.deleteIfExists(d);
 				if (Files.isSymbolicLink(s)) {
-					logger.log(Level.INFO, String.format("Creating link %s.", s));
+					logger.log(Level.FINE, String.format("Creating link %s.", s));
 					Files.createSymbolicLink(d, Files.readSymbolicLink(s));
 				} else {
 					long fileSize = Files.size(s);
-					logger.log(Level.INFO, String.format("Creating linkfile %s.", s));
+					logger.log(Level.FINE, String.format("Creating linkfile %s.", s));
 					try (InputStream in = Files.newInputStream(s)) {
 						try (OutputStream out = Files.newOutputStream(d)) {
 							byte[] buf = new byte[65536];
@@ -393,6 +390,7 @@ public class Updater extends ForkerWrapper {
 					Files.setPosixFilePermissions(d, Files.getPosixFilePermissions(s));
 				}
 				handler.installFileDone(s);
+				file++;
 			}
 
 			logger.log(Level.FINE, String.format("Installation complete."));

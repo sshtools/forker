@@ -4,6 +4,8 @@ import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -29,16 +31,99 @@ public abstract class NonBlockingProcess extends ForkerProcess {
 	protected ConcurrentLinkedQueue<ByteBuffer> pendingWrites;
 	protected volatile boolean isRunning;
 	private final Object lock = new Object();
+	private PipedInputStream pipeIn;
+	private PipedInputStream pipeErr;
 
 	/**
 	 * Constructor
 	 * 
-	 * @param builder builder
-	 * @param factory factory
+	 * @param builder  builder
+	 * @param factory  factory
 	 * @param listener listener
 	 */
-	public NonBlockingProcess(final ForkerBuilder builder, NonBlockingProcessFactory factory, NonBlockingProcessListener listener) {
-		this.listener = listener;
+	public NonBlockingProcess(final ForkerBuilder builder, NonBlockingProcessFactory factory,
+			NonBlockingProcessListener listener) {
+		if (listener == null) {
+			/*
+			 * If there is no listener, the we create one so that getInputStream() / getErrorStream() can be
+			 * used instead if wanted.
+			 */
+			pipeIn = new PipedInputStream();
+			try {
+				PipedOutputStream pipeOut = new PipedOutputStream(pipeIn);
+				PipedOutputStream pipeErrOut = null;
+				if(!builder.redirectErrorStream()) {
+					pipeErr = new PipedInputStream();
+					pipeErrOut = new PipedOutputStream(pipeErr);
+				}
+				final PipedOutputStream fPipeErrOut = pipeErrOut;
+				this.listener = new NonBlockingProcessListener() {
+
+					@Override
+					public void onStdout(NonBlockingProcess process, ByteBuffer buffer, boolean closed) {
+						if (!closed) {
+							byte[] bytes = new byte[buffer.remaining()];
+							/* Consume bytes from buffer (so position is updated) */
+							buffer.get(bytes);
+							try {
+								pipeOut.write(bytes);
+							} catch (IOException e) {
+								throw new IllegalStateException(
+										"Failed to write back to pipe for simulated non-blocking I/O.", e);
+							}
+						}
+					}
+
+					@Override
+					public boolean onStdinReady(NonBlockingProcess process, ByteBuffer buffer) {
+						return false;
+					}
+
+					@Override
+					public void onStderr(NonBlockingProcess process, ByteBuffer buffer, boolean closed) {
+						if(!closed) {
+							if(builder.redirectErrorStream()) {
+								onStdout(process, buffer, closed);
+							}
+							else {
+								byte[] bytes = new byte[buffer.remaining()];
+								/* Consume bytes from buffer (so position is updated) */
+								buffer.get(bytes);
+								try {
+									fPipeErrOut.write(bytes);
+								} catch (IOException e) {
+									throw new IllegalStateException(
+											"Failed to write back to pipe for simulated non-blocking I/O.", e);
+								}
+							}
+						}
+					}
+
+					@Override
+					public void onStarted(NonBlockingProcess process) {
+					}
+
+					@Override
+					public void onStart(NonBlockingProcess process) {
+					}
+
+					@Override
+					public void onExit(int exitCode, NonBlockingProcess process) {
+						try {
+							pipeOut.close();
+						} catch (IOException e) {
+						}
+					}
+
+					@Override
+					public void onError(Exception exception, NonBlockingProcess process, boolean exiting) {
+					}
+				};
+			} catch (IOException ioe) {
+				throw new IllegalStateException("Joining of input pipe failed.", ioe);
+			}
+		} else
+			this.listener = listener;
 		this.builder = builder;
 		this.factory = factory;
 		this.exitCode = new AtomicInteger();
@@ -92,7 +177,8 @@ public abstract class NonBlockingProcess extends ForkerProcess {
 
 					@Override
 					public void write(byte[] b, int off, int len) throws IOException {
-						ByteBuffer buf = factory.isAllocateDirect() ? ByteBuffer.allocate(len) : ByteBuffer.allocate(len);
+						ByteBuffer buf = factory.isAllocateDirect() ? ByteBuffer.allocate(len)
+								: ByteBuffer.allocate(len);
 						buf.put(b, off, len);
 						buf.flip();
 						writeStdin(buf);
@@ -110,12 +196,20 @@ public abstract class NonBlockingProcess extends ForkerProcess {
 
 	@Override
 	public InputStream getInputStream() {
-		throw new UnsupportedOperationException("This process is a non-blocking one. Please use NonBlockProcess.listen() instead.");
+		if (pipeIn == null)
+			throw new UnsupportedOperationException(
+					"This process is a non-blocking one. Please use NonBlockProcess.listen() instead.");
+		else
+			return pipeIn;
 	}
 
 	@Override
 	public InputStream getErrorStream() {
-		throw new UnsupportedOperationException("This process is a non-blocking one. Please use NonBlockProcess.listen() instead.");
+		if (pipeErr == null)
+			throw new UnsupportedOperationException(
+					"This process is a non-blocking one. Please use NonBlockProcess.listen() instead.");
+		else
+			return pipeErr;
 	}
 
 	/**
