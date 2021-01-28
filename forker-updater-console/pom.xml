@@ -32,11 +32,15 @@
 
 	</build>
 	<dependencies>
-
 		<dependency>
 			<groupId>${project.groupId}</groupId>
 			<version>${project.version}</version>
 			<artifactId>forker-updater</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<version>${project.version}</version>
+			<artifactId>forker-daemon</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.fusesource.jansi</groupId>

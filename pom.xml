@@ -89,13 +89,32 @@
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
-			<version>4.7</version>
+			<version>4.13.1</version>
 			<scope>test</scope>
 		</dependency>
 
 	</dependencies>
 
 	<profiles>
+		<profile>
+			<activation>
+				<jdk>[9,)</jdk>
+			</activation>
+			<build>
+				<pluginManagement>
+					<plugins>
+						<plugin>
+							<groupId>org.apache.maven.plugins</groupId>
+							<artifactId>maven-javadoc-plugin</artifactId>
+							<configuration>
+								<!-- TODO: Why is this STILL broken! -->
+								<javadocExecutable>${java.home}/bin/javadoc</javadocExecutable>
+							</configuration>
+						</plugin>
+					</plugins>
+				</pluginManagement>
+			</build>
+		</profile>
 		<profile>
 			<id>release-sign-artifacts</id>
 			<activation>
@@ -205,7 +224,6 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-javadoc-plugin</artifactId>
-				<version>3.2.0</version>
 				<executions>
 					<execution>
 						<id>release</id>
@@ -215,14 +233,6 @@
 						</goals>
 					</execution>
 				</executions>
-				<configuration>
-					<encoding>UTF-8</encoding>
-					<excludePackageNames>**.impl.*</excludePackageNames>
-					<!-- https://bugs.openjdk.java.net/browse/JDK-8212233 -->
-					<detectJavaApiLink>false</detectJavaApiLink>
-					<source>8</source>
-					<additionalparam>-Xdoclint:none</additionalparam>
-				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
@@ -284,23 +294,25 @@
 					</executions>
 				</plugin>
 				<plugin>
-					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-javadoc-plugin</artifactId>
 					<version>3.2.0</version>
+					<configuration>
+						<encoding>UTF-8</encoding>
+						<excludePackageNames>**.impl.*</excludePackageNames>
+						<!-- https://bugs.openjdk.java.net/browse/JDK-8212233 -->
+						<detectJavaApiLink>false</detectJavaApiLink>
+						<source>8</source>
+						<additionalparam>-Xdoclint:none</additionalparam>
+					</configuration>
 				</plugin>
 				<plugin>
-					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-site-plugin</artifactId>
 					<version>${maven.site.plugin}</version>
 				</plugin>
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
-					<artifactId>maven-deploy-plugin</artifactId>
-					<version>3.0.0-M1</version>
-				</plugin>
-				<plugin>
-					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-jar-plugin</artifactId>
+					<version>3.2.0</version>
 					<configuration>
 						<archive>
 							<manifestEntries>
@@ -309,6 +321,35 @@
 						</archive>
 					</configuration>
 				</plugin>
+				<plugin>
+					<artifactId>maven-clean-plugin</artifactId>
+					<version>3.1.0</version>
+				</plugin>
+				<plugin>
+					<artifactId>maven-resources-plugin</artifactId>
+					<version>3.2.0</version>
+				</plugin>
+				<plugin>
+					<artifactId>maven-plugin-plugin</artifactId>
+					<version>3.6.0</version>
+				</plugin>
+				<plugin>
+					<artifactId>maven-surefire-plugin</artifactId>
+					<version>3.0.0-M5</version>
+				</plugin>
+				<plugin>
+					<artifactId>maven-install-plugin</artifactId>
+					<version>3.0.0-M1</version>
+				</plugin>
+				<plugin>
+					<artifactId>maven-deploy-plugin</artifactId>
+					<version>3.0.0-M1</version>
+				</plugin>
+				<plugin>
+					<artifactId>maven-invoker-plugin</artifactId>
+					<version>3.2.1</version>
+				</plugin>
+
 				<plugin>
 					<groupId>org.eclipse.m2e</groupId>
 					<artifactId>lifecycle-mapping</artifactId>

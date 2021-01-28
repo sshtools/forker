@@ -24,7 +24,6 @@ import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 
 import org.fusesource.jansi.Ansi;
-import org.fusesource.jansi.Ansi.Erase;
 
 import com.sshtools.forker.updater.AbstractHandler;
 import com.sshtools.forker.updater.InstallHandler;

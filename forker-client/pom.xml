@@ -60,12 +60,5 @@ Parts of the non-blocking API are based on NuProcess (https://github.com/brettwo
 			<artifactId>forker-common</artifactId>
 			<version>${project.version}</version>
 		</dependency>
-
-		<dependency>
-			<groupId>junit</groupId>
-			<artifactId>junit</artifactId>
-			<version>4.7</version>
-			<scope>test</scope>
-		</dependency>
 	</dependencies>
 </project>
