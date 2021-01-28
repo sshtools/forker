@@ -462,7 +462,8 @@ public class OSCommand {
 		if (cwd != null) {
 			builder.directory(cwd);
 		}
-		builder.redirectErrorStream(true);
+		if(IO.SINK != builder.io())
+			builder.redirectErrorStream(true);
 		Process process = builder.start();
 		InputStream inputStream = process.getInputStream();
 		try {
@@ -949,7 +950,8 @@ public class OSCommand {
 		if (cwd != null) {
 			pb.directory(cwd);
 		}
-		pb.redirectErrorStream(true);
+		if(IO.SINK != pb.io())
+			pb.redirectErrorStream(true);
 		Process p = pb.start();
 		IOUtils.copy(p.getInputStream(), out == null ? new NullOutputStream() : out);
 		try {
@@ -1031,7 +1033,8 @@ public class OSCommand {
 		if (cwd != null) {
 			pb.directory(cwd);
 		}
-		pb.redirectErrorStream(true);
+		if(IO.SINK != pb.io())
+			pb.redirectErrorStream(true);
 		final Process p = pb.start();
 		final BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
 		return new Iterable<String>() {
@@ -1108,7 +1111,8 @@ public class OSCommand {
 			if (cwd != null) {
 				pb.directory(cwd);
 			}
-			pb.redirectErrorStream(true);
+			if(IO.SINK != pb.io())
+				pb.redirectErrorStream(true);
 			Process p = pb.start();
 			Collection<String> lines = IOUtils.readLines(p.getInputStream(),  Charset.defaultCharset());
 			try {
@@ -1177,7 +1181,8 @@ public class OSCommand {
 			if (cwd != null) {
 				pb.directory(cwd);
 			}
-			pb.redirectErrorStream(true);
+			if(IO.SINK != pb.io())
+				pb.redirectErrorStream(true);
 			checkElevationAndEnvironment(pb);
 			Process p = pb.start();
 			IOUtils.copy(p.getInputStream(), fos);
