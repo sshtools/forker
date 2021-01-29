@@ -261,7 +261,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		AppManifest manifest = new AppManifest();
 		manifest.id(id);
 		try {
-			manifest.baseUri(new URI(remoteBase));
+			manifest.baseUri(new URI(normalizeForUri(remoteBase)));
 		} catch (URISyntaxException e1) {
 			throw new MojoExecutionException("Invalid remote base.", e1);
 		}
@@ -363,7 +363,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 					Path relTarget = imagePath.relativize(target);
 					copy(path, target, manifest.timestamp());
 					manifest.entries().add(new Entry(target).section(Section.APP).path(relTarget)
-							.uri(new URI(resolveUrl(remoteBase, relTarget.toString()))).type(Type.OTHER));
+							.uri(new URI(resolveUrl(normalizeForUri(remoteBase), relTarget.toString()))).type(Type.OTHER));
 				}
 			}
 
@@ -377,7 +377,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 								&& !manifest.hasPath(relPath)) {
 							try {
 								manifest.entries().add(new Entry(s).section(Section.BOOTSTRAP).type(Type.OTHER)
-										.path(relPath).uri(new URI(resolveUrl(remoteBase, relPath.toString()))));
+										.path(relPath).uri(new URI(resolveUrl(normalizeForUri(remoteBase), normalizeForUri(relPath.toString())))));
 							} catch (IOException | URISyntaxException e) {
 								throw new IllegalStateException("Failed to construct bootstrap manifest entry.", e);
 							}
@@ -414,7 +414,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 			writeAppCfg(manifest, appCfgPath, imagePath);
 			manifest.entries()
 					.add(new Entry(appCfgPath).section(Section.BOOTSTRAP).path(imagePath.relativize(appCfgPath))
-							.uri(new URI(resolveUrl(remoteBase, imagePath.relativize(appCfgPath).toString())))
+							.uri(new URI(resolveUrl(normalizeForUri(remoteBase), imagePath.relativize(appCfgPath).toString())))
 							.type(Type.OTHER));
 			if (repository) {
 				Path repositoryAppCfgPath = repositoryPath.resolve("app.cfg");
@@ -431,12 +431,12 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 				manifest.entries()
 						.add(new Entry(scriptPath).section(Section.BOOTSTRAP)
 								.path(repositoryPath.relativize(scriptPath))
-								.uri(new URI(resolveUrl(remoteBase, repositoryPath.relativize(scriptPath).toString())))
+								.uri(new URI(resolveUrl(normalizeForUri(remoteBase), normalizeForUri(repositoryPath.relativize(scriptPath).toString()))))
 								.type(Type.OTHER));
 				if (useArgfile) {
 					manifest.entries().add(new Entry(argsPath).section(Section.BOOTSTRAP)
 							.path(repositoryPath.relativize(argsPath))
-							.uri(new URI(resolveUrl(remoteBase, repositoryPath.relativize(argsPath).toString())))
+							.uri(new URI(resolveUrl(normalizeForUri(remoteBase), repositoryPath.relativize(argsPath).toString())))
 							.type(Type.OTHER));
 				}
 			}
@@ -539,7 +539,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 				vmopts.add("--add-modules");
 				vmopts.add(String.join(",", systemModules));
 			}
-			vmopts.add("-Dforker.remoteManifest=" + remoteBase);
+			vmopts.add("-Dforker.remoteManifest=" + normalizeForUri(remoteBase));
 			if (vmArgs != null) {
 				for (String vmArg : vmArgs) {
 					vmopts.add(vmArg);
@@ -621,7 +621,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(appCfgPath), true)) {
 			out.println("configuration-directory app.cfg.d");
 			out.println("local-manifest manifest.xml");
-			out.println("default-remote-manifest " + remoteBase + "/manifest.xml");
+			out.println("default-remote-manifest " + normalizeForUri(remoteBase) + "/manifest.xml");
 			List<String> cp = new ArrayList<>();
 			List<String> mp = new ArrayList<>();
 			for (Entry entry : manifest.entries(Section.APP)) {
@@ -804,21 +804,24 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		// ----------------------------------------------------------------------
 		toolExe = new File(SystemUtils.getJavaHome() + File.separator + ".." + File.separator + "bin", toolCommand);
 
-		// ----------------------------------------------------------------------
-		// Try to find javadocExe from JAVA_HOME environment variable
-		// ----------------------------------------------------------------------
 		if (!toolExe.exists() || !toolExe.isFile()) {
-			final Properties env = CommandLineUtils.getSystemEnvVars();
-			final String javaHome = env.getProperty("JAVA_HOME");
-			if (StringUtils.isEmpty(javaHome)) {
-				throw new IOException("The environment variable JAVA_HOME is not correctly set.");
+			toolExe = new File(SystemUtils.getJavaHome() + File.separator + "bin", toolCommand);
+			if (!toolExe.exists() || !toolExe.isFile()) {			
+				// ----------------------------------------------------------------------
+				// Try to find javadocExe from JAVA_HOME environment variable
+				// ----------------------------------------------------------------------
+				final Properties env = CommandLineUtils.getSystemEnvVars();
+				final String javaHome = env.getProperty("JAVA_HOME");
+				if (StringUtils.isEmpty(javaHome)) {
+					throw new IOException("The environment variable JAVA_HOME is not correctly set." + SystemUtils.getJavaHome() + " : " + toolExe);
+				}
+				if (!new File(javaHome).getCanonicalFile().exists() || new File(javaHome).getCanonicalFile().isFile()) {
+					throw new IOException("The environment variable JAVA_HOME=" + javaHome
+							+ " doesn't exist or is not a valid directory.");
+				}
+	
+				toolExe = new File(javaHome + File.separator + "bin", toolCommand);
 			}
-			if (!new File(javaHome).getCanonicalFile().exists() || new File(javaHome).getCanonicalFile().isFile()) {
-				throw new IOException("The environment variable JAVA_HOME=" + javaHome
-						+ " doesn't exist or is not a valid directory.");
-			}
-
-			toolExe = new File(javaHome + File.separator + "bin", toolCommand);
 		}
 		if (!toolExe.getCanonicalFile().exists() || !toolExe.getCanonicalFile().isFile()) {
 			throw new IOException("The " + toolName + " executable '" + toolExe
@@ -956,7 +959,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 				for (MavenProject p : collectedProjects) {
 					for (RemoteRepository r : p.getRemoteProjectRepositories()) {
 						if (r.getId().equals(repo.getId())) {
-							String url = repo == null ? resolveUrl(remoteBase, remoteJars) : r.getUrl();
+							String url = repo == null ? resolveUrl(normalizeForUri(remoteBase), remoteJars) : r.getUrl();
 							return mavenUrl(url, result.getArtifact().getGroupId(),
 									result.getArtifact().getArtifactId(), result.getArtifact().getVersion(),
 									result.getArtifact().getClassifier());
@@ -969,8 +972,12 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		return null;
 	}
 
+	private String normalizeForUri(String localPath) {
+		return localPath.replace(File.separator, "/");
+	}
+
 	private String repositoryUrl(String path) {
-		return resolveUrl(resolveUrl(remoteBase, appPath), path);
+		return resolveUrl(resolveUrl(normalizeForUri(remoteBase), normalizeForUri(appPath)), normalizeForUri(path));
 	}
 
 	private String repositoryUrl(ArtifactResult result) {

@@ -1,4 +1,4 @@
-package helloworld;
+package hello.world;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;

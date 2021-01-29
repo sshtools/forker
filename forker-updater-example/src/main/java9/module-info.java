@@ -1,4 +1,5 @@
-module helloworld {
+module hello.world {
 	requires java.desktop;
-	exports helloworld;
+	exports hello.world;
+	opens hello.world;
 }

@@ -55,7 +55,7 @@
 							want a http:// or https:// URL. -->
 							<remoteBase>file://${build.directory}/image</remoteBase>
 							
-							<mainClass>helloworld/helloworld.HelloWorld</mainClass>
+							<mainClass>helloworld/hello.world.HelloWorld</mainClass>
 							<systemModules>
 								<systemModule>java.desktop</systemModule>
 								<systemModule>java.management</systemModule>
@@ -76,7 +76,7 @@
 			<plugin>
 				<groupId>com.github.hazendaz.maven</groupId>
 				<artifactId>makeself-maven-plugin</artifactId>
-				<version>1.2.0</version>
+				<version>1.3.0-M1</version>
 				<executions>
 					<execution>
 						<id>package</id>
