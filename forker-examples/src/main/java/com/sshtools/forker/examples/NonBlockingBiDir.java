@@ -1,4 +1,4 @@
-package com.nervepoint.forker.examples;
+package com.sshtools.forker.examples;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -21,6 +21,9 @@ public class NonBlockingBiDir {
 		if (SystemUtils.IS_OS_UNIX) {
 			// The unix example uses wc to count lines of standard input
 			builder.command("wc", "-l");
+		} else if (SystemUtils.IS_OS_WINDOWS) {
+			// The windows example uses find to count lines of standard input
+			builder.command("find", "/c", "/v", "");
 		} else {
 			throw new UnsupportedOperationException();
 		}

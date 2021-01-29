@@ -1,4 +1,4 @@
-package com.nervepoint.forker.examples;
+package com.sshtools.forker.examples;
 
 import org.apache.commons.io.IOUtils;
 

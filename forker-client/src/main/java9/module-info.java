@@ -5,6 +5,7 @@
  */
 module com.sshtools.forker.client {
 	exports com.sshtools.forker.client;
+	exports com.sshtools.forker.client.impl;
 
 	requires transitive com.sshtools.forker.common;
 	requires java.desktop;

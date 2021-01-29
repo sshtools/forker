@@ -1,4 +1,4 @@
-package com.nervepoint.forker.examples;
+package com.sshtools.forker.examples;
 
 /** This is the application that {@link WrapperTest} will launch */
 public class WrappedTest {

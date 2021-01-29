@@ -92,7 +92,7 @@ public class WinRunAs extends JFrame {
 		 */
 
 		HANDLEByReference token = new HANDLEByReference();
-		if (!XAdvapi32.INSTANCE.LogonUser(username, domain, new String(password), WinBase.LOGON32_LOGON_INTERACTIVE,
+		if (!XAdvapi32.INSTANCE.LogonUser(username, domain, new String(password), WinBase.LOGON32_LOGON_BATCH,
 				WinBase.LOGON32_PROVIDER_DEFAULT, token)) {
 			throw new IOException("Logon failed.");
 		}

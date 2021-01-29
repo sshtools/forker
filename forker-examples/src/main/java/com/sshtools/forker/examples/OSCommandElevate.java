@@ -1,4 +1,4 @@
-package com.nervepoint.forker.examples;
+package com.sshtools.forker.examples;
 
 import static com.sshtools.forker.client.OSCommand.admin;
 import static com.sshtools.forker.client.OSCommand.elevate;
