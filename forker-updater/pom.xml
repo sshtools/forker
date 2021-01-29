@@ -2,7 +2,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<artifactId>forker-updater</artifactId>
 	<name>Forker Updater</name>
-	<description>Extends forker-daemon to add update features.</description>
+	<description>Extends forker-wrapper to add update features.</description>
 	<parent>
 		<groupId>com.sshtools</groupId>
 		<artifactId>forker</artifactId>
