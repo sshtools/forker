@@ -25,4 +25,6 @@ public interface InstallHandler {
 
 	Path chooseDestination(Callable<Void> callable);
 
+	void installDone();
+
 }

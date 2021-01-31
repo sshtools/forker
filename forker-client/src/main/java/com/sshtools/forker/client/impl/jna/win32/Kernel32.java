@@ -13,7 +13,7 @@ import com.sun.jna.win32.W32APIOptions;
  */
 public interface Kernel32 extends com.sun.jna.platform.win32.Kernel32 {
 	/** The instance. */
-	Kernel32 INSTANCE = Native.loadLibrary("kernel32", Kernel32.class, W32APIOptions.DEFAULT_OPTIONS);
+	Kernel32 INSTANCE = Native.load("kernel32", Kernel32.class, W32APIOptions.DEFAULT_OPTIONS);
 
 	/**
 	 * @param hFile

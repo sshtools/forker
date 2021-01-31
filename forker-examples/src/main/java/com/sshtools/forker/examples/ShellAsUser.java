@@ -3,13 +3,12 @@ package com.sshtools.forker.examples;
 import java.io.Console;
 import java.io.IOException;
 
-import org.apache.commons.io.IOUtils;
-
 import com.sshtools.forker.client.EffectiveUserFactory.DefaultEffectiveUserFactory;
 import com.sshtools.forker.client.Forker;
 import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.client.ShellBuilder;
 import com.sshtools.forker.common.OS;
+import com.sshtools.forker.common.Util;
 import com.sshtools.forker.pty.PTYExecutor;
 
 /**
@@ -57,7 +56,7 @@ public class ShellAsUser {
 		new Thread() {
 			public void run() {
 				try {
-					IOUtils.copy(System.in, p.getOutputStream());
+					Util.copy(System.in, p.getOutputStream());
 				} catch (IOException e) {
 				} finally {
 					// Close the process input stream when stdin closes, this
@@ -69,7 +68,7 @@ public class ShellAsUser {
 				}
 			}
 		}.start();
-		IOUtils.copy(p.getInputStream(), System.out);
+		Util.copy(p.getInputStream(), System.out);
 		int ret = p.waitFor();
 		System.err.println("Exited with code: " + ret);
 		System.exit(ret);

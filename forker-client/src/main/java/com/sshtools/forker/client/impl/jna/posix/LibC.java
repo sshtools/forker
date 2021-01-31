@@ -197,7 +197,7 @@ public class LibC {
 	/**
 	 * 
 	 */
-	public static SyscallLibrary SYSCALL = (SyscallLibrary) Native.loadLibrary(Platform.C_LIBRARY_NAME, SyscallLibrary.class);
+	public static SyscallLibrary SYSCALL = Native.load(Platform.C_LIBRARY_NAME, SyscallLibrary.class);
 	/**
 	 * 
 	 */

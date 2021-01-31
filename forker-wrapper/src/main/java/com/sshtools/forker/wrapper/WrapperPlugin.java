@@ -4,9 +4,9 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
-import org.apache.commons.cli.Options;
-
 import com.sshtools.forker.client.ForkerBuilder;
+
+import picocli.CommandLine.Model.CommandSpec;
 
 public interface WrapperPlugin {
 
@@ -28,7 +28,7 @@ public interface WrapperPlugin {
 		return Integer.MIN_VALUE;
 	}
 
-	default void addOptions(Options options) {
+	default void addOptions(CommandSpec options) {
 	}
 
 	default void beforeProcess() throws IOException {

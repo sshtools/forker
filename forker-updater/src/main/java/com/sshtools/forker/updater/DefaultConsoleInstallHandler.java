@@ -54,12 +54,7 @@ public class DefaultConsoleInstallHandler extends AbstractHandler implements Ins
 	}
 
 	@Override
-	public void failed(Throwable t) {
-		t.printStackTrace();
-	}
-
-	@Override
-	public void complete() {
+	public void installDone() {
 	}
 
 	@Override

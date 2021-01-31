@@ -16,7 +16,7 @@ public interface Userenv extends StdCallLibrary {
 	/**
 	 * Instance
 	 */
-	Userenv INSTANCE = (Userenv) Native.loadLibrary("userenv", Userenv.class, W32APIOptions.UNICODE_OPTIONS);
+	Userenv INSTANCE = (Userenv) Native.load("userenv", Userenv.class, W32APIOptions.UNICODE_OPTIONS);
 
 	/**
 	 * Retrieves the environment variables for the specified user. This block

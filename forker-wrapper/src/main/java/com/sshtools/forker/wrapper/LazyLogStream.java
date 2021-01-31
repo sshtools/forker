@@ -104,4 +104,9 @@ public class LazyLogStream extends OutputStream {
 			out = null;
 		}
 	}
+
+	@Override
+	public String toString() {
+		return outputFile.getPath();
+	}
 }

@@ -3,7 +3,7 @@ package com.sshtools.forker.updater;
 import java.io.Console;
 import java.io.PrintWriter;
 
-public abstract class AbstractHandler {
+public abstract class AbstractHandler implements Handler {
 
 	protected Console console;
 	protected PrintWriter out;
@@ -19,5 +19,14 @@ public abstract class AbstractHandler {
 
 	protected void print(String str) {
 		out.print(str);
+	}
+
+	@Override
+	public void complete() {
+	}
+
+	@Override
+	public void failed(Throwable error) {
+		error.printStackTrace(out);
 	}
 }

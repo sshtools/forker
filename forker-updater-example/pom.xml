@@ -16,7 +16,7 @@
 		<dependency>
 			<groupId>${project.groupId}</groupId>
 			<version>${project.version}</version>
-			<artifactId>forker-updater-console</artifactId>
+			<artifactId>forker-updater-swt</artifactId>
 		</dependency>
 	</dependencies>
 
@@ -55,18 +55,26 @@
 							want a http:// or https:// URL. -->
 							<remoteBase>file://${build.directory}/image</remoteBase>
 							
-							<mainClass>helloworld/hello.world.HelloWorld</mainClass>
+							<mainClass>hello.world/hello.world.HelloWorld</mainClass>
 							<systemModules>
 								<systemModule>java.desktop</systemModule>
 								<systemModule>java.management</systemModule>
 								<systemModule>java.logging</systemModule>
 								<systemModule>jdk.attach</systemModule>
 							</systemModules>
-							
-							<bootstrapOnlyModules>
-								<bootstrapOnlyModule>forker-updater-console</bootstrapOnlyModule>
-								<bootstrapOnlyModule>jansi</bootstrapOnlyModule>
-							</bootstrapOnlyModules>
+							<artifactArch>
+								<linux>org.eclipse.swt.gtk.linux.x86_64</linux>
+							</artifactArch>
+							<artifactOS>
+								<amd64>org.eclipse.swt.gtk.linux.x86_64</amd64>
+							</artifactOS>
+							<bootstrapArtifacts>
+								<!-- <bootstrapOnlyModule>forker-updater-console</bootstrapOnlyModule>
+								<bootstrapOnlyModule>jansi</bootstrapOnlyModule> -->
+								<bootstrapArtifact>forker-updater-swt</bootstrapArtifact>
+								<bootstrapArtifact>org.eclipse.swt</bootstrapArtifact>
+								<bootstrapArtifact>org.eclipse.swt.gtk.linux.x86_64</bootstrapArtifact>
+							</bootstrapArtifacts>
 						</configuration>
 					</execution>
 

@@ -16,8 +16,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.StringTokenizer;
 
-import org.apache.commons.io.IOUtils;
-
 import com.sshtools.forker.common.Cookie;
 import com.sshtools.forker.common.Cookie.Instance;
 import com.sshtools.forker.common.IO;
@@ -730,7 +728,7 @@ public class Forker {
 						}
 					}
 					// Now just read till it dies (or we die)
-					IOUtils.copy(inputStream, System.err);
+					inputStream.transferTo(System.err);
 				} finally {
 					process.waitFor();
 				}

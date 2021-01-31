@@ -1,9 +1,9 @@
 package com.sshtools.forker.examples;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.SystemUtils;
 
 import com.sshtools.forker.client.ForkerBuilder;
+import com.sshtools.forker.common.Util;
 import com.sshtools.forker.wrapper.ForkerWrapper;
 import com.sshtools.forker.wrapper.KeyValuePair;
 import com.sshtools.forker.wrapper.WrapperIO;
@@ -44,7 +44,7 @@ public class WrappedProcessTest {
 		// Boilerplate stuff
 		fb.redirectErrorStream(true);
 		Process p = fb.start();
-		IOUtils.copy(p.getInputStream(), System.out);
+		Util.copy(p.getInputStream(), System.out);
 		System.out.println(" (" + p.waitFor() + ")");
 
 	}

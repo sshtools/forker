@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -22,14 +21,13 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.io.output.NullOutputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
 
 import com.sshtools.forker.client.EffectiveUserFactory.SudoFixedPasswordUser;
 import com.sshtools.forker.common.IO;
 import com.sshtools.forker.common.OS;
+import com.sshtools.forker.common.Util;
 
 /**
  * Some helper methods for running commands and doing common things with minimal
@@ -484,7 +482,7 @@ public class OSCommand {
 						System.out.print((char) b);
 					}
 				};
-				IOUtils.copy(inputStream, out);
+				Util.copy(inputStream, out);
 			}
 		} finally {
 			try {
@@ -953,7 +951,7 @@ public class OSCommand {
 		if(IO.SINK != pb.io())
 			pb.redirectErrorStream(true);
 		Process p = pb.start();
-		IOUtils.copy(p.getInputStream(), out == null ? new NullOutputStream() : out);
+		Util.copy(p.getInputStream(), out);
 		try {
 			return p.waitFor();
 		} catch (InterruptedException e) {
@@ -1114,7 +1112,7 @@ public class OSCommand {
 			if(IO.SINK != pb.io())
 				pb.redirectErrorStream(true);
 			Process p = pb.start();
-			Collection<String> lines = IOUtils.readLines(p.getInputStream(),  Charset.defaultCharset());
+			Collection<String> lines = Util.readLines(p.getInputStream());
 			try {
 				int ret = p.waitFor();
 				if (ret != 0) {
@@ -1185,7 +1183,7 @@ public class OSCommand {
 				pb.redirectErrorStream(true);
 			checkElevationAndEnvironment(pb);
 			Process p = pb.start();
-			IOUtils.copy(p.getInputStream(), fos);
+			Util.copy(p.getInputStream(), fos);
 			try {
 				return p.waitFor();
 			} catch (InterruptedException e) {

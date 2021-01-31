@@ -7,8 +7,8 @@ module com.sshtools.forker.wrapper {
 	requires transitive java.logging;
 	requires java.management;
 	requires transitive com.sshtools.forker.daemon;
-	requires transitive commons.cli;
 	requires transitive jdk.attach;
+	requires transitive info.picocli;
 
 	exports com.sshtools.forker.wrapper;
 

@@ -8,10 +8,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.output.NullOutputStream;
-
 import com.sshtools.forker.client.OSCommand;
+import com.sshtools.forker.common.Util;
+import com.sshtools.forker.common.Util.NullOutputStream;
 import com.sshtools.forker.services.AbstractService;
 import com.sshtools.forker.services.Service;
 import com.sshtools.forker.services.Service.Status;
@@ -209,7 +208,7 @@ public class InitctlServiceService extends AbstractServiceService implements Ser
 		boolean enabledByDefault = false;
 		File confFile = getServiceConfFile(service);
 		if (confFile.exists()) {
-			for (String line : FileUtils.readLines(confFile, "UTF-8")) {
+			for (String line : Util.readLines(confFile, "UTF-8")) {
 				if (line.startsWith("start on runlevel")) {
 					enabledByDefault = true;
 					break;
@@ -225,7 +224,7 @@ public class InitctlServiceService extends AbstractServiceService implements Ser
 		boolean defaultState = isEnabledByDefault(service);
 		if (!override.exists())
 			return defaultState;
-		for (String line : FileUtils.readLines(override, "UTF-8")) {
+		for (String line : Util.readLines(override, "UTF-8")) {
 			if (line.startsWith("start on runlevel"))
 				return true;
 		}

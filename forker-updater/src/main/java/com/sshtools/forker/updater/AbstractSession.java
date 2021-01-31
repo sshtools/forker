@@ -1,5 +1,5 @@
 package com.sshtools.forker.updater;
- 
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -15,7 +15,7 @@ import org.apache.commons.lang3.SystemUtils;
 
 import com.sshtools.forker.updater.DesktopShortcut.Type;
 
-public abstract class AbstractSession {
+public abstract class AbstractSession implements Session {
 
 	private Updater updater;
 	private AppManifest manifest;
@@ -70,7 +70,8 @@ public abstract class AbstractSession {
 			if (shortcut.icon() != null)
 				pw.println("Icon=" + addIcon(shortcut.icon(), shortcut.id()));
 			for (Map.Entry<Locale, String> en : shortcut.icons().entrySet()) {
-				pw.println("Icon[" + en.getKey().toLanguageTag() + "]=" + addIcon(en.getValue(), shortcut.id() + "_" + en.getKey().toLanguageTag() ));
+				pw.println("Icon[" + en.getKey().toLanguageTag() + "]="
+						+ addIcon(en.getValue(), shortcut.id() + "_" + en.getKey().toLanguageTag()));
 			}
 			if (shortcut.name() != null)
 				pw.println("Name=" + shortcut.name());
@@ -92,7 +93,7 @@ public abstract class AbstractSession {
 				pw.println("Categories=" + String.join(";", shortcut.categories()));
 			pw.println("StartupNotify=false"); // TODO never in Java unless native/jna etc
 			if (shortcut.type() != Type.AUTOSTART) {
-				switch(shortcut.type()) {
+				switch (shortcut.type()) {
 				case APPLICATION:
 					pw.println("Type=Application");
 					break;
@@ -125,11 +126,10 @@ public abstract class AbstractSession {
 					in.transferTo(fos);
 				}
 			}
-			
+
 			return iconFile.getAbsolutePath();
-		}
-		catch(IOException ioe) {
-			/* Give up  / named icon*/
+		} catch (IOException ioe) {
+			/* Give up / named icon */
 			return icon;
 		}
 	}
@@ -148,4 +148,11 @@ public abstract class AbstractSession {
 	File getShortcutFile(String id) {
 		return new File(getShare(), "applications" + File.separator + id);
 	}
+
+	@Override
+	public abstract long size();
+
+	@Override
+	public abstract int updates();
+
 }

@@ -1,5 +1,5 @@
 package com.sshtools.forker.updater;
- 
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,11 +15,28 @@ public class UpdateSession extends AbstractSession {
 	private Path localDir = Paths.get(System.getProperty("user.dir"));
 	private List<String> appArgs;
 	private boolean systemWideBootstrapInstall;
+	private long sz = 0;
+	private int updates = 0;
 
-	UpdateSession(AppManifest manifiest, Updater updater) {
+	UpdateSession(Updater updater) {
 		super();
-		manifest(manifiest);
 		updater(updater);
+	}
+
+	@Override
+	public AbstractSession manifest(AppManifest manifest) {
+		AbstractSession m = super.manifest(manifest);
+		sz = 0;
+		try {
+			Collection<? extends Entry> l = getUpdates();
+			updates = l.size();
+			for (Entry p : l) {
+				sz += p.size();
+			}
+		} catch (IOException ioe) {
+			throw new IllegalStateException("Could not get update size.", ioe);
+		}
+		return m;
 	}
 
 	public boolean systemWideBootstrapInstall() {
@@ -65,15 +82,20 @@ public class UpdateSession extends AbstractSession {
 		return doGetUpdates(manifest().entries());
 	}
 
+	@Override
+	public long size() {
+		return sz;
+	}
+
 	protected Collection<? extends Entry> doGetUpdates(List<Entry> entries) throws IOException {
 		List<Entry> updates = new ArrayList<>();
 		for (Entry entry : entries) {
 			Path local = entry.section() == Section.APP ? entry.resolve(localDir, manifest().path())
 					: entry.resolve(localDir);
-			
-			if(systemWideBootstrapInstall && entry.section() == Section.BOOTSTRAP)
+
+			if (systemWideBootstrapInstall && entry.section() == Section.BOOTSTRAP)
 				continue;
-			
+
 			boolean update = false;
 			if (Files.isSymbolicLink(local)) {
 				if (!entry.isLink())
@@ -100,6 +122,11 @@ public class UpdateSession extends AbstractSession {
 				updates.add(entry);
 			}
 		}
+		return updates;
+	}
+
+	@Override
+	public int updates() {
 		return updates;
 	}
 }

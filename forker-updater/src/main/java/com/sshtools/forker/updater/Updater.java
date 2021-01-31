@@ -21,8 +21,6 @@ import java.util.ServiceLoader;
 import java.util.concurrent.Callable;
 import java.util.logging.Level;
 
-import org.apache.commons.cli.Option;
-import org.apache.commons.cli.Options;
 import org.apache.commons.lang3.SystemUtils;
 
 import com.sshtools.forker.common.OS;
@@ -31,26 +29,45 @@ import com.sshtools.forker.updater.AppManifest.Section;
 import com.sshtools.forker.wrapper.ForkerWrapper;
 import com.sshtools.forker.wrapper.Replace;
 
+import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Model.OptionSpec;
+
 public class Updater extends ForkerWrapper {
 
 	public static void main(String[] args) {
 		Updater wrapper = new Updater();
 		wrapper.getWrappedApplication().setOriginalArgs(args);
-		Options opts = new Options();
+		CommandSpec opts = CommandSpec.create();
+		opts.mixinStandardHelpOptions(true);
 		wrapper.addOptions(opts);
-		opts.addOption(new Option(null, "update-on-exit", true,
-				"Update when hosted application returns this exit status. The hosted application can also detect if there is an update by examining the system property forker.updateAvailable or then environment variable FORKER_UPDATE_AVAILABLE."));
-		opts.addOption(new Option(null, "local-manifest", true, "The location of the local manifest."));
-		opts.addOption(new Option(null, "offline", false, "Do not check for updates at all."));
-		opts.addOption(new Option(null, "default-remote-manifest", true, "The default location of the remote manifest. Can be override by remote-manifest"));
-		opts.addOption(new Option(null, "remote-manifest", true, "The location of the remote manifest. Overrides default-remote-manifest"));
-		opts.addOption(new Option(null, "update-exit", true,
-				"This is the exit code update will exit with if the bootstrap itself needs updating. The files are downloaded to .bootstrap-updates in the cwd. If not present, the default value of '9' will be used."));
-		opts.addOption(new Option(null, "install", false,
-				"Install the application (useful from self extracting scripts for example)."));
-		opts.addOption(new Option(null, "install-location", true, "The default installation location."));
-		opts.addOption(new Option(null, "run-on-install", false,
-				"If specified, the installer will launch the application once installed."));
+		opts.addOption(OptionSpec.builder("--update-on-exit").paramLabel("exitCode").type(int.class).description(
+				"Update when hosted application returns this exit status. The hosted application can also detect if there is an update by examining the system property forker.updateAvailable or then environment variable FORKER_UPDATE_AVAILABLE.")
+				.build());
+		opts.addOption(OptionSpec.builder("--local-manifest").paramLabel("file").type(File.class)
+				.description("The location of the local manifest.").build());
+		opts.addOption(OptionSpec.builder("--offline").description("Do not check for updates at all.").build());
+		opts.addOption(OptionSpec.builder("--default-remote-manifest").paramLabel("uri").type(String.class)
+				.description("The default location of the remote manifest. Can be override by remote-manifest")
+				.build());
+		opts.addOption(OptionSpec.builder("--remote-manifest").paramLabel("uri").type(String.class)
+				.description("The location of the remote manifest. Overrides default-remote-manifest").build());
+		opts.addOption(OptionSpec.builder("--update-exit").paramLabel("exitCode").type(int.class).description(
+				"This is the exit code update will exit with if the bootstrap itself needs updating. The files are downloaded to .bootstrap-updates in the cwd. If not present, the default value of '9' will be used.")
+				.build());
+		opts.addOption(OptionSpec.builder("--install")
+				.description("Install the application (useful from self extracting scripts for example).").build());
+		opts.addOption(OptionSpec.builder("--install-location").paramLabel("directory").type(File.class)
+				.description("The default installation location.").build());
+		opts.addOption(OptionSpec.builder("--run-on-install")
+				.description("If specified, the installer will launch the application once installed.").build());
+		opts.addOption(OptionSpec.builder("--throttle").paramLabel("bytesPerSecondOrTrue").type(String.class)
+				.description(
+						"If specified, the maximum number of bytes per second that may be read or written. Useful for testing.")
+				.build());
+
+		opts.usageMessage().header("Forker Updater", "Provided by JAdpative.");
+		opts.usageMessage().description(
+				"Based on Forker Wrapper, the Updater can create full installable and updateable working images of applications from minimal configuration.");
 
 		wrapperMain(args, wrapper, opts);
 	}
@@ -138,6 +155,7 @@ public class Updater extends ForkerWrapper {
 
 	protected boolean manifest(Callable<Void> task, AppManifest manifest, UpdateHandler handler, UpdateSession session,
 			URL url, Reader in) throws IOException, Exception {
+		session.manifest(manifest);
 		if (manifest.getProperties().containsKey("main")) {
 			getConfiguration().setProperty("main", manifest.getProperties().get("main"));
 		}
@@ -216,12 +234,12 @@ public class Updater extends ForkerWrapper {
 		try {
 			AppManifest manifest = new AppManifest();
 			UpdateHandler handler = getUpdateHandler();
-			UpdateSession session = new UpdateSession(manifest, this);
+			UpdateSession session = new UpdateSession(this);
 			if (userCwd != null)
 				session.systemWideBootstrapInstall(true);
 
 			session.localDir(cwd());
-			session.appArgs(getCmd().getArgList());
+			session.appArgs(getCmd().unmatched());
 			handler.init(session);
 
 			/*
@@ -372,9 +390,9 @@ public class Updater extends ForkerWrapper {
 					Files.createSymbolicLink(d, Files.readSymbolicLink(s));
 				} else {
 					long fileSize = Files.size(s);
-					logger.log(Level.FINE, String.format("Creating linkfile %s.", s));
-					try (InputStream in = Files.newInputStream(s)) {
-						try (OutputStream out = Files.newOutputStream(d)) {
+					logger.log(Level.FINE, String.format("Creating %s.", s));
+					try (InputStream in = throttleStream(Files.newInputStream(s))) {
+						try (OutputStream out = throttleStream(Files.newOutputStream(d))) {
 							byte[] buf = new byte[65536];
 							int r;
 							long total = 0;
@@ -392,6 +410,7 @@ public class Updater extends ForkerWrapper {
 				handler.installFileDone(s);
 				file++;
 			}
+			handler.installDone();
 
 			logger.log(Level.FINE, String.format("Installation complete."));
 			handler.complete();
@@ -405,22 +424,48 @@ public class Updater extends ForkerWrapper {
 		}
 	}
 
+	protected InputStream throttleStream(InputStream in) throws IOException {
+		long throttle = getThrottle();
+		;
+		if (throttle > 0) {
+			try {
+				return new ThrottledInputStream(in, throttle);
+			} catch (NumberFormatException nfe) {
+				return new ThrottledInputStream(in, 65536);
+			}
+		}
+		return in;
+	}
+
+	protected long getThrottle() {
+		String tv = getConfiguration().getOptionValue("throttle", "");
+		return tv.equals("") ? 0 : (tv.equals("true") ? 10240 : Long.parseLong(tv));
+	}
+
+	protected OutputStream throttleStream(OutputStream out) throws IOException {
+		long throttle = getThrottle();
+		if (throttle > 0) {
+			try {
+				return new ThrottledOutputStream(out, throttle);
+			} catch (NumberFormatException nfe) {
+				return new ThrottledOutputStream(out, 65536);
+			}
+		}
+		return out;
+	}
+
 	protected boolean update(Callable<Void> task, UpdateSession session) throws Exception {
 		logger.log(Level.INFO, String.format("Updating app %s in %s.", session.manifest().id(), session.localDir()));
 		UpdateHandler handler = getUpdateHandler();
 		Collection<? extends Entry> updates = session.getUpdates();
 		boolean requiredBootstrapUpdate = session.requiresBootstrapUpdate();
 		handler.startDownloads();
-		long grandTotal = 0;
-		for (Entry entry : updates) {
-			grandTotal += entry.size();
-		}
 		long readTotal = 0;
 		Path tempBootstrapPath = null;
 		boolean upgradeError = false;
-
+		int idx = 0;
 		for (Entry entry : updates) {
-			handler.startDownloadFile(entry);
+			handler.startDownloadFile(entry, idx++);
 			Path manifestFolderPath = entry.resolve(session.localDir(), session.manifest().path());
 			Path path;
 			Path outPath = null;
@@ -444,9 +489,10 @@ public class Updater extends ForkerWrapper {
 					Path target = entry.target();
 					if (target == null)
 						throw new IOException("Found an entry that has no uri, and it is not a symbolic link.");
-					
-					if(tempBootstrapPath != null) {
-						/* If we are in the temporary bootstrap, then we must test for the existence of 
+
+					if (tempBootstrapPath != null) {
+						/*
+						 * If we are in the temporary bootstrap, then we must test for the existence of
 						 * the link cdc jdk
 						 */
 					}
@@ -461,9 +507,9 @@ public class Updater extends ForkerWrapper {
 					URL url = AppManifest.concat(session.manifest().baseUri(), entry.uri()).toURL();
 					logger.log(Level.INFO, String.format("Updating file %s from %s in %s section.", entry.path(), url,
 							entry.section()));
-					
-					try (InputStream in = url.openStream()) {
-						try (OutputStream out = Files.newOutputStream(checkFilesDir(outPath))) {
+
+					try (InputStream in = throttleStream(url.openStream())) {
+						try (OutputStream out = throttleStream(Files.newOutputStream(checkFilesDir(outPath)))) {
 							byte[] buf = new byte[65536];
 							int r;
 							long total = 0;
@@ -473,7 +519,7 @@ public class Updater extends ForkerWrapper {
 								readTotal += r;
 								handler.updateDownloadFileProgress(entry,
 										(float) ((double) total / (double) entry.size()));
-								handler.updateDownloadProgress((float) ((double) readTotal / (double) grandTotal));
+								handler.updateDownloadProgress((float) ((double) readTotal / (double) session.size()));
 							}
 						}
 					}
@@ -502,8 +548,9 @@ public class Updater extends ForkerWrapper {
 				handler.doneDownloadFile(entry);
 			}
 		}
-		
-		if(upgradeError) {
+
+		handler.updateDone(upgradeError);
+		if (upgradeError) {
 			throw new IOException("This upgrade must be manually restarted to continue.");
 		}
 

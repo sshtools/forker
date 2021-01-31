@@ -29,6 +29,7 @@ import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
+import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchEvent;
@@ -66,16 +67,6 @@ import javax.management.ReflectionException;
 import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
 
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.DefaultParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Option;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.ParseException;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.io.output.TeeOutputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
 
@@ -88,6 +79,7 @@ import com.sshtools.forker.common.IO;
 import com.sshtools.forker.common.OS;
 import com.sshtools.forker.common.Priority;
 import com.sshtools.forker.common.Util;
+import com.sshtools.forker.common.Util.TeeOutputStream;
 import com.sshtools.forker.daemon.CommandHandler;
 import com.sshtools.forker.daemon.Forker;
 import com.sshtools.forker.daemon.Forker.Client;
@@ -95,6 +87,12 @@ import com.sshtools.forker.wrapper.JVM.Version;
 import com.sun.tools.attach.AttachNotSupportedException;
 import com.sun.tools.attach.VirtualMachine;
 import com.sun.tools.attach.VirtualMachineDescriptor;
+
+import picocli.CommandLine;
+import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Model.OptionSpec;
+import picocli.CommandLine.Model.PositionalParamSpec;
+import picocli.CommandLine.ParseResult;
 
 /**
  * <i>Forker Wrapper</i> can be used to wrap java applications in a manner
@@ -138,7 +136,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	public final static String WRAPPED_MX_BEAN_NAME = "WrappedMXBean";
 	public final static String EXITED_WRAPPER = "exited-wrapper";
 	public final static String EXITING_WRAPPER = "exiting-wrapper";
-	public final static String STARTING_FORKER_DAEMON = "started-forker-daemon";
+	public final static String STARTING_FORKER_DAEMON = "starting-forker-daemon";
 	public final static String STARTED_FORKER_DAEMON = "started-forker-daemon";
 	public final static String STARTING_APPLICATION = "starting-application";
 	public final static String STARTED_APPLICATION = "started-application";
@@ -191,7 +189,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return systemProperties;
 	}
 
-	public CommandLine getCmd() {
+	public ParseResult getCmd() {
 		return configuration.getCmd();
 	}
 
@@ -353,7 +351,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				}
 			}
 
-
 			int retval = 2;
 			int times = 0;
 			int lastRetVal = -1;
@@ -447,7 +444,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		monitorConfigurationFiles();
 		monitorWrappedApplication();
 		monitorWrappedJMXApplication();
-		
+
 		event(STARTING_APPLICATION, String.valueOf(times), resolveCwd().getAbsolutePath(), app.fullClassAndModule(),
 				String.valueOf(lastRetVal));
 		logger.info(
@@ -669,7 +666,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 //				}
 //			};
 //			System.setSecurityManager(exitDefeat);
-			
+
 			monitorConfigurationFiles();
 
 			main.invoke(null, new Object[] { allArgs.toArray(new String[0]) });
@@ -834,38 +831,33 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	public static void main(String[] args) {
 		ForkerWrapper wrapper = new ForkerWrapper();
 		wrapper.getWrappedApplication().setArguments(args);
-		Options opts = new Options();
+
+		CommandSpec opts = CommandSpec.create();
+		opts.mixinStandardHelpOptions(true);
 		// Add the options always available
+
+		opts.usageMessage().header("Forker Wrapper", "Provided by JAdpative.");
+		opts.usageMessage().description("Forker Wrapper is used to launch Java applications, optionally changing "
+				+ "the user they are run as, providing automatic restarting, signal handling and "
+				+ "other facilities that will be useful running applications as a 'service'.\n\n"
+				+ "Configuration may be passed to Forker Wrapper in four different ways :-\n\n"
+				+ "1. Command line options.\n\n" + "2. Configuration files (see -c and -C options)\n\n"
+				+ "3. Java system properties. The key of which is option name prefixed with 'forker.' and with - replaced with a dot (.)\n\n"
+				+ "4. Environment variables. The key of which is the option name prefixed with   'FORKER_' (in upper case) with - replaced with _\n\n"
+				+ "You can also narrow any configuration key down to a specific platform by prefixing it with "
+				+ "one of 'windows', 'mac-osx', 'linux', 'unix' or 'other'. The exact format will depend on "
+				+ "whether you are using options, files, system properties or environment variables. For "
+				+ "example, to specify '-XstartOnFirstThread' as a JVM argument for only Max OSX as an "
+				+ "option, you would use '--mac-osx-jvmarg=\"-XstartOnFirstThread\".");
+
 		wrapper.addOptions(opts);
 		wrapperMain(args, wrapper, opts);
 	}
 
-	public static void wrapperMain(String[] args, ForkerWrapper wrapper, Options opts) {
-		// Add the command line launch options
-		opts.addOption(Option.builder("c").argName("file").hasArg()
-				.desc("A file to read configuration. This can either be a JavaScript file that evaluates to an object "
-						+ "containing keys and values of the configuration options (use arrays for multiple value commands), or "
-						+ "it may be a simple text file that contains name=value pairs, where name is the same name as used for command line "
-						+ "arguments (see --help for a list of these)")
-				.longOpt("configuration").build());
-		opts.addOption(Option.builder("C").argName("directory").hasArg().desc(
-				"A directory to read configuration files from. Each file can either be a JavaScript file that evaluates to an object "
-						+ "containing keys and values of the configuration options (use arrays for multiple value commands), or "
-						+ "it may be a simple text file that contains name=value pairs, where name is the same name as used for command line "
-						+ "arguments (see --help for a list of these)")
-				.longOpt("configuration-directory").build());
-		opts.addOption(Option.builder("h")
-				.desc("Show command line help. When the optional argument is supplied, help will "
-						+ "be displayed for the option with that name")
-				.optionalArg(true).hasArg().argName("option").longOpt("help").build());
-		opts.addOption(Option.builder("O").desc("File descriptor for stdout").optionalArg(true).hasArg().argName("fd")
-				.longOpt("fdout").build());
-		opts.addOption(Option.builder("E").desc("File descriptor for stderr").optionalArg(true).hasArg().argName("fd")
-				.longOpt("fderr").build());
-		CommandLineParser parser = new DefaultParser();
-		HelpFormatter formatter = new HelpFormatter();
+	public static void wrapperMain(String[] args, ForkerWrapper wrapper, CommandSpec opts) {
+		CommandLine cl = new CommandLine(opts);
 		try {
-			CommandLine cmd = parser.parse(opts, args);
+			ParseResult cmd = cl.parseArgs(args);
 			wrapper.init(cmd);
 			String outFdStr = wrapper.getConfiguration().getOptionValue("fdout", null);
 			if (outFdStr != null) {
@@ -881,38 +873,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				FileDescriptor fdErr = cons.newInstance(Integer.parseInt(errFdStr));
 				System.setErr(new PrintStream(new FileOutputStream(fdErr), true));
 			}
-			if (cmd.hasOption('h')) {
-				String optionName = cmd.getOptionValue('h');
-				if (optionName == null) {
-					formatter.printHelp(new PrintWriter(System.err, true), 132, getAppName(),
-							"     <application.class.name> [<argument> [<argument> ..]]\n\n"
-									+ "Forker Wrapper is used to launch Java applications, optionally changing "
-									+ "the user they are run as, providing automatic restarting, signal handling and "
-									+ "other facilities that will be useful running applications as a 'service'.\n\n"
-									+ "Configuration may be passed to Forker Wrapper in four different ways :-\n\n"
-									+ "1. Command line options.\n" + "2. Configuration files (see -c and -C options)\n"
-									+ "3. Java system properties. The key of which is option name prefixed with   'forker.' and with - replaced with a dot (.)\n"
-									+ "4. Environment variables. The key of which is the option name prefixed with   'FORKER_' (in upper case) with - replaced with _\n\n"
-									+ "You can also narrow any configuration key down to a specific platform by prefixing\n"
-									+ "it with one of 'windows', 'mac-osx', 'linux', 'unix' or 'other'. The exact format\n"
-									+ "will depend on whether you are using options, files, system properties or environment\n"
-									+ "variables. For example, to specify '-XstartOnFirstThread' as a JVM argument for\n"
-									+ "only Max OSX as an option, you would use '--mac-osx-jvmarg=\"-XstartOnFirstThread\".",
-							opts, 2, 5, "\nProvided by SSHTOOLS Limited.", true);
-					System.exit(1);
-				} else {
-					Option opt = opts.getOption(optionName);
-					if (opt == null) {
-						throw new Exception(String.format("No option named", optionName));
-					} else {
-						System.err.println(optionName);
-						System.err.println();
-						System.err.println(opt.getDescription());
-					}
-				}
+			if (CommandLine.printHelpIfRequested(cmd)) {
+				System.exit(0);
 			}
-			if (cmd.hasOption("configuration")) {
-				wrapper.readConfigFile(new File(cmd.getOptionValue('c')));
+			for(String cfg : wrapper.getConfiguration().getOptionValues("configuration")) {
+				wrapper.readConfigFile(new File(cfg));
 			}
 			String cfgDir = wrapper.getConfiguration().getOptionValue("configuration-directory", null);
 			if (cfgDir != null) {
@@ -932,17 +897,16 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				} catch (Throwable e) {
 					e.printStackTrace();
 					System.err.println(String.format("%s: %s\n", wrapper.getClass().getName(), e.getMessage()));
-					formatter.printUsage(new PrintWriter(System.err, true), 80,
-							String.format("%s  <application.class.name> [<argument> [<argument> ..]]", getAppName()));
+					cl.usage(new PrintWriter(System.err, true));
 					return 1;
 				}
 			});
 			if (ret != Integer.MIN_VALUE)
 				System.exit(ret);
 		} catch (Throwable e) {
+			e.printStackTrace();
 			System.err.println(String.format("%s: %s\n", wrapper.getClass().getName(), e.getMessage()));
-			formatter.printUsage(new PrintWriter(System.err, true), 80,
-					String.format("%s  <application.class.name> [<argument> [<argument> ..]]", getAppName()));
+			cl.usage(new PrintWriter(System.err, true));
 			System.exit(1);
 		}
 
@@ -952,7 +916,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return configuration;
 	}
 
-	public void init(CommandLine cmd) {
+	public void init(ParseResult cmd) {
 		if (!inited) {
 			configuration.init(cmd);
 			reconfigureLogging();
@@ -1105,163 +1069,242 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
-	protected void addOptions(Options options) {
+	protected void addOptions(CommandSpec options) {
+
 		for (WrapperPlugin plugin : plugins) {
 			plugin.addOptions(options);
 		}
 		for (String event : EVENT_NAMES) {
-			options.addOption(Option.builder().longOpt("on-" + event).hasArg(true).argName("command-or-classname")
-					.desc("Executes a script or a Java class (that must be on wrappers own classpath) "
+			options.addOption(OptionSpec.builder("--on-" + event).paramLabel("command-or-classname").type(String.class)
+					.description("Executes a script or a Java class (that must be on wrappers own classpath) "
 							+ "when a particular event occurs. If a Java class is to be execute, it "
 							+ "must contain a main(String[] args) method. Each event may pass a number of arguments.")
 					.build());
 		}
-		options.addOption(new Option(null, "stop", false,
+		options.addOption(OptionSpec.builder("--stop").description(
 				"If single-instance mode is enabled, and the wrapped application includes the forker-wrapped module,"
 						+ "then a stop command is sent. It is up to app whether or not to exit the runtime through the use of "
 						+ "the 'ShutdownListener' registered on the 'Wrapped' instance. If it is happy to stop, it should do it's "
-						+ "own clean up, then System.exit(). "));
-		options.addOption(new Option("x", "allow-execute", true,
-				"The wrapped application can use it's wrapper to execute commands on it's behalf. If the "
+						+ "own clean up, then System.exit(). ")
+				.build());
+		options.addOption(OptionSpec.builder("-x", "--allow-execute").paramLabel("spec").type(String.class)
+				.description("The wrapped application can use it's wrapper to execute commands on it's behalf. If the "
 						+ "wrapper itself runs under an administrative user, and the application as a non-privileged user,"
 						+ "you may wish to restrict which commands may be run. One or more of these options specifies the "
-						+ "name of the command that may be run. The value may be a regular expression, see also 'prevent-execute'"));
-		options.addOption(new Option("X", "reject-execute", true,
-				"The wrapped application can use it's wrapper to execute commands on it's behalf. If the "
+						+ "name of the command that may be run. The value may be a regular expression, see also 'prevent-execute'")
+				.build());
+		options.addOption(OptionSpec.builder("-X", "--reject-execute").paramLabel("pattern").type(String.class)
+				.description("The wrapped application can use it's wrapper to execute commands on it's behalf. If the "
 						+ "wrapper itself runs under an administrative user, and the application as a non-privileged user,"
 						+ "you may wish to restrict which commands may be run. One or more of these options specifies the "
-						+ "name of the commands that may NOT be run. The value may be a regular expression, see also 'allow-execute'"));
-		options.addOption(new Option("F", "no-forker-classpath", false,
-				"When the forker daemon is being used, the wrappers own classpath will be appened to "
+						+ "name of the commands that may NOT be run. The value may be a regular expression, see also 'allow-execute'")
+				.build());
+		options.addOption(OptionSpec.builder("-F", "--no-forker-classpath")
+				.description("When the forker daemon is being used, the wrappers own classpath will be appened to "
 						+ "to the application classpath. This option prevents that behaviour for example if "
-						+ "the application includes the modules itself."));
-		options.addOption(new Option("K", "monitor-configuration", false,
+						+ "the application includes the modules itself.")
+				.build());
+		options.addOption(OptionSpec.builder("-K", "--monitor-configuration").description(
 				"Monitor for configuration file changes. Some changes can be applied while the wrapped application is running, while "
-						+ "some may cause the application to be restarted, and finally others may have no effect at all (until forker itself is restarted)."));
-		options.addOption(new Option("k", "never-restart", false,
+						+ "some may cause the application to be restarted, and finally others may have no effect at all (until forker itself is restarted).")
+				.build());
+		options.addOption(OptionSpec.builder("-k", "--never-restart").description(
 				"Prevent wrapper from restarting the process, regardless of the exit value from the spawned process. Totall overrides "
-						+ "dont-restart-on and restart-on options."));
-		options.addOption(new Option("r", "restart-on", true,
-				"Which exit values from the spawned process will cause the wrapper to attempt to restart it. When not specified, all exit "
-						+ "values will cause a restart except those that are configure not to (see dont-restart-on)."));
-		options.addOption(new Option("R", "dont-restart-on", true,
-				"Which exit values from the spawned process will NOT cause the wrapper to attempt to restart it. By default,"
-						+ "this is set to 0, 1 and 2. See also 'restart-on'"));
-		options.addOption(
-				new Option("w", "restart-wait", true, "How long (in seconds) to wait before attempting a restart."));
-		options.addOption(
-				new Option("d", "daemon", false, "Fork the process and exit, leaving it running in the background."));
-		options.addOption(new Option("n", "no-forker-daemon", false,
-				"Do not enable the forker daemon. This will prevent the forked application from executing elevated commands via the daemon and will also disable JVM timeout detection."));
-		options.addOption(new Option("q", "quiet", false,
-				"Do not output anything on stderr or stdout from the wrapped process."));
-		options.addOption(
-				new Option("z", "quiet-stderr", false, "Do not output anything on stderr from the wrapped process."));
-		options.addOption(
-				new Option("Z", "quiet-stdout", false, "Do not output anything on stdout from the wrapped process."));
-		options.addOption(new Option("S", "single-instance", false,
-				"Only allow one instance of the wrapped application to be active at any one time. "
-						+ "This is achieved through locked files."));
-		options.addOption(new Option(null, "single-instance-per-user", false,
+						+ "dont-restart-on and restart-on options.")
+				.build());
+		options.addOption(OptionSpec.builder("-r", "--restart-on").paramLabel("exitCodes").type(String.class)
+				.description(
+						"Which exit values from the spawned process will cause the wrapper to attempt to restart it. When not specified, all exit "
+								+ "values will cause a restart except those that are configure not to (see dont-restart-on).")
+				.build());
+		options.addOption(OptionSpec.builder("-R", "--dont-restart-on").paramLabel("exitCodes").type(String.class)
+				.description(
+						"Which exit values from the spawned process will NOT cause the wrapper to attempt to restart it. By default,"
+								+ "this is set to 0, 1 and 2. See also 'restart-on'")
+				.build());
+		options.addOption(OptionSpec.builder("-w", "--restart-wait").paramLabel("seconds").type(int.class)
+				.description("How long (in seconds) to wait before attempting a restart.").build());
+		options.addOption(OptionSpec.builder("-d", "--daemon")
+				.description("Fork the process and exit, leaving it running in the background.").build());
+		options.addOption(OptionSpec.builder("-n", "--no-forker-daemon").description(
+				"Do not enable the forker daemon. This will prevent the forked application from executing elevated commands via the daemon and will also disable JVM timeout detection.")
+				.build());
+		options.addOption(OptionSpec.builder("-q", "--quiet")
+				.description("Do not output anything on stderr or stdout from the wrapped process.").build());
+		options.addOption(OptionSpec.builder("-z", "--quiet-stderr")
+				.description("Do not output anything on stderr from the wrapped process.").build());
+		options.addOption(OptionSpec.builder("-Z", "--quiet-stdout")
+				.description("Do not output anything on stdout from the wrapped process.").build());
+		options.addOption(OptionSpec.builder("-S", "--single-instance")
+				.description("Only allow one instance of the wrapped application to be active at any one time. "
+						+ "This is achieved through locked files.")
+				.build());
+		options.addOption(OptionSpec.builder("--single-instance-per-user").description(
 				"When single-instance is installed, by default it means a single instance on the entire local system. Adding "
-						+ "this flag allows a single instance per username."));
-		options.addOption(new Option("s", "setenv", false,
+						+ "this flag allows a single instance per username.")
+				.build());
+		options.addOption(OptionSpec.builder("-s", "--setenv").paramLabel("name=value").type(String.class).description(
 				"Set an environment on the wrapped process. This is in the format NAME=VALUE. The option may be "
-						+ "specified multiple times to specify multiple environment variables."));
-		options.addOption(new Option("N", "native", false,
-				"This option signals that main is not a Java classname, it is instead the name "
+						+ "specified multiple times to specify multiple environment variables.")
+				.build());
+		options.addOption(OptionSpec.builder("-N", "--native")
+				.description("This option signals that main is not a Java classname, it is instead the name "
 						+ "of a native command. This option is incompatible with 'classpath' and also "
 						+ "means the forker daemon will not be used and so hang detection and some other "
-						+ "features will not be available."));
-		options.addOption(new Option(null, "no-fork", false,
-				"When this option is specified, instead of starting a new JVM an isolated "
+						+ "features will not be available.")
+				.build());
+		options.addOption(OptionSpec.builder("--no-fork")
+				.description("When this option is specified, instead of starting a new JVM an isolated "
 						+ "classloader will be created and the application loaded using the same JVM as the wrapper. "
-						+ "A number of features will not be available in this mode."));
-		options.addOption(new Option("I", "no-info", false,
-				"Ordinary, forker will set some system properties in the wrapped application. These "
+						+ "A number of features will not be available in this mode.")
+				.build());
+		options.addOption(OptionSpec.builder("-I", "--no-info")
+				.description("Ordinary, forker will set some system properties in the wrapped application. These "
 						+ "communicate things such as the last exited code (forker.info.lastExitCode), number "
-						+ "of times start via (forker.info.attempts) and more. This option prevents those being set."));
-		options.addOption(new Option("o", "log-overwrite", false, "Overwriite logfiles instead of appending."));
-		options.addOption(new Option("l", "log", true,
-				"Where to log stdout (and by default stderr) output. If not specified, will be output on stdout (or stderr) of this process."));
-		options.addOption(new Option("L", "level", true,
+						+ "of times start via (forker.info.attempts) and more. This option prevents those being set.")
+				.build());
+		options.addOption(OptionSpec.builder("-o", "--log-overwrite")
+				.description("Overwriite logfiles instead of appending.").build());
+		options.addOption(OptionSpec.builder("-l", "--log").paramLabel("file").type(File.class).description(
+				"Where to log stdout (and by default stderr) output. If not specified, will be output on stdout (or stderr) of this process.")
+				.build());
+		options.addOption(OptionSpec.builder("-L", "--level").paramLabel("level").type(String.class).description(
 				"Output level for information and debug output from wrapper itself (NOT the application). By default "
-						+ "this is WARNING, with other possible levels being FINE, FINER, FINEST, SEVERE, INFO, ALL."));
-		options.addOption(new Option("D", "log-write-delay", true,
-				"In order to be compatible with external log rotation, log files are closed as soon as they are "
-						+ "written to. You can delay the closing of the log file, so that any new log messages that are "
-						+ "written within this time will not need to open the file again. The time is in milliseconds "
-						+ "with a default of 50ms. A value of zero indicates to always immmediately reopen the log."));
-		options.addOption(new Option("e", "errors", true,
-				"Where to log stderr. If not specified, will be output on stderr of this process or to 'log' if specified."));
-		options.addOption(new Option("cp", "classpath", true,
-				"The classpath to use to run the application. If not set, the current runtime classpath is used (the java.class.path system property). Prefix the "
-						+ "path with '+' to add it to the end of the existing classpath, or '-' to add it to the start."));
-		options.addOption(new Option("mp", "modulepath", true,
-				"The modulepath to use to run the application. If not set, the current runtime default is used. Prefix the "
-						+ "path with '+' to add it to the end of the existing modulepath, or '-' to add it to the start."));
-		options.addOption(new Option("bcp", "boot-classpath", true,
-				"The boot classpath to use to run the application. If not set, the current runtime classpath is used (the java.class.path system property). Prefix the "
-						+ "path with '+' to add it to the end of the existing classpath, or '-' to add it to the start. Use of a jvmarg that starts with '-Xbootclasspath' will "
-						+ "override this setting."));
-		options.addOption(new Option("u", "run-as", true, "The user to run the application as."));
-		options.addOption(new Option(null, "argfile", true,
+						+ "this is WARNING, with other possible levels being FINE, FINER, FINEST, SEVERE, INFO, ALL.")
+				.build());
+		options.addOption(OptionSpec.builder("-D", "--log-write-delay").paramLabel("milliseconds").type(Long.class)
+				.description(
+						"In order to be compatible with external log rotation, log files are closed as soon as they are "
+								+ "written to. You can delay the closing of the log file, so that any new log messages that are "
+								+ "written within this time will not need to open the file again. The time is in milliseconds "
+								+ "with a default of 50ms. A value of zero indicates to always immmediately reopen the log.")
+				.build());
+		options.addOption(OptionSpec.builder("-e", "--errors").paramLabel("file").type(String.class).description(
+				"Where to log stderr. If not specified, will be output on stderr of this process or to 'log' if specified.")
+				.build());
+		options.addOption(OptionSpec.builder("-cp", "--classpath").paramLabel("classpath").type(String.class)
+				.description(
+						"The classpath to use to run the application. If not set, the current runtime classpath is used (the java.class.path system property). Prefix the "
+								+ "path with '+' to add it to the end of the existing classpath, or '-' to add it to the start.")
+				.build());
+		options.addOption(OptionSpec.builder("-mp", "--modulepath").paramLabel("modulepath").type(String.class)
+				.description(
+						"The modulepath to use to run the application. If not set, the current runtime default is used. Prefix the "
+								+ "path with '+' to add it to the end of the existing modulepath, or '-' to add it to the start.")
+				.build());
+		options.addOption(OptionSpec.builder("-bcp", "--boot-classpath").paramLabel("classpath").type(String.class)
+				.description(
+						"The boot classpath to use to run the application. If not set, the current runtime classpath is used (the java.class.path system property). Prefix the "
+								+ "path with '+' to add it to the end of the existing classpath, or '-' to add it to the start. Use of a jvmarg that starts with '-Xbootclasspath' will "
+								+ "override this setting.")
+				.build());
+		options.addOption(OptionSpec.builder("-u", "--run-as").paramLabel("user").type(String.class)
+				.description("The user to run the application as.").build());
+		options.addOption(OptionSpec.builder("--argfile").paramLabel("argfile").type(String.class).description(
 				"By default, the wrapper will try and create the argfile in the working directory. If this is "
-						+ "not possible, the system temporary directory is used. This option forces a particular file path to be used."));
-		options.addOption(new Option(null, "argfilemode", true,
+						+ "not possible, the system temporary directory is used. This option forces a particular file path to be used.")
+				.build());
+		options.addOption(OptionSpec.builder("--argfilemode").paramLabel("mode").type(ArgfileMode.class).description(
 				"Specifies how arguments will be provided to the java command. Possible values are 'COMPACT', "
 						+ "(all arguments except for the classname and it's arguments are placed in an @argfile), "
 						+ "'ARGFILE' (all arguments including classname and it's arguments in place in an @argfile), 'EXPANDED' ("
-						+ "an @argfile is not used, all argumentes are part of the command). "));
-		options.addOption(new Option("a", "administrator", false, "Run as administrator."));
-		options.addOption(new Option("p", "pidfile", true, "A filename to write the process ID to. May be used "
-				+ "by external application to obtain the PID to send signals to."));
-		options.addOption(new Option("b", "buffer-size", true,
-				"How big (in byte) to make the I/O buffer. By default this is 1 byte for immediate output."));
-		options.addOption(new Option("B", "cpu", true,
-				"Bind to a particular CPU, may be specified multiple times to bind to multiple CPUs."));
-		options.addOption(new Option("j", "java", true, "Alternative path to java runtime launcher."));
-		options.addOption(new Option("J", "jvmarg", true,
-				"Additional VM argument. Specify multiple times for multiple arguments."));
-		options.addOption(new Option("W", "cwd", true,
-				"Change working directory, the wrapped process will be run from this location."));
-		options.addOption(new Option("t", "timeout", true,
-				"How long to wait since the last 'ping' from the launched application before "
-						+ "considering the process as hung. Requires forker daemon is enabled."));
-		options.addOption(new Option("f", "jar", true,
+						+ "an @argfile is not used, all argumentes are part of the command). ")
+				.build());
+		options.addOption(OptionSpec.builder("-a", "--administrator").description("Run as administrator.").build());
+		options.addOption(OptionSpec.builder("-p", "--pidfile").paramLabel("file").type(String.class)
+				.description("A filename to write the process ID to. May be used "
+						+ "by external application to obtain the PID to send signals to.")
+				.build());
+		options.addOption(OptionSpec.builder("-b", "--buffer-size").paramLabel("bytes").type(String.class)
+				.description(
+						"How big (in byte) to make the I/O buffer. By default this is 1 byte for immediate output.")
+				.build());
+		options.addOption(OptionSpec.builder("-B", "--cpu").paramLabel("cpus").type(String.class)
+				.description("Bind to a particular CPU, may be specified multiple times to bind to multiple CPUs.")
+				.build());
+		options.addOption(OptionSpec.builder("-j", "--java").paramLabel("file").type(String.class)
+				.description("Alternative path to java runtime launcher.").build());
+		options.addOption(OptionSpec.builder("-J", "--jvmarg").paramLabel("jvmarg").type(String.class)
+				.description("Additional VM argument. Specify multiple times for multiple arguments.").build());
+		options.addOption(OptionSpec.builder("-W", "--cwd").paramLabel("directory").type(File.class)
+				.description("Change working directory, the wrapped process will be run from this location.").build());
+		options.addOption(OptionSpec.builder("-t", "--timeout").paramLabel("milliseconds").type(Long.class)
+				.description("How long to wait since the last 'ping' from the launched application before "
+						+ "considering the process as hung. Requires forker daemon is enabled.")
+				.build());
+		options.addOption(OptionSpec.builder("-f", "--jar").paramLabel("jar").type(File.class).description(
 				"The path of a jar file to run. If this is specified, then this path will be added to the classpath, and META-INF/MANIFEST.MF examined for Main-Class for the"
-						+ "main class to run. The first argument passed to the command becomes the first app argument."));
-		options.addOption(new Option("m", "main", true,
+						+ "main class to run. The first argument passed to the command becomes the first app argument.")
+				.build());
+		options.addOption(OptionSpec.builder("-m", "--main").paramLabel("main").type(String.class).description(
 				"The classname to run. If this is specified, then the first argument passed to the command "
-						+ "becomes the first app argument. This may also be a module path (<module>/<class>), in which case the -m argument will be appended to the command as well."));
-		options.addOption(new Option("E", "exit-wait", true,
-				"How long to wait after attempting to stop a wrapped appllication before giving up and forcibly killing the applicaton."));
-		options.addOption(new Option("M", "argmode", true,
+						+ "becomes the first app argument. This may also be a module path (<module>/<class>), in which case the -m argument will be appended to the command as well.")
+				.build());
+		options.addOption(OptionSpec.builder("-E", "--exit-wait").paramLabel("milliseconds").type(Long.class)
+				.description(
+						"How long to wait after attempting to stop a wrapped appllication before giving up and forcibly killing the applicaton.")
+				.build());
+		options.addOption(OptionSpec.builder("-M", "--argmode").paramLabel("argmode").type(ArgMode.class).description(
 				"Determines how apparg options are treated. May be one FORCE, APPEND, PREPEND or DEFAULT. FORCE "
 						+ "passed on only the appargs specified by configuration. APPEND will append all appargs to "
 						+ "any command line arguments, PREPEND will prepend them. Finally DEFAULT is the default behaviour "
-						+ "and any command line arguments will override all appargs."));
-		options.addOption(new Option("A", "apparg", true,
-				"Application arguments. How these are treated depends on argmode, but by default the will be overridden by any command line arguments passed in."));
-		options.addOption(new Option("P", "priority", true,
-				"Scheduling priority, may be one of LOW, NORMAL, HIGH or REALTIME (where supported)."));
-		options.addOption(new Option("Y", "min-java", true,
-				"Minimum java version. If the selected JVM (default or otherwise) is lower than this, an "
-						+ "attempt will be made to locate a later version."));
-		options.addOption(new Option("y", "max-java", true,
-				"Maximum java version. If the selected JVM (default or otherwise) is lower than this, an "
-						+ "attempt will be made to locate an earlier version."));
-		options.addOption(new Option("i", "init-temp", true,
-				"Initialise a named temporary folder before execution of application. The folder will be created if it does not exist, and emptied if it exists and has contents."));
-		options.addOption(new Option("T", "to-temp", true,
-				"Copy file(s) to the named temporary folder. Supports glob syntax for final part of the path."));
-		options.addOption(new Option("G", "service-mode", true,
-				"When enabled, 'start', 'stop', 'restart' and 'status' arguments can be passed which act in the same way as service control commands on Linux and similar operating systems."));
-		Option opt = new Option("U", "debug", false,
-				"Adds default neccessary properties for remote debugging. If an argument is provided, is should either be true,false, or a list of comma separated name=value pairs of any parameters to pass to the debugger agent.");
-		opt.setOptionalArg(true);
-		options.addOption(opt);
+						+ "and any command line arguments will override all appargs.")
+				.build());
+		options.addOption(OptionSpec.builder("-A", "--apparg").paramLabel("apparg").type(String.class).description(
+				"Application arguments. How these are treated depends on argmode, but by default the will be overridden by any command line arguments passed in.")
+				.build());
+		options.addOption(OptionSpec.builder("-P", "--priority").paramLabel("priority").type(String.class)
+				.description("Scheduling priority, may be one of LOW, NORMAL, HIGH or REALTIME (where supported).")
+				.build());
+		options.addOption(OptionSpec.builder("-Y", "--min-java").paramLabel("version").type(String.class)
+				.description("Minimum java version. If the selected JVM (default or otherwise) is lower than this, an "
+						+ "attempt will be made to locate a later version.")
+				.build());
+		options.addOption(OptionSpec.builder("-y", "--max-java").paramLabel("version").type(String.class)
+				.description("Maximum java version. If the selected JVM (default or otherwise) is lower than this, an "
+						+ "attempt will be made to locate an earlier version.")
+				.build());
+		options.addOption(OptionSpec.builder("-i", "--init-temp").paramLabel("directory").type(File.class).description(
+				"Initialise a named temporary folder before execution of application. The folder will be created if it does not exist, and emptied if it exists and has contents.")
+				.build());
+		options.addOption(OptionSpec.builder("-T", "--to-temp").paramLabel("directory").type(File.class)
+				.description(
+						"Copy file(s) to the named temporary folder. Supports glob syntax for final part of the path.")
+				.build());
+		options.addOption(OptionSpec.builder("-G", "--service-mode").paramLabel("serviceOp").type(String.class)
+				.description(
+						"When enabled, 'start', 'stop', 'restart' and 'status' arguments can be passed which act in the same way as service control commands on Linux and similar operating systems.")
+				.build());
+		options.addOption(OptionSpec.builder("-U", "--debug").arity("0..1").paramLabel("debugOptions")
+				.type(String.class)
+				.description(
+						"Adds default neccessary properties for remote debugging. If an argument is provided, is should either be true,false, or a list of comma separated name=value pairs of any parameters to pass to the debugger agent.")
+				.build());
 
+		options.addPositional(PositionalParamSpec.builder().paramLabel("classNameOrExecutable").type(String.class)
+				.description("The classname or executable name or path of the application to run.").build());
+
+		// Add the command line launch options
+		options.addOption(OptionSpec.builder("-c", "--configuration").paramLabel("file").type(String.class).description(
+				"A file to read configuration. This can either be a JavaScript file that evaluates to an object "
+						+ "containing keys and values of the configuration options (use arrays for multiple value commands), or "
+						+ "it may be a simple text file that contains name=value pairs, where name is the same name as used for command line "
+						+ "arguments (see --help for a list of these)")
+				.build());
+		options.addOption(OptionSpec.builder("-C", "--configuration-directory").paramLabel("directory")
+				.type(String.class)
+				.description(
+						"A directory to read configuration files from. Each file can either be a JavaScript file that evaluates to an object "
+								+ "containing keys and values of the configuration options (use arrays for multiple value commands), or "
+								+ "it may be a simple text file that contains name=value pairs, where name is the same name as used for command line "
+								+ "arguments (see --help for a list of these)")
+				.build());
+		options.addOption(OptionSpec.builder("-FO", "--fdout").description("File descriptor for stdout")
+				.paramLabel("fd").type(int.class).build());
+		options.addOption(OptionSpec.builder("-FE", "--fderr").description("File descriptor for stderr")
+				.paramLabel("fd").type(int.class).build());
+
+		options.name(getAppName());
 	}
 
 	protected String buildPath(File cwd, String defaultClasspath, String classpath, boolean appendByDefault)
@@ -1287,7 +1330,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			Path root = cwd.toPath();
 			for (String el : classpath.split(CROSSPLATFORM_PATH_SEPARATOR)) {
 				logger.log(Level.INFO, "    " + el);
-				String basename = FilenameUtils.getName(el);
+				String basename = Paths.get(el).getFileName().toString();
 				if (basename.contains("*") || basename.contains("?")) {
 
 					Finder finder = new Finder(root, el, newClasspath);
@@ -1384,7 +1427,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				int pid = CSystem.INSTANCE.fork();
 				if (pid > 0) {
 					if (pidfile != null) {
-						FileUtils.writeLines(makeDirectoryForFile(relativize(resolveCwd(), pidfile)),
+						writeLines(makeDirectoryForFile(relativize(resolveCwd(), pidfile)),
 								Arrays.asList(String.valueOf(pid)));
 					}
 					return true;
@@ -1429,11 +1472,17 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			if (pidfile != null) {
 				int pid = OS.getPID();
 				logger.info(String.format("Writing PID %d", pid));
-				FileUtils.writeLines(makeDirectoryForFile(relativize(resolveCwd(), pidfile)),
-						Arrays.asList(String.valueOf(pid)));
+				writeLines(makeDirectoryForFile(relativize(resolveCwd(), pidfile)), Arrays.asList(String.valueOf(pid)));
 			}
 		}
 		return false;
+	}
+
+	private static void writeLines(File file, List<String> lines) throws IOException {
+		try (PrintWriter w = new PrintWriter(new FileWriter(file), true)) {
+			for (String line : lines)
+				w.println(line);
+		}
 	}
 
 	protected void addShutdownHook(final boolean useDaemon) {
@@ -1603,10 +1652,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 								try {
 									executeJmxCommandInApp("ping");
 									lastPing = System.currentTimeMillis();
-								}
-								catch(Exception e) {
-									if (lastPing > 0
-											&& (lastPing + timeout * 1000) <= System.currentTimeMillis()) {
+								} catch (Exception e) {
+									if (lastPing > 0 && (lastPing + timeout * 1000) <= System.currentTimeMillis()) {
 										logger.warning(String.format(
 												"Process has not sent a ping in %d seconds, attempting to terminate",
 												timeout));
@@ -1777,9 +1824,13 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		List<String> paths = configuration.getOptionValues("to-temp");
 		if (!paths.isEmpty()) {
 			for (String path : paths) {
-				String parentPath = FilenameUtils.getPath(path);
-				String pattern = FilenameUtils.getName(path);
-				PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + pattern);
+				int idx = path.lastIndexOf('/');
+				String parentPath = null;
+				if (idx != -1) {
+					parentPath = path.substring(0, idx);
+					path = path.substring(idx + 1);
+				}
+				PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + path);
 				File parentFile = new File(parentPath);
 				if (!parentFile.isAbsolute()) {
 					parentFile = new File(cwd, parentPath);
@@ -1788,7 +1839,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				if (children != null) {
 					for (File child : children) {
 						if (matcher.matches(child.toPath().getFileName())) {
-							FileUtils.copyFile(child, new File(tempFile, child.getName()));
+							Util.copy(child, new File(tempFile, child.getName()));
 						}
 					}
 				}
@@ -1828,9 +1879,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
-	protected void continueProcessing() throws ParseException, IOException {
+	protected void continueProcessing() throws IOException {
 		app.set(configuration.getOptionValue("main", null), configuration.getOptionValue("jar", null),
-				configuration.getCmd().getArgList(), configuration.getOptionValues("apparg"), getArgMode());
+				configuration.getCmd().unmatched(), configuration.getOptionValues("apparg"), getArgMode());
 	}
 
 	private void configurationFileChanged(File file) {
@@ -2016,14 +2067,12 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		OutputStream errlog = null;
 		long logDelay = Long.parseLong(configuration.getOptionValue("log-write-delay", "50"));
 		if (StringUtils.isNotBlank(logpath)) {
-			logger.info(String.format("Writing stdout output to %s", logpath));
 			outlog = new LazyLogStream(logDelay, makeDirectoryForFile(relativize(cwd, logpath)), !logoverwrite);
 		}
 		if (errpath != null) {
 			if (Objects.equals(logpath, errpath))
 				errlog = outlog;
 			else {
-				logger.info(String.format("Writing stderr output to %s", logpath));
 				errlog = new LazyLogStream(logDelay, makeDirectoryForFile(relativize(cwd, errpath)), !logoverwrite);
 			}
 		}
@@ -2031,12 +2080,18 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		OutputStream out = null;
 		if (stdout != null) {
 			if (outlog != null) {
+				logger.info(String.format("Writing stdout output to stdout and %s", logpath));
 				out = new TeeOutputStream(stdout, outlog);
 			} else {
+				logger.info("Stdout passthrough");
 				out = stdout;
 			}
-		} else if (outlog != null)
+		} else if (outlog != null) {
+			logger.info(String.format("Writing stdout output %s", logpath));
 			out = outlog;
+		}
+		else
+			logger.info("Sinking all stdout");
 		if (out == null) {
 			out = new SinkOutputStream();
 		}
@@ -2044,12 +2099,18 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		OutputStream err = null;
 		if (stderr != null) {
 			if (errlog != null) {
+				logger.info(String.format("Writing stderr output to stderr and %s", errlog));
 				err = new TeeOutputStream(stderr, errlog);
 			} else {
+				logger.info("Stderr passthrough");
 				err = stderr;
 			}
-		} else if (errlog != null)
+		} else if (errlog != null) {
+			logger.info(String.format("Writing stderr output %s", errlog));
 			err = errlog;
+		}
+		else
+			logger.info("Sinking all stderr");
 		if (err == null) {
 			err = out;
 		}

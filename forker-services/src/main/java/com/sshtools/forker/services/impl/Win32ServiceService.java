@@ -8,9 +8,8 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
-import org.apache.commons.io.output.NullOutputStream;
-
 import com.sshtools.forker.client.OSCommand;
+import com.sshtools.forker.common.Util.NullOutputStream;
 import com.sshtools.forker.services.AbstractService;
 import com.sshtools.forker.services.Service;
 import com.sshtools.forker.services.Service.Status;

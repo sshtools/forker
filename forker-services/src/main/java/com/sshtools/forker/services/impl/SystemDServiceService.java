@@ -9,15 +9,14 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.io.output.NullOutputStream;
-import org.freedesktop.DBus.Properties;
-import org.freedesktop.DBus.Properties.PropertiesChanged;
-import org.freedesktop.dbus.DBusConnection;
-import org.freedesktop.dbus.DBusSigHandler;
+import org.freedesktop.dbus.connections.impl.DBusConnection;
 import org.freedesktop.dbus.exceptions.DBusException;
+import org.freedesktop.dbus.interfaces.DBusSigHandler;
+import org.freedesktop.dbus.interfaces.Properties;
+import org.freedesktop.dbus.interfaces.Properties.PropertiesChanged;
 
 import com.sshtools.forker.client.OSCommand;
+import com.sshtools.forker.common.Util.NullOutputStream;
 import com.sshtools.forker.services.AbstractService;
 import com.sshtools.forker.services.Service;
 import com.sshtools.forker.services.ServiceService;
@@ -45,7 +44,7 @@ public class SystemDServiceService extends AbstractServiceService implements Ser
 			return uf.getActiveState();
 		}
 
-	}
+	}	
 
 	private abstract class AbststractUnitFileService extends SystemDService {
 
@@ -159,11 +158,22 @@ public class SystemDServiceService extends AbstractServiceService implements Ser
 	}
 
 	private Service unitToService(final UnitType uf) {
-		return new UnitTypeService(FilenameUtils.getBaseName(uf.getUnitName()), uf);
+		return new UnitTypeService(getBaseName(uf.getUnitName()), uf);
+	}
+
+	private String getBaseName(String name) {
+		int idx = name.indexOf('/');
+		if(idx != -1) {
+			name = name.substring(idx + 1);
+		}
+		idx = name.lastIndexOf('.');
+		if(idx != -1)
+			name = name.substring(0, idx);
+		return name;
 	}
 
 	private Service unitToService(final UnitFileType uf) {
-		return new UnitFileTypeService(FilenameUtils.getBaseName(uf.getPath()), uf);
+		return new UnitFileTypeService(getBaseName(uf.getPath()), uf);
 	}
 
 	@Override
@@ -186,7 +196,7 @@ public class SystemDServiceService extends AbstractServiceService implements Ser
 							for (String n : names) {
 								final de.thjom.java.systemd.Service unit = (de.thjom.java.systemd.Service) systemd
 										.getManager().getUnit(n);
-								fireStateChange(new SystemDService(FilenameUtils.getBaseName(n)) {
+								fireStateChange(new SystemDService(getBaseName(n)) {
 									@Override
 									String getState() {
 										return unit.getActiveState();

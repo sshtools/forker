@@ -7,6 +7,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -29,46 +31,83 @@ public class Entry {
 	private boolean execute;
 	private boolean read;
 	private Path target;
+	private Set<String> architecture = new LinkedHashSet<>();
+	private Set<String> os = new LinkedHashSet<>();
 
-	public Entry(Path file) throws IOException {
-		size = Files.size(file);
-		checksum = AppManifest.checksum(file);
-		read = Files.isReadable(file);
-		write = Files.isWritable(file);
-		execute = Files.isExecutable(file);
+	public Entry(Path path) throws IOException {
+		size = Files.size(path);
+		checksum = AppManifest.checksum(path);
+		read = Files.isReadable(path);
+		write = Files.isWritable(path);
+		execute = Files.isExecutable(path);
 		try {
 			permissions = Files.getPosixFilePermissions(path);
 		} catch (Exception e) {
 		}
-		if(Files.isSymbolicLink(file))
-			target = Files.readSymbolicLink(file); 
+		if (Files.isSymbolicLink(path))
+			target = Files.readSymbolicLink(path);
 	}
-	
+
 	public Entry(Section section, Replace replace, Node file, AppManifest manifest)
 			throws IOException, URISyntaxException {
 		this.section = section;
 		path = Paths.get(AppManifest.getRequiredAttribute(replace, file, "path"));
 		String targetStr = AppManifest.getAttribute(replace, file, "target");
-		if(StringUtils.isNotBlank(targetStr)) {
+		if (StringUtils.isNotBlank(targetStr)) {
 			target = Paths.get(targetStr);
-		}
-		else {
+		} else {
 			uri = new URI(AppManifest.getRequiredAttribute(replace, file, "uri"));
 			size = Long.parseLong(AppManifest.getRequiredAttribute(replace, file, "size"));
 			checksum = Long.parseLong(AppManifest.getRequiredAttribute(replace, file, "checksum"), 16);
-			write = !"false".equals(AppManifest.getAttribute(replace, file, "write"));
-			execute = !"false".equals(AppManifest.getAttribute(replace, file, "execute"));
 			read = !"false".equals(AppManifest.getAttribute(replace, file, "read"));
+			architecture = toSet(AppManifest.getAttribute(replace, file, "architecture"));
+			os = toSet(AppManifest.getAttribute(replace, file, "os"));
 			String permString = AppManifest.getAttribute(replace, file, "permissions");
 			if (permString != null) {
-				String[] perms = permString.split(",");
-				permissions = new LinkedHashSet<>();
-				for (String s : perms) {
-					try {
-						permissions.add(PosixFilePermission.valueOf(s));
-					} catch (Exception e) {
+				if (permString.startsWith("-")) {
+					permissions = new LinkedHashSet<>();
+					if (permString.length() > 1 && permString.charAt(1) == 'r') {
+						permissions.add(PosixFilePermission.OWNER_READ);
 					}
+					if (permString.length() > 2 && permString.charAt(2) == 'w') {
+						permissions.add(PosixFilePermission.OWNER_WRITE);
+					}
+					if (permString.length() > 3 && permString.charAt(3) == 'x') {
+						permissions.add(PosixFilePermission.OWNER_EXECUTE);
+					}
+					if (permString.length() > 4 && permString.charAt(4) == 'r') {
+						permissions.add(PosixFilePermission.GROUP_READ);
+					}
+					if (permString.length() > 5 && permString.charAt(5) == 'w') {
+						permissions.add(PosixFilePermission.GROUP_WRITE);
+					}
+					if (permString.length() > 6 && permString.charAt(6) == 'x') {
+						permissions.add(PosixFilePermission.GROUP_EXECUTE);
+					}
+					if (permString.length() > 7 && permString.charAt(7) == 'r') {
+						permissions.add(PosixFilePermission.OTHERS_READ);
+					}
+					if (permString.length() > 8 && permString.charAt(8) == 'w') {
+						permissions.add(PosixFilePermission.OTHERS_WRITE);
+					}
+					if (permString.length() > 9 && permString.charAt(9) == 'x') {
+						permissions.add(PosixFilePermission.OTHERS_EXECUTE);
+					}
+				} else {
+					String[] perms = permString.split(",");
+					permissions = new LinkedHashSet<>();
+					for (String s : perms) {
+						try {
+							permissions.add(PosixFilePermission.valueOf(s));
+						} catch (Exception e) {
+						}
+					}
+					write = permissions.contains(PosixFilePermission.OWNER_WRITE);
+					execute = permissions.contains(PosixFilePermission.OWNER_EXECUTE);
 				}
+			} else {
+				write = !"false".equals(AppManifest.getAttribute(replace, file, "write"));
+				execute = !"false".equals(AppManifest.getAttribute(replace, file, "execute"));
 			}
 		}
 		if ("true".equals(AppManifest.getAttribute(replace, file, "modulepath"))) {
@@ -79,7 +118,7 @@ public class Entry {
 			type = Type.OTHER;
 		}
 	}
-	
+
 	public boolean isLink() {
 		return target != null;
 	}
@@ -118,6 +157,14 @@ public class Entry {
 	public Entry read(boolean read) {
 		this.read = read;
 		return this;
+	}
+
+	public Set<String> architecture() {
+		return architecture;
+	}
+
+	public Set<String> os() {
+		return os;
 	}
 
 	public Set<PosixFilePermission> permissions() {
@@ -198,8 +245,15 @@ public class Entry {
 
 	@Override
 	public String toString() {
-		return "Entry [uri=" + uri + ", path=" + path + ", size=" + size + ", checksum=" + checksum + ", type="
-				+ type + ", section=" + section + "]";
+		return "Entry [uri=" + uri + ", path=" + path + ", size=" + size + ", checksum=" + checksum + ", type=" + type
+				+ ", section=" + section + "]";
+	}
+
+	public static Set<String> toSet(String attribute) {
+		if (attribute == null || attribute.equals(""))
+			return Collections.emptySet();
+		else
+			return new LinkedHashSet<>(Arrays.asList(attribute.split(",")));
 	}
 
 }

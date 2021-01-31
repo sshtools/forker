@@ -17,13 +17,18 @@ public class InstallSession extends AbstractSession {
 		return base;
 	}
 
+	@Override
+	public int updates() {
+		return files.size();
+	}
+
 	public List<Path> files() {
 		return Collections.unmodifiableList(files);
 	}
-	
+
 	public InstallSession addFile(Path path) {
 		files.add(path);
-		if(sz > -1) {
+		if (sz > -1) {
 			sz = -1;
 		}
 		return this;
@@ -34,11 +39,15 @@ public class InstallSession extends AbstractSession {
 		return this;
 	}
 
-	public long size() throws IOException {
+	public long size() {
 		if (sz == -1) {
 			sz = 0;
-			for (Path p : files()) {
-				sz += Files.size(p);
+			try {
+				for (Path p : files()) {
+					sz += Files.size(p);
+				}
+			} catch (IOException ioe) {
+				throw new IllegalStateException("Could not get update size.", ioe);
 			}
 		}
 		return sz;

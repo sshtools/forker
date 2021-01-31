@@ -6,9 +6,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 
-import org.apache.commons.io.IOUtils;
-
 import com.sshtools.forker.common.States;
+import com.sshtools.forker.common.Util;
 
 /**
  * Handler that deals with requests for opening files for reading as the user
@@ -40,7 +39,7 @@ public class OSInputStreamHandler implements Handler {
 			dos.writeInt(States.OK);
 			dos.writeLong(file.length());
 			dos.flush();
-			IOUtils.copyLarge(fin, dos);
+			Util.copy(fin, dos);
 			dos.flush();
 		} finally {
 			fin.close();

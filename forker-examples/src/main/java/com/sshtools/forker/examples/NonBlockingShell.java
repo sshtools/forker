@@ -17,13 +17,12 @@ package com.sshtools.forker.examples;
 
 import java.nio.ByteBuffer;
 
-import org.apache.commons.io.IOUtils;
-
 import com.sshtools.forker.client.DefaultNonBlockingProcessListener;
 import com.sshtools.forker.client.NonBlockingProcess;
 import com.sshtools.forker.client.ShellBuilder;
 import com.sshtools.forker.common.IO;
 import com.sshtools.forker.common.OS;
+import com.sshtools.forker.common.Util;
 
 /**
  * This example shows how to create an interactive shell. 
@@ -63,7 +62,7 @@ public class NonBlockingShell {
 		 * the OutputStream provided by the process as we are just joining
 		 * it to stdin of this process
 		 */
-		IOUtils.copy(System.in, p.getOutputStream());
+		Util.copy(System.in, p.getOutputStream());
 		
 		/* When this processes stdin closes, close the shells stdin too and 
 		 * wait for it to finish

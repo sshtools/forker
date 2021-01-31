@@ -44,35 +44,28 @@
 		
 		<dependency>
 			<groupId>org.eclipse.platform</groupId>
-			<artifactId>org.eclipse.swt.gtk.linux.x86_64</artifactId>
+			<artifactId>org.eclipse.swt.${osgi.platform}</artifactId>
 			<version>${swt.version}</version>
-			<scope>provided</scope>
 			<exclusions>
+				<!-- TODO: Workaround -->
 				<exclusion>
+					<groupId>org.eclipse.platform</groupId>
+					<artifactId>org.eclipse.swt</artifactId>
+				</exclusion>
+				<!-- <exclusion>
 					<groupId>org.eclipse.platform</groupId>
 					<artifactId>org.eclipse.swt.gtk.linux.aarch64</artifactId>
 				</exclusion>
 				<exclusion>
 					<groupId>org.eclipse.platform</groupId>
 					<artifactId>org.eclipse.swt.gtk.linux.arm</artifactId>
-				</exclusion>
+				</exclusion> -->
 			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>org.eclipse.platform</groupId>
 			<artifactId>org.eclipse.swt</artifactId>
 			<version>${swt.version}</version>
-			<scope>provided</scope>
-			<exclusions>
-				<exclusion>
-					<groupId>org.eclipse.platform</groupId>
-					<artifactId>org.eclipse.swt.gtk.linux.aarch64</artifactId>
-				</exclusion>
-				<exclusion>
-					<groupId>org.eclipse.platform</groupId>
-					<artifactId>org.eclipse.swt.gtk.linux.arm</artifactId>
-				</exclusion>
-			</exclusions>
 		</dependency>
 	</dependencies>
 	<profiles>

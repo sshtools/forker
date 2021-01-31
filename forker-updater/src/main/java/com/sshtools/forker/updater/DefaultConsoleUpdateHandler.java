@@ -15,7 +15,7 @@ public class DefaultConsoleUpdateHandler extends AbstractHandler implements Upda
 	}
 
 	@Override
-	public void startDownloadFile(Entry file) throws Exception {
+	public void startDownloadFile(Entry file, int index) throws Exception {
 	}
 
 	@Override
@@ -27,11 +27,7 @@ public class DefaultConsoleUpdateHandler extends AbstractHandler implements Upda
 	}
 
 	@Override
-	public void failed(Throwable t) {
-	}
-
-	@Override
-	public void complete() {
+	public void updateDone(boolean upgradeError) {
 	}
 
 	@Override

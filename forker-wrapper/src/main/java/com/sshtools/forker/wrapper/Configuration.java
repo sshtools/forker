@@ -1,21 +1,22 @@
 package com.sshtools.forker.wrapper;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.cli.CommandLine;
 import org.apache.commons.lang3.SystemUtils;
+
+import picocli.CommandLine.Model.OptionSpec;
+import picocli.CommandLine.ParseResult;
 
 public class Configuration {
 
 	private List<KeyValuePair> properties = new ArrayList<KeyValuePair>();
 	private List<KeyValuePair> externalProperties = new ArrayList<KeyValuePair>();
 	private Object cfgLock = new Object();
-	private CommandLine cmd;
+	private ParseResult cmd;
 
 	public Configuration() {
 	}
@@ -24,7 +25,7 @@ public class Configuration {
 		return cfgLock;
 	}
 
-	public CommandLine getCmd() {
+	public ParseResult getCmd() {
 		return cmd;
 	}
 
@@ -38,9 +39,9 @@ public class Configuration {
 
 	public boolean getSwitch(String key, boolean defaultValue) {
 		String optionValue = getOptionValue(key, null);
-		if(optionValue != null)
+		if (optionValue != null)
 			return !"false".equals(optionValue);
-		if (cmd != null && cmd.hasOption(key))
+		if (cmd != null && cmd.hasMatchedOption(key))
 			return true;
 		if (isBool(key)) {
 			return true;
@@ -106,9 +107,10 @@ public class Configuration {
 	public List<String> getOptionValues(String key) {
 		synchronized (cfgLock) {
 			String os = getOsPrefix();
-			String[] vals = cmd == null ? null : cmd.getOptionValues(key);
-			if (vals != null)
-				return Arrays.asList(vals);
+			OptionSpec matchedOption = cmd.matchedOption(key);
+			if (matchedOption != null) {
+				return matchedOption.originalStringValues();
+			}
 			List<String> valList = new ArrayList<String>();
 			for (KeyValuePair nvp : properties) {
 				if ((nvp.getName().equals(key) || nvp.getName().equals(os + "-" + key)) && nvp.getValue() != null) {
@@ -183,19 +185,19 @@ public class Configuration {
 			}
 		}
 
-		if (val == null) {
-			val = cmd == null ? null : cmd.getOptionValue(os + "-" + key);
-			if (val == null)
-				val = cmd == null ? null : cmd.getOptionValue(key);
-		}
-		
+//		if (val == null) {
+//			val = cmd == null ? null : cmd.(os + "-" + key);
+		if (val == null)
+			val = cmd == null || cmd.matchedOption(key) == null ? null : cmd.matchedOption(key).getValue().toString();
+//		}
+
 		if (val == null)
 			val = defaultValue;
-		
+
 		return val;
 	}
 
-	public void init(CommandLine cmd) {
+	public void init(ParseResult cmd) {
 		this.cmd = cmd;
 	}
 }

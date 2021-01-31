@@ -112,7 +112,7 @@ public interface XAdvapi32 extends Advapi32 {
 	/**
 	 * Instance
 	 */
-	XAdvapi32 INSTANCE = (XAdvapi32) Native.loadLibrary("Advapi32", XAdvapi32.class, W32APIOptions.UNICODE_OPTIONS);
+	XAdvapi32 INSTANCE = Native.load("Advapi32", XAdvapi32.class, W32APIOptions.UNICODE_OPTIONS);
 
 	/**
 	 * Creates a new process and its primary thread. The new process runs in the

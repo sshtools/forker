@@ -14,6 +14,7 @@ import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +43,7 @@ import com.sshtools.forker.wrapper.Replace;
 import com.sshtools.forker.wrapper.Replace.Replacer;
 
 public class AppManifest {
-	
+
 	public enum ManifestVersion {
 		V1, V2
 	}
@@ -71,7 +72,6 @@ public class AppManifest {
 	private List<Entry> entries = new ArrayList<>();
 	private String version;
 	private String id;
-	private Map<String, Launcher> launchers = new HashMap<>();
 	private ManifestVersion manifestVersion = ManifestVersion.V2;
 
 	public AppManifest() {
@@ -82,7 +82,7 @@ public class AppManifest {
 			load(reader);
 		}
 	}
-	
+
 	public ManifestVersion manfifestVersion() {
 		return manifestVersion;
 	}
@@ -126,13 +126,12 @@ public class AppManifest {
 			version = getAttribute(replace, root, "version");
 			id = getRequiredAttribute(replace, root, "id");
 			String manififestVerString = getAttribute(replace, root, "manifest");
-			if(manififestVerString != null && manififestVerString.length() > 0) {
+			if (manififestVerString != null && manififestVerString.length() > 0) {
 				try {
 					manifestVersion = ManifestVersion.valueOf("V_" + manififestVerString);
-				}
-				catch(Exception e) {
+				} catch (Exception e) {
 					/* Assume default */
-					manifestVersion  = ManifestVersion.values()[ManifestVersion.values().length - 1];
+					manifestVersion = ManifestVersion.values()[ManifestVersion.values().length - 1];
 				}
 			}
 
@@ -230,7 +229,7 @@ public class AppManifest {
 				l.add(e);
 			}
 		}
-		return l;
+		return Collections.unmodifiableList(l);
 	}
 
 	public String version() {
@@ -357,24 +356,62 @@ public class AppManifest {
 		default:
 			break;
 		}
-		if(e.target() != null)
+		if (e.target() != null)
 			fileElement.setAttribute("target", e.target().toString());
 		else {
+			if (!e.architecture().isEmpty()) {
+				fileElement.setAttribute("architecture", String.join(",", e.architecture()));
+			}
+			if (!e.os().isEmpty()) {
+				fileElement.setAttribute("os", String.join(",", e.os()));
+			}
 			fileElement.setAttribute("uri", baseUri.relativize(e.uri()).toString());
 			fileElement.setAttribute("size", String.valueOf(e.size()));
 			if (!e.read())
 				fileElement.setAttribute("read", "false");
-			fileElement.setAttribute("write", String.valueOf(e.write()));
 			if (e.permissions() != null) {
-				StringBuilder b = new StringBuilder();
-				for (PosixFilePermission p : e.permissions()) {
-					if (b.length() > 0)
-						b.append(",");
-					b.append(p.name());
-				}
+				StringBuilder b = new StringBuilder("-");
+				if (e.permissions().contains(PosixFilePermission.OWNER_READ))
+					b.append("r");
+				else
+					b.append("-");
+				if (e.permissions().contains(PosixFilePermission.OWNER_WRITE))
+					b.append("w");
+				else
+					b.append("-");
+				if (e.permissions().contains(PosixFilePermission.OWNER_EXECUTE))
+					b.append("x");
+				else
+					b.append("-");
+				if (e.permissions().contains(PosixFilePermission.GROUP_READ))
+					b.append("r");
+				else
+					b.append("-");
+				if (e.permissions().contains(PosixFilePermission.GROUP_WRITE))
+					b.append("w");
+				else
+					b.append("-");
+				if (e.permissions().contains(PosixFilePermission.GROUP_EXECUTE))
+					b.append("x");
+				else
+					b.append("-");
+				if (e.permissions().contains(PosixFilePermission.OTHERS_READ))
+					b.append("r");
+				else
+					b.append("-");
+				if (e.permissions().contains(PosixFilePermission.OTHERS_WRITE))
+					b.append("w");
+				else
+					b.append("-");
+				if (e.permissions().contains(PosixFilePermission.OTHERS_EXECUTE))
+					b.append("x");
+				else
+					b.append("-");
 				fileElement.setAttribute("permissions", b.toString());
+			} else {
+				fileElement.setAttribute("execute", String.valueOf(e.execute()));
+				fileElement.setAttribute("write", String.valueOf(e.write()));
 			}
-			fileElement.setAttribute("execute", String.valueOf(e.execute()));
 			fileElement.setAttribute("checksum", Long.toHexString(e.checksum()));
 		}
 		filesElement.appendChild(fileElement);

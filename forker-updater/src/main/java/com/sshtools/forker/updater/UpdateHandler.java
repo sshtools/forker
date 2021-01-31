@@ -23,7 +23,7 @@ public interface UpdateHandler {
 
 	void updateDownloadProgress(float progress) throws Exception;
 
-	void startDownloadFile(Entry file) throws Exception;
+	void startDownloadFile(Entry file, int index) throws Exception;
 
 	void startDownloads() throws Exception;
 
@@ -34,4 +34,6 @@ public interface UpdateHandler {
 	default boolean updatesComplete(Callable<Void> task) throws Exception {
 		return true;
 	}
+
+	void updateDone(boolean upgradeError);
 }

@@ -15,35 +15,25 @@
  */
 package com.sshtools.forker.updater.console;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 
 import org.fusesource.jansi.Ansi;
+import org.fusesource.jansi.Ansi.Erase;
 
-import com.sshtools.forker.updater.AbstractHandler;
 import com.sshtools.forker.updater.InstallHandler;
 import com.sshtools.forker.updater.InstallSession;
 
-public class ConsoleInstallHandler extends AbstractHandler implements InstallHandler {
+public class ConsoleInstallHandler extends AbstractConsoleHandler<InstallSession> implements InstallHandler {
 
-	private InstallSession session;
-	private Path dest;
 	private Path chosenDestination;
 
 	@Override
-	public void init(InstallSession context) {
-		this.session = context;
-		ConsoleSystem.get().activate();
-	}
-
-	@Override
 	public Path chooseDestination(Callable<Void> callable) {
-		chosenDestination = getDestination();
+		chosenDestination = processPath(prompt(Ansi.ansi().a("Enter destination (").fg(Ansi.Color.RED).a("Enter")
+				.fgDefault().a(" for %s):").toString(), session.base()));
 		if (Files.exists(chosenDestination)) {
 			if (Files.isDirectory(chosenDestination)) {
 				if (Files.exists(chosenDestination.resolve("manifest.xml"))) {
@@ -65,82 +55,50 @@ public class ConsoleInstallHandler extends AbstractHandler implements InstallHan
 		return chosenDestination;
 	}
 
-	private Path getDestination() {
-		return processPath(prompt(Ansi.ansi().a("Enter destination (").fg(Ansi.Color.RED).a("Enter").fgDefault()
-				.a(" for %s):").toString(), session.base()));
+	@Override
+	public Path chosenDestination() {
+		return chosenDestination;
 	}
 
-	private int getConsoleWidth() {
-		return 80;
+	@Override
+	public void installDone() {
+		Ansi ansi = Ansi.ansi();
+		println(ansi.cursorToColumn(0).bold().a("Installation complete.").eraseLine(Erase.FORWARD).toString());
 	}
 
-	private String prompt(String text, Object... args) {
-		if (console == null) {
-			try (BufferedReader reader = new BufferedReader(new InputStreamReader(System.in))) {
-				print(String.format(text, args));
-				return reader.readLine();
-			} catch (IOException ioe) {
-				throw new IllegalStateException("Failed to get prompt.", ioe);
-			}
-		} else {
-			return console.readLine(text, args);
-		}
+	@Override
+	public void installFile(Path file, Path dest, int index) throws Exception {
+		this.currentIndex = index;
+		this.currentDest = dest.getFileName().toString();
+		this.currentFrac = 0;
+		updateRow();
+
+	}
+
+	@Override
+	public void installFileDone(Path file) throws Exception {
+	}
+
+	@Override
+	public void installFileProgress(Path file, float progress) throws Exception {
+	}
+
+	@Override
+	public void installProgress(float frac) throws Exception {
+		currentFrac = frac;
+		updateRow();
+	}
+
+	@Override
+	public void startInstall() throws Exception {
+		println("Installing");
 	}
 
 	private Path processPath(String path) {
 		if (path == null)
 			throw new IllegalStateException("Aborted.");
 		if (path.equals(""))
-			return dest = session.base();
-		return dest = Paths.get(path);
-	}
-
-	@Override
-	public void startInstall() throws Exception {
-	}
-
-	@Override
-	public void failed(Throwable error) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void complete() {
-		println("");
-	}
-
-	@Override
-	public void installProgress(float frac) throws Exception {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void installFile(Path file, Path d, int index) throws Exception {
-		Ansi ansi = Ansi.ansi();
-		print(ansi.cursorToColumn(0).toString());
-		print(String.format("%4d/%4d [%s40] - %20s (%02d:%02d:%02d)", index + 1, session.files().size(), "XXX",
-				d.getFileName().toString(), 0, 0, 0));
-//		print(ansi.eraseLine(Erase.FORWARD).toString());
-		print(ansi.cursorToColumn(0).toString());
-
-	}
-
-	@Override
-	public void installFileProgress(Path file, float progress) throws Exception {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void installFileDone(Path file) throws Exception {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public Path chosenDestination() {
-		return chosenDestination;
+			return session.base();
+		return Paths.get(path);
 	}
 }

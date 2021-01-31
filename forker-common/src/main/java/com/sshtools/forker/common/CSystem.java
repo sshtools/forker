@@ -18,7 +18,7 @@ public interface CSystem extends Library {
 	/**
 	 * Instance of library.
 	 */
-	CSystem INSTANCE = (CSystem) Native.loadLibrary((Platform.isWindows() ? "msvcrt" : "c"), CSystem.class);
+	CSystem INSTANCE = (CSystem) Native.load((Platform.isWindows() ? "msvcrt" : "c"), CSystem.class);
 
 	/**
 	 * The change occurs immediately.
