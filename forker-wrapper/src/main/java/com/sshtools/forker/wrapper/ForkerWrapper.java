@@ -2097,9 +2097,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			logger.info(String.format("Writing stdout output %s", logpath));
 			out = outlog;
 		}
-		else
-			logger.info("Sinking all stdout");
 		if (out == null) {
+			logger.info("Sinking all stdout");
 			out = new SinkOutputStream();
 		}
 		OutputStream stderr = quietStdErr ? null : defaultErr;
@@ -2116,9 +2115,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			logger.info(String.format("Writing stderr output %s", errlog));
 			err = errlog;
 		}
-		else
-			logger.info("Sinking all stderr");
 		if (err == null) {
+			if(out instanceof SinkOutputStream)
+				logger.info("Sinking all stderr");
+			else
+				logger.info("Sending stderr to stdout");
 			err = out;
 		}
 		Thread errThread = new Thread(copyRunnable(process.getErrorStream(), err), "StdErr");

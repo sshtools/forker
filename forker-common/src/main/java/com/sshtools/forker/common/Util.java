@@ -295,8 +295,8 @@ public class Util {
 
 		@Override
 		public void flush() throws IOException {
-			left.close();
-			right.close();
+			left.flush();
+			right.flush();
 		}
 
 		@Override
