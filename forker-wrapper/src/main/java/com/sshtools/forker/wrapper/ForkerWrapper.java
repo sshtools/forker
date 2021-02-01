@@ -833,6 +833,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		wrapper.getWrappedApplication().setArguments(args);
 
 		CommandSpec opts = CommandSpec.create();
+//		opts.parser().stopAtUnmatched(true);
+//		opts.parser().unmatchedOptionsArePositionalParams(true);
 		opts.mixinStandardHelpOptions(true);
 		// Add the options always available
 
@@ -856,6 +858,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 	public static void wrapperMain(String[] args, ForkerWrapper wrapper, CommandSpec opts) {
 		CommandLine cl = new CommandLine(opts);
+		cl.setUnmatchedArgumentsAllowed(true);
+		cl.setUnmatchedOptionsAllowedAsOptionParameters(true);
+		cl.setUnmatchedOptionsArePositionalParams(true);
 		try {
 			ParseResult cmd = cl.parseArgs(args);
 			wrapper.init(cmd);
@@ -1281,9 +1286,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 						"Adds default neccessary properties for remote debugging. If an argument is provided, is should either be true,false, or a list of comma separated name=value pairs of any parameters to pass to the debugger agent.")
 				.build());
 
-		options.addPositional(PositionalParamSpec.builder().paramLabel("classNameOrExecutable").type(String.class)
-				.description("The classname or executable name or path of the application to run.").build());
-
 		// Add the command line launch options
 		options.addOption(OptionSpec.builder("-c", "--configuration").paramLabel("file").type(String.class).description(
 				"A file to read configuration. This can either be a JavaScript file that evaluates to an object "
@@ -1303,6 +1305,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				.paramLabel("fd").type(int.class).build());
 		options.addOption(OptionSpec.builder("-FE", "--fderr").description("File descriptor for stderr")
 				.paramLabel("fd").type(int.class).build());
+
+		options.addPositional(PositionalParamSpec.builder().paramLabel("classNameOrExecutable").type(String.class)
+				.description("The classname or executable name or path of the application to run.").build());
+		options.addPositional(PositionalParamSpec.builder().paramLabel("arguments").type(String.class).arity("1..*")
+				.description("All other arguments to pass on to the wrapped application.").build());
 
 		options.name(getAppName());
 	}
@@ -1881,7 +1888,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 	protected void continueProcessing() throws IOException {
 		app.set(configuration.getOptionValue("main", null), configuration.getOptionValue("jar", null),
-				configuration.getCmd().unmatched(), configuration.getOptionValues("apparg"), getArgMode());
+				configuration.getRemaining(), configuration.getOptionValues("apparg"), getArgMode());
 	}
 
 	private void configurationFileChanged(File file) {

@@ -9,6 +9,7 @@ import java.util.Map;
 import org.apache.commons.lang3.SystemUtils;
 
 import picocli.CommandLine.Model.OptionSpec;
+import picocli.CommandLine.Model.PositionalParamSpec;
 import picocli.CommandLine.ParseResult;
 
 public class Configuration {
@@ -17,6 +18,7 @@ public class Configuration {
 	private List<KeyValuePair> externalProperties = new ArrayList<KeyValuePair>();
 	private Object cfgLock = new Object();
 	private ParseResult cmd;
+	private List<String> remaining = new ArrayList<>();
 
 	public Configuration() {
 	}
@@ -196,8 +198,16 @@ public class Configuration {
 
 		return val;
 	}
+	
+	public List<String> getRemaining() {
+		return remaining;
+	}
 
 	public void init(ParseResult cmd) {
 		this.cmd = cmd;
+		for(PositionalParamSpec p : cmd.matchedPositionals()) {
+			remaining.addAll(p.stringValues());
+		}
+		remaining.addAll(cmd.unmatched());
 	}
 }

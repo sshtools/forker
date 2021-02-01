@@ -239,7 +239,7 @@ public class Updater extends ForkerWrapper {
 				session.systemWideBootstrapInstall(true);
 
 			session.localDir(cwd());
-			session.appArgs(getCmd().unmatched());
+			session.appArgs(getConfiguration().getRemaining());
 			handler.init(session);
 
 			/*
