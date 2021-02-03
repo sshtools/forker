@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.logging.Logger;
 
 import org.apache.commons.lang3.StringUtils;
 import org.w3c.dom.Node;
@@ -33,8 +34,12 @@ public class Entry {
 	private Path target;
 	private Set<String> architecture = new LinkedHashSet<>();
 	private Set<String> os = new LinkedHashSet<>();
+	private AppManifest manifest;
+	
+	protected Logger logger = Logger.getGlobal();
 
-	public Entry(Path path) throws IOException {
+	public Entry(Path path, AppManifest manifest) throws IOException {
+		this.manifest = manifest;
 		size = Files.size(path);
 		checksum = AppManifest.checksum(path);
 		read = Files.isReadable(path);
@@ -50,7 +55,9 @@ public class Entry {
 
 	public Entry(Section section, Replace replace, Node file, AppManifest manifest)
 			throws IOException, URISyntaxException {
+		this.manifest = manifest;
 		this.section = section;
+		
 		path = Paths.get(AppManifest.getRequiredAttribute(replace, file, "path"));
 		String targetStr = AppManifest.getAttribute(replace, file, "target");
 		if (StringUtils.isNotBlank(targetStr)) {
@@ -198,7 +205,14 @@ public class Entry {
 		return path;
 	}
 
+	public Entry name(Path path) {
+		this.path = path.getFileName();
+		return this;
+	}
+
 	public Entry path(Path path) {
+		if(!path.isAbsolute())
+			path =  Paths.get("/").resolve(path);
 		this.path = path;
 		return this;
 	}
@@ -231,16 +245,21 @@ public class Entry {
 	}
 
 	public Path resolve(Path localDir) {
-		return resolve(localDir, null);
-	}
-
-	public Path resolve(Path localDir, Path basePath) {
-		if (path.isAbsolute())
+		if (path.isAbsolute()) {
 			return localDir.resolve(path.toString().substring(1));
-		else if (basePath == null)
-			return localDir.resolve(path);
-		else
-			return localDir.resolve(basePath).resolve(path.toString());
+		}
+		else {
+			Path sectionPath = manifest.resolve(section, localDir);
+			if(type == Type.CLASSPATH) {
+				return sectionPath.resolve(manifest.classPath()).resolve(path);
+			}
+			else if(type == Type.MODULEPATH) {
+				return sectionPath.resolve(manifest.modulePath()).resolve(path);
+			}
+			else {
+				return sectionPath.resolve(path);
+			}
+		}
 	}
 
 	@Override

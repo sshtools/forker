@@ -90,8 +90,7 @@ public class UpdateSession extends AbstractSession {
 	protected Collection<? extends Entry> doGetUpdates(List<Entry> entries) throws IOException {
 		List<Entry> updates = new ArrayList<>();
 		for (Entry entry : entries) {
-			Path local = entry.section() == Section.APP ? entry.resolve(localDir, manifest().path())
-					: entry.resolve(localDir);
+			Path local = entry.resolve(localDir);
 
 			if (systemWideBootstrapInstall && entry.section() == Section.BOOTSTRAP)
 				continue;

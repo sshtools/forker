@@ -18,6 +18,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.Adler32;
@@ -43,6 +44,8 @@ import com.sshtools.forker.wrapper.Replace;
 import com.sshtools.forker.wrapper.Replace.Replacer;
 
 public class AppManifest {
+	
+	protected Logger logger = Logger.getGlobal();
 
 	public enum ManifestVersion {
 		V1, V2
@@ -68,11 +71,14 @@ public class AppManifest {
 	private Instant timestamp = Instant.now();
 	private URI baseUri;
 	private Map<String, String> properties = new HashMap<>();
-	private Path path;
 	private List<Entry> entries = new ArrayList<>();
 	private String version;
 	private String id;
 	private ManifestVersion manifestVersion = ManifestVersion.V2;
+	private Map<Section, Path> sectionPath = new HashMap<>();
+	private Path basePath = Paths.get("/");
+	private Path modulePath = Paths.get("modulepath");
+	private Path classPath = Paths.get("classpath");
 
 	public AppManifest() {
 	}
@@ -157,14 +163,20 @@ public class AppManifest {
 			NodeList base = document.getElementsByTagName(BASE_TAG);
 			if (base.getLength() == 1) {
 				baseUri = new URI(getRequiredAttribute(replace, base.item(0), "uri"));
-				path = Paths.get(getRequiredAttribute(replace, base.item(0), "path"));
+				basePath = Paths.get(getRequiredAttribute(replace, base.item(0), "path"));
+				modulePath = Paths.get(getAttribute(replace, base.item(0), "modulepath", "modulepath"));
+				classPath = Paths.get(getAttribute(replace, base.item(0), "classpath", "classpath"));
 			} else
 				throw new IOException("Should only be a single base element.");
 
 			/* Files */
 			NodeList files = document.getElementsByTagName(APP_TAG);
 			if (files.getLength() == 1) {
-				files = files.item(0).getChildNodes();
+				Node app = files.item(0);
+				String path = getAttribute(replace, app, "path");
+				if(path != null)
+					sectionPath.put(Section.APP, Paths.get(path));
+				files = app.getChildNodes();
 				for (int i = 0; i < files.getLength(); i++) {
 					Node file = files.item(i);
 					if (file instanceof Element) {
@@ -180,7 +192,11 @@ public class AppManifest {
 			/* Bootstrap Files */
 			NodeList bootstrapFiles = document.getElementsByTagName(BOOTSTRAP_TAG);
 			if (bootstrapFiles.getLength() == 1) {
-				bootstrapFiles = bootstrapFiles.item(0).getChildNodes();
+				Node bootstrap = bootstrapFiles.item(0);
+				String path = getAttribute(replace, bootstrap, "path");
+				if(path != null)
+					sectionPath.put(Section.BOOTSTRAP, Paths.get(path));
+				bootstrapFiles = bootstrap.getChildNodes();
 				for (int i = 0; i < bootstrapFiles.getLength(); i++) {
 					Node bootstrapFile = bootstrapFiles.item(i);
 					if (bootstrapFile instanceof Element) {
@@ -205,8 +221,30 @@ public class AppManifest {
 	}
 
 	static String getAttribute(Replace replace, Node item, String name) {
+		return getAttribute(replace, item, name, null);
+	}
+
+	static String getAttribute(Replace replace, Node item, String name, String defaultValue) {
 		Node attr = item.getAttributes().getNamedItem(name);
-		return attr == null ? null : replace.replace(attr.getNodeValue());
+		return attr == null ? defaultValue : replace.replace(attr.getNodeValue());
+	}
+
+	public Path modulePath() {
+		return modulePath;
+	}
+
+	public AppManifest modulePath(Path modulePath) {
+		this.modulePath = modulePath;
+		return this;
+	}
+
+	public Path classPath() {
+		return classPath;
+	}
+
+	public AppManifest classPath(Path classPath) {
+		this.classPath = classPath;
+		return this;
 	}
 
 	public String id() {
@@ -263,12 +301,8 @@ public class AppManifest {
 		return properties;
 	}
 
-	public Path path() {
-		return path;
-	}
-
-	public AppManifest path(Path path) {
-		this.path = path;
+	public AppManifest basePath(Path basePath) {
+		this.basePath = basePath;
 		return this;
 	}
 
@@ -307,8 +341,8 @@ public class AppManifest {
 			Element baseElement = doc.createElement(BASE_TAG);
 			if (baseUri != null)
 				baseElement.setAttribute("uri", baseUri.toString());
-			if (path != null)
-				baseElement.setAttribute("path", path.toString());
+			if (basePath != null)
+				baseElement.setAttribute("path", basePath.toString());
 			rootElement.appendChild(baseElement);
 
 			if (properties != null && properties.size() > 0) {
@@ -323,12 +357,18 @@ public class AppManifest {
 			}
 
 			Element filesElement = doc.createElement(APP_TAG);
+			Path path = sectionPath(Section.APP);
+			if(path != null)
+				filesElement.setAttribute("path", path.toString());
 			for (Entry e : entries(Section.APP)) {
 				addFileElements(doc, filesElement, e, APP_FILE_TAG);
 			}
 			rootElement.appendChild(filesElement);
 
 			Element bootstrapsElement = doc.createElement(BOOTSTRAP_TAG);
+			path = sectionPath(Section.BOOTSTRAP);
+			if(path != null)
+				bootstrapsElement.setAttribute("path", path.toString());
 			for (Entry e : entries(Section.BOOTSTRAP)) {
 				addFileElements(doc, bootstrapsElement, e, BOOTSTRAP_FILE_TAG);
 			}
@@ -458,6 +498,45 @@ public class AppManifest {
 			if (e.path().equals(fileName))
 				return true;
 		return false;
+	}
+	
+	public Path sectionPath(Section section) {
+		return sectionPath.get(section);
+	}
+	
+	public AppManifest sectionPath(Section section, Path path) {
+		sectionPath.put(section, path);
+		return this;
+	}
+
+	public Path basePath() {
+		return basePath;
+	}
+	
+	public Path resolveBasePath(Path localDir) {
+		return basePath == null || basePath.toString().equals("/") ? localDir : localDir.resolve(basePath);
+	}
+
+	public Path resolve(Section section, Path localDir) {
+		if(basePath != null) {
+			localDir = resolveBasePath(localDir);
+		}
+		if(sectionPath.containsKey(section)) {
+			localDir = localDir.resolve(sectionPath.get(section));
+		}
+		return localDir;
+	}
+	
+	public static void main(String[] args) {
+		AppManifest mf = new AppManifest();
+		Path p1 = Paths.get("/home/tanktarta");
+		Path p2 = Paths.get("/another/path");
+		mf.basePath = p1;
+		System.out.println("p1: " + p1 + " p2: " + p2 + " = " +  mf.resolveBasePath(p1));
+	}
+
+	public Map<Section, Path> sectionPaths() {
+		return sectionPath;
 	}
 
 }

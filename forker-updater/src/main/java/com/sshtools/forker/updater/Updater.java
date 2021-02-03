@@ -466,11 +466,12 @@ public class Updater extends ForkerWrapper {
 		int idx = 0;
 		for (Entry entry : updates) {
 			handler.startDownloadFile(entry, idx++);
-			Path manifestFolderPath = entry.resolve(session.localDir(), session.manifest().path());
+			Path resolvedPath = entry.resolve(session.localDir()); /*.relativize(Paths.get("/"));*/
+			logger.log(Level.INFO, String.format("Installing %s to %s", entry.path(), resolvedPath));
 			Path path;
 			Path outPath = null;
 			if (entry.section() == Section.APP) {
-				path = manifestFolderPath;
+				path = resolvedPath;
 				if (entry.isLink())
 					outPath = path;
 				else
@@ -507,6 +508,10 @@ public class Updater extends ForkerWrapper {
 					URL url = AppManifest.concat(session.manifest().baseUri(), entry.uri()).toURL();
 					logger.log(Level.INFO, String.format("Updating file %s from %s in %s section.", entry.path(), url,
 							entry.section()));
+					
+					if(logger.isLoggable(Level.FINE)) {
+						logger.log(Level.FINE, String.format("Writing to temporary file %s", outPath));
+					}
 
 					try (InputStream in = throttleStream(url.openStream())) {
 						try (OutputStream out = throttleStream(Files.newOutputStream(checkFilesDir(outPath)))) {
@@ -532,13 +537,29 @@ public class Updater extends ForkerWrapper {
 					}
 
 					if (entry.permissions() != null) {
-						Files.setPosixFilePermissions(outPath, entry.permissions());
+						if(logger.isLoggable(Level.FINE)) {
+							logger.log(Level.FINE, String.format("Setting permissions %s on %s", entry.permissions(), path));
+						}
+						Files.setPosixFilePermissions(path, entry.permissions());
 					} else {
-						if (!entry.write())
-							outPath.toFile().setWritable(false, false);
-						if (!entry.read())
-							outPath.toFile().setReadable(false);
-						outPath.toFile().setExecutable(true);
+						if (!entry.write()) {
+							if(logger.isLoggable(Level.FINE)) {
+								logger.log(Level.FINE, String.format("Setting read-only on %s", path));
+							}
+							path.toFile().setWritable(false, false);
+						}
+						if(!entry.read()) {
+							if(logger.isLoggable(Level.FINE)) {
+								logger.log(Level.FINE, String.format("Setting no-read on %s", path));
+							}
+							path.toFile().setReadable(false);
+						}
+						if(entry.execute()) {
+							if(logger.isLoggable(Level.FINE)) {
+								logger.log(Level.FINE, String.format("Setting execute on %s", path));
+							}
+							path.toFile().setExecutable(true);
+						}
 					}
 
 					entry.checksum(AppManifest.checksum(path));
@@ -569,22 +590,23 @@ public class Updater extends ForkerWrapper {
 		 * Now check everything else in the base path (i.e. where app jars are) for
 		 * anything that shouldn't be there.
 		 */
-		Path appBase = session.localDir().resolve(session.manifest().path());
-		try (DirectoryStream<Path> stream = Files.newDirectoryStream(appBase)) {
-			for (Path path : stream) {
-				if (Files.isDirectory(path) && !appBase.equals(session.localDir())) {
-					/*
-					 * Unless it's the root of the install, the appBase should have no folders in it
-					 */
-					logger.log(Level.INFO,
-							String.format("Removing directory with no manifiest entry %s from app base path %s.", path,
-									session.manifest().path()));
-					Util.deleteRecursiveIfExists(path.toFile());
-				} else if (!Files.isDirectory(path) && !session.manifest().hasPath(path.getFileName())) {
-					logger.log(Level.INFO,
-							String.format("Removing file with no manifiest entry %s from app base path %s.", path,
-									session.manifest().path()));
-					Files.delete(path);
+		for(Path appBase : session.manifest().sectionPaths().values())  {
+			try (DirectoryStream<Path> stream = Files.newDirectoryStream(appBase)) {
+				for (Path path : stream) {
+					if (Files.isDirectory(path) && !appBase.equals(session.localDir())) {
+						/*
+						 * Unless it's the root of the install, the appBase should have no folders in it
+						 */
+						logger.log(Level.INFO,
+								String.format("Removing directory with no manifest entry %s from app base path %s.", path,
+										appBase));
+						Util.deleteRecursiveIfExists(path.toFile());
+					} else if (!Files.isDirectory(path) && !session.manifest().hasPath(path.getFileName())) {
+						logger.log(Level.INFO,
+								String.format("Removing file with no manifiest entry %s from app base path %s.", path,
+										appBase));
+						Files.delete(path);
+					}
 				}
 			}
 		}
