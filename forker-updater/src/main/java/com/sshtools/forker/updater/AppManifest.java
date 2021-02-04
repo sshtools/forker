@@ -134,7 +134,7 @@ public class AppManifest {
 			String manififestVerString = getAttribute(replace, root, "manifest");
 			if (manififestVerString != null && manififestVerString.length() > 0) {
 				try {
-					manifestVersion = ManifestVersion.valueOf("V_" + manififestVerString);
+					manifestVersion = ManifestVersion.valueOf("V" + manififestVerString);
 				} catch (Exception e) {
 					/* Assume default */
 					manifestVersion = ManifestVersion.values()[ManifestVersion.values().length - 1];
@@ -163,7 +163,27 @@ public class AppManifest {
 			NodeList base = document.getElementsByTagName(BASE_TAG);
 			if (base.getLength() == 1) {
 				baseUri = new URI(getRequiredAttribute(replace, base.item(0), "uri"));
-				basePath = Paths.get(getRequiredAttribute(replace, base.item(0), "path"));
+				
+				/* An attempt to be backward and forward compatible. For releases AFTER
+				 * 1.0-SNAPSHOT-24, the manifest was made a bit more consistent, but
+				 * this breaks backward compatibility so an update would not be possible.
+				 * 
+				 * The manifest will now contain the new attributes and the old attributes.
+				 * The old attributes will be removed at some point in the future.
+				 */
+				String pathStr = getAttribute(replace, base.item(0), "path", null);
+				String basePathStr = getAttribute(replace, base.item(0), "basepath", null);
+				if(basePathStr == null) {
+					basePath = Paths.get("/");
+					if(pathStr != null) {
+						sectionPath(Section.APP, Paths.get(pathStr));
+						sectionPath(Section.BOOTSTRAP, basePath);
+					}
+				}
+				else {
+					basePath = Paths.get(basePathStr);
+				}
+				
 				modulePath = Paths.get(getAttribute(replace, base.item(0), "modulepath", "modulepath"));
 				classPath = Paths.get(getAttribute(replace, base.item(0), "classpath", "classpath"));
 			} else
@@ -336,13 +356,19 @@ public class AppManifest {
 			rootElement.setAttribute("id", id);
 			if (version != null && !version.equals(""))
 				rootElement.setAttribute("version", version);
-			rootElement.setAttribute("manifest", manifestVersion.name().substring(2));
+			rootElement.setAttribute("manifest", manifestVersion.name().substring(1));
 
 			Element baseElement = doc.createElement(BASE_TAG);
 			if (baseUri != null)
 				baseElement.setAttribute("uri", baseUri.toString());
+
+			baseElement.setAttribute("path", sectionPath.getOrDefault(Section.APP, Paths.get("app/business")).toString());
 			if (basePath != null)
-				baseElement.setAttribute("path", basePath.toString());
+				baseElement.setAttribute("basepath", basePath.toString());
+			if(modulePath != null)
+				baseElement.setAttribute("modulepath", modulePath.toString());
+			if(classPath != null)
+				baseElement.setAttribute("classpath", classPath.toString());
 			rootElement.appendChild(baseElement);
 
 			if (properties != null && properties.size() > 0) {
@@ -385,7 +411,29 @@ public class AppManifest {
 
 	private void addFileElements(Document doc, Element filesElement, Entry e, String name) {
 		Element fileElement = doc.createElement(name);
-		fileElement.setAttribute("path", e.path().toString());
+		if(e.section() == Section.BOOTSTRAP && (e.type() == Type.CLASSPATH ||  e.type() == Type.MODULEPATH)) {
+			switch(e.type()) {
+			case CLASSPATH:
+				fileElement.setAttribute("path",  sectionPath(Section.BOOTSTRAP).resolve(classPath).resolve(e.path()).toString());
+				break;
+			default:
+				fileElement.setAttribute("path",  sectionPath(Section.BOOTSTRAP).resolve(modulePath).resolve(e.path()).toString());
+				break;
+			}
+		}
+		else if(e.section() == Section.APP && (e.type() == Type.CLASSPATH ||  e.type() == Type.MODULEPATH)) {
+			switch(e.type()) {
+			case CLASSPATH:
+				fileElement.setAttribute("path", classPath.resolve(e.path()).toString()); 
+				break;
+			default:
+				fileElement.setAttribute("path", modulePath.resolve(e.path()).toString());
+				break;
+			}
+		}
+		else
+			fileElement.setAttribute("path", e.path().toString());
+		fileElement.setAttribute("filepath", e.path().toString());
 		switch (e.type()) {
 		case CLASSPATH:
 			fileElement.setAttribute("classpath", "true");
@@ -447,11 +495,15 @@ public class AppManifest {
 					b.append("x");
 				else
 					b.append("-");
-				fileElement.setAttribute("permissions", b.toString());
-			} else {
-				fileElement.setAttribute("execute", String.valueOf(e.execute()));
-				fileElement.setAttribute("write", String.valueOf(e.write()));
-			}
+				fileElement.setAttribute("rwx", b.toString());
+			} 
+
+			/* DEPRECATED: Remove/Move when the new manifest handling makes it
+			 * out into the wild
+			 */
+			fileElement.setAttribute("execute", String.valueOf(e.execute()));
+			fileElement.setAttribute("write", String.valueOf(e.write()));
+
 			fileElement.setAttribute("checksum", Long.toHexString(e.checksum()));
 		}
 		filesElement.appendChild(fileElement);

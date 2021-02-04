@@ -2009,6 +2009,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	}
 
 	private int maybeRestart(int retval, int lastRetVal) throws IOException, InterruptedException {
+		
+		logger.info(String.format("App has exited with %d.", retval));
 
 		for (WrapperPlugin plugin : plugins) {
 			int retVal = plugin.maybeRestart(retval, lastRetVal);

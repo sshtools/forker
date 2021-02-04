@@ -35,7 +35,7 @@ public class Entry {
 	private Set<String> architecture = new LinkedHashSet<>();
 	private Set<String> os = new LinkedHashSet<>();
 	private AppManifest manifest;
-	
+
 	protected Logger logger = Logger.getGlobal();
 
 	public Entry(Path path, AppManifest manifest) throws IOException {
@@ -57,8 +57,32 @@ public class Entry {
 			throws IOException, URISyntaxException {
 		this.manifest = manifest;
 		this.section = section;
-		
-		path = Paths.get(AppManifest.getRequiredAttribute(replace, file, "path"));
+
+		if ("true".equals(AppManifest.getAttribute(replace, file, "modulepath"))) {
+			type = Type.MODULEPATH;
+		} else if ("true".equals(AppManifest.getAttribute(replace, file, "classpath"))) {
+			type = Type.CLASSPATH;
+		} else {
+			type = Type.OTHER;
+		}
+
+		String pathStr = AppManifest.getAttribute(replace, file, "path");
+		String filepathStr = AppManifest.getAttribute(replace, file, "filepath");
+		if (filepathStr != null)
+			path = Paths.get(filepathStr);
+		else {
+			Path sectionPath = manifest.sectionPath(section);
+			Path pathObj = Paths.get(pathStr);
+			if (sectionPath.toString().equals("/")) {
+				path = pathObj;
+			} else {
+				if (pathObj.isAbsolute())
+					path = Paths.get("/").relativize(pathObj);
+				else {
+					path = sectionPath.resolve(pathObj);
+				}
+			}
+		}
 		String targetStr = AppManifest.getAttribute(replace, file, "target");
 		if (StringUtils.isNotBlank(targetStr)) {
 			target = Paths.get(targetStr);
@@ -69,7 +93,8 @@ public class Entry {
 			read = !"false".equals(AppManifest.getAttribute(replace, file, "read"));
 			architecture = toSet(AppManifest.getAttribute(replace, file, "architecture"));
 			os = toSet(AppManifest.getAttribute(replace, file, "os"));
-			String permString = AppManifest.getAttribute(replace, file, "permissions");
+			String permString = AppManifest.getAttribute(replace, file, "rwx",
+					AppManifest.getAttribute(replace, file, "permissions", null));
 			if (permString != null) {
 				if (permString.startsWith("-")) {
 					permissions = new LinkedHashSet<>();
@@ -116,13 +141,6 @@ public class Entry {
 				write = !"false".equals(AppManifest.getAttribute(replace, file, "write"));
 				execute = !"false".equals(AppManifest.getAttribute(replace, file, "execute"));
 			}
-		}
-		if ("true".equals(AppManifest.getAttribute(replace, file, "modulepath"))) {
-			type = Type.MODULEPATH;
-		} else if ("true".equals(AppManifest.getAttribute(replace, file, "classpath"))) {
-			type = Type.CLASSPATH;
-		} else {
-			type = Type.OTHER;
 		}
 	}
 
@@ -211,8 +229,8 @@ public class Entry {
 	}
 
 	public Entry path(Path path) {
-		if(!path.isAbsolute())
-			path =  Paths.get("/").resolve(path);
+		if (!path.isAbsolute())
+			path = Paths.get("/").resolve(path);
 		this.path = path;
 		return this;
 	}
@@ -247,16 +265,13 @@ public class Entry {
 	public Path resolve(Path localDir) {
 		if (path.isAbsolute()) {
 			return localDir.resolve(path.toString().substring(1));
-		}
-		else {
+		} else {
 			Path sectionPath = manifest.resolve(section, localDir);
-			if(type == Type.CLASSPATH) {
+			if (type == Type.CLASSPATH) {
 				return sectionPath.resolve(manifest.classPath()).resolve(path);
-			}
-			else if(type == Type.MODULEPATH) {
+			} else if (type == Type.MODULEPATH) {
 				return sectionPath.resolve(manifest.modulePath()).resolve(path);
-			}
-			else {
+			} else {
 				return sectionPath.resolve(path);
 			}
 		}

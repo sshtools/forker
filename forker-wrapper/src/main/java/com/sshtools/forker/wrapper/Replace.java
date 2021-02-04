@@ -66,6 +66,9 @@ public class Replace {
 	}
 
 	public synchronized String replace(String input) {
+		if(input == null)
+			return input;
+		
 		Iterator<Replacement> it = replacementsList.iterator();
 
 		inputBuffer.setLength(0);

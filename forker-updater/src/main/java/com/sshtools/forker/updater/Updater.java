@@ -307,6 +307,7 @@ public class Updater extends ForkerWrapper {
 			getUpdateHandler().complete();
 
 		} catch (Exception e) {
+			e.printStackTrace();
 			getUpdateHandler().failed(e);
 			continueProcessing = false;
 		} finally {
