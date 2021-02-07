@@ -290,6 +290,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		final boolean nativeMain = configuration.getSwitch("native", false);
 		final boolean useDaemon = !nativeMain && !configuration.getSwitch("no-forker-daemon", nativeMain);
 		List<String> jvmArgs = configuration.getOptionValues("jvmarg");
+		List<String> systemProperties = configuration.getOptionValues("system");
 		if (nativeMain && StringUtils.isNotBlank(configuration.getOptionValue("classpath", null))) {
 			throw new IOException("Native main may not be used with classpath option.");
 		}
@@ -298,6 +299,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 		if (nativeMain && !jvmArgs.isEmpty()) {
 			throw new IOException("Native main may not be used with jvmarg option.");
+		}
+		if (nativeMain && !systemProperties.isEmpty()) {
+			throw new IOException("Native main may not be used with system option.");
 		}
 		boolean daemonize = isDaemon();
 		String pidfile = configuration.getOptionValue("pidfile", null);
@@ -499,6 +503,10 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				String[] nv = nameValue(jvmArg.substring(2));
 				System.setProperty(nv[0], nv[1]);
 			}
+		}
+		for (String jvmArg : configuration.getOptionValues("system")) {
+			String[] nv = nameValue(jvmArg);
+			System.setProperty(nv[0], nv[1]);
 		}
 
 		if (configuration.getSwitch("debug", false)) {
@@ -858,6 +866,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 	public static void wrapperMain(String[] args, ForkerWrapper wrapper, CommandSpec opts) {
 		CommandLine cl = new CommandLine(opts);
+		cl.setTrimQuotes(true);
 		cl.setUnmatchedArgumentsAllowed(true);
 		cl.setUnmatchedOptionsAllowedAsOptionParameters(true);
 		cl.setUnmatchedOptionsArePositionalParams(true);
@@ -1231,6 +1240,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				.description("Alternative path to java runtime launcher.").build());
 		options.addOption(OptionSpec.builder("-J", "--jvmarg").paramLabel("jvmarg").type(String.class)
 				.description("Additional VM argument. Specify multiple times for multiple arguments.").build());
+		options.addOption(OptionSpec.builder("-sp", "--system").paramLabel("name=value").type(String.class)
+				.description("Additional system properties.").build());
 		options.addOption(OptionSpec.builder("-W", "--cwd").paramLabel("directory").type(File.class)
 				.description("Change working directory, the wrapped process will be run from this location.").build());
 		options.addOption(OptionSpec.builder("-t", "--timeout").paramLabel("milliseconds").type(Long.class)
@@ -1912,6 +1923,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					boolean wasDaemon = isDaemon();
 					String wasPidfile = configuration.getOptionValue("pidfile", null);
 					List<String> wasJvmArgs = configuration.getOptionValues("jvmarg");
+					List<String> wasSyspropArgs = configuration.getOptionValues("system");
 					boolean wasSingleInstance = isSingleInstance();
 					boolean wasQuietStdErr = isQuietStderr();
 					boolean wasQuietStdOut = isQuietStdout();
@@ -1947,6 +1959,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 							|| !Objects.equals(wasBootClasspath, configuration.getOptionValue("boot-classpath", null))
 							|| !Objects.equals(wasNativeMain, isNativeMain())
 							|| !Objects.equals(wasJvmArgs, configuration.getOptionValues("jvmarg"))
+							|| !Objects.equals(wasSyspropArgs, configuration.getOptionValues("system"))
 							|| !Objects.equals(wasSingleInstance, isSingleInstance())) {
 						fullRestart = restart = true;
 					} else if (!Objects.equals(wasQuietStdOut, isQuietStderr())
@@ -2216,6 +2229,15 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			}
 			for (Object key : systemProperties.keySet()) {
 				command.add("-D" + key + "=\"" + systemProperties.getProperty((String) key) + "\"");
+			}
+
+			for (String val : configuration.getOptionValues("system")) {
+				int idx = val.indexOf("=");
+				/* Make sure jvmarg's are quoted */
+				if (idx != -1 && !val.substring(idx + 1).startsWith("\"")) {
+					val = val.substring(0, idx) + "=\"" + val.substring(idx + 1) + "\"";
+				}
+				command.add("-D" + val);
 			}
 
 			if (configuration.getSwitch("debug", false)) {
