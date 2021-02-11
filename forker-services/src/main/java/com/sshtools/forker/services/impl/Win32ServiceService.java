@@ -10,28 +10,24 @@ import java.util.logging.Logger;
 
 import com.sshtools.forker.client.OSCommand;
 import com.sshtools.forker.common.Util.NullOutputStream;
-import com.sshtools.forker.common.XAdvapi32;
-import com.sshtools.forker.common.XWinsvc;
 import com.sshtools.forker.services.AbstractService;
 import com.sshtools.forker.services.Service;
-import com.sshtools.forker.services.Service.Status;
 import com.sshtools.forker.services.ServiceService;
 import com.sshtools.forker.services.ServicesContext;
-import com.sun.jna.Memory;
 import com.sun.jna.Native;
-import com.sun.jna.Structure;
 import com.sun.jna.platform.win32.Advapi32;
-import com.sun.jna.platform.win32.Kernel32;
-import com.sun.jna.platform.win32.Kernel32Util;
+import com.sun.jna.platform.win32.W32Service;
+import com.sun.jna.platform.win32.W32ServiceManager;
 import com.sun.jna.platform.win32.WinNT;
 import com.sun.jna.platform.win32.Winsvc;
+import com.sun.jna.platform.win32.Winsvc.ENUM_SERVICE_STATUS_PROCESS;
 import com.sun.jna.platform.win32.Winsvc.SC_HANDLE;
 import com.sun.jna.platform.win32.Winsvc.SERVICE_STATUS_PROCESS;
-import com.sun.jna.ptr.IntByReference;
 
 public class Win32ServiceService extends AbstractServiceService implements ServiceService {
 	private static final long POLL_DELAY = 1000;
 	private List<Service> services = new ArrayList<>();
+	private W32ServiceManager smgr;
 	final static Logger LOG = Logger.getLogger(Win32ServiceService.class.getName());
 
 	@Override
@@ -41,6 +37,7 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 
 	@Override
 	public void configure(ServicesContext app) {
+		smgr = new W32ServiceManager();
 		load();
 		app.schedule(new Runnable() {
 			@Override
@@ -57,146 +54,141 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 
 	@Override
 	public void restartService(Service service) throws Exception {
-		OSCommand.elevate();
-		try {
-			OSCommand.runCommand(new NullOutputStream(),
-					Arrays.asList("cmd.exe", "/c", "sc", "restart", service.getNativeName()));
-		} finally {
-			OSCommand.restrict();
-			load();
-		}
+		if(service.getStatus().isRunning())
+			stopService(service);
+		startService(service);
 	}
 
 	@Override
 	public void pauseService(Service service) throws Exception {
-		OSCommand.elevate();
+		W32Service srv = smgr.openService(service.getNativeName(), WinNT.GENERIC_EXECUTE);
 		try {
-			OSCommand.runCommand(new NullOutputStream(),
-					Arrays.asList("cmd.exe", "/c", "sc", "pause", service.getNativeName()));
+			srv.pauseService();
 		} finally {
-			OSCommand.restrict();
-			load();
+			srv.close();
 		}
 	}
 
 	@Override
 	public void unpauseService(Service service) throws Exception {
-		OSCommand.elevate();
+		W32Service srv = smgr.openService(service.getNativeName(), WinNT.GENERIC_EXECUTE);
 		try {
-			OSCommand.runCommand(new NullOutputStream(),
-					Arrays.asList("cmd.exe", "/c", "sc", "continue", service.getNativeName()));
+			srv.continueService();
 		} finally {
-			OSCommand.restrict();
-			load();
+			srv.close();
 		}
 	}
 
 	@Override
 	public void startService(Service service) throws Exception {
-		OSCommand.elevate();
+		W32Service srv = smgr.openService(service.getNativeName(), WinNT.GENERIC_EXECUTE);
 		try {
-			OSCommand.runCommand(new NullOutputStream(),
-					Arrays.asList("cmd.exe", "/c", "sc", "start", service.getNativeName()));
+			srv.startService();
 		} finally {
-			OSCommand.restrict();
-			load();
+			srv.close();
 		}
 	}
 
 	@Override
 	public void stopService(Service service) throws Exception {
-		OSCommand.elevate();
+		W32Service srv = smgr.openService(service.getNativeName(), WinNT.GENERIC_EXECUTE);
 		try {
-			OSCommand.runCommand(new NullOutputStream(),
-					Arrays.asList("cmd.exe", "/c", "sc", "stop", service.getNativeName()));
+			srv.stopService();
 		} finally {
-			OSCommand.restrict();
-			load();
+			srv.close();
 		}
 	}
 
 	private void load() {
-		try (Closeable o = OSCommand.elevated()) {
-			List<Service> oldServices = new ArrayList<>(services);
-			List<Service> newServices = new ArrayList<>();
-			List<Service> addServices = new ArrayList<>();
-			List<Service> updateServices = new ArrayList<>();
-			newServices.clear();
-
-			XAdvapi32 advapi32 = XAdvapi32.INSTANCE;
-			SC_HANDLE serviceManager = Win32ServiceService.getManager(null, Winsvc.SC_MANAGER_ENUMERATE_SERVICE);
+		synchronized (smgr) {
 			try {
-				Memory buf = null;
-				int service_data_size = 0;
-				int info = Winsvc.SC_ENUM_PROCESS_INFO;
+				List<Service> oldServices = new ArrayList<>(services);
+				List<Service> newServices = new ArrayList<>();
+				List<Service> addServices = new ArrayList<>();
+				List<Service> updateServices = new ArrayList<>();
+				newServices.clear();
 
-				boolean retVal;
-
-				IntByReference bytesNeeded = new IntByReference(0);
-				IntByReference srvCount = new IntByReference(0);
-				IntByReference resumeHandle = new IntByReference(0);
-
-				int srvType = WinNT.SERVICE_WIN32;
-				int srvState = Winsvc.SERVICE_STATE_ALL;
-
-				/* Get the required memory size by calling with null data and size of 0 */
-
-				retVal = Advapi32.INSTANCE.EnumServicesStatusEx(serviceManager, info, srvType, srvState, buf,
-						service_data_size, bytesNeeded, srvCount, resumeHandle, null);
-
-				int err = Native.getLastError();
-
-				if ((!retVal) || err == Kernel32.ERROR_MORE_DATA) {
-					/* Need more space */
-
-					int bytesCount = bytesNeeded.getValue();
-
-					buf = new Memory(bytesCount);
-					buf.clear();
-					service_data_size = bytesCount;
-
-					resumeHandle.setValue(0);
-
-					retVal = Advapi32.INSTANCE.EnumServicesStatusEx(serviceManager, info, srvType, srvState, buf,
-							service_data_size, bytesNeeded, srvCount, resumeHandle, null);
-
-					if (!retVal) {
-						err = Native.getLastError();
-						throw new IOException(String.format("Failed to enumerate services. %d. %s", err,
-								Kernel32Util.formatMessageFromLastErrorCode(err)));
-
-					}
-				} else
-					throw new IOException(String.format("Failed to enumerate services. %d. %s", err,
-							Kernel32Util.formatMessageFromLastErrorCode(err)));
-
-				XWinsvc.ENUM_SERVICE_STATUS_PROCESS serviceStatus = new XWinsvc.ENUM_SERVICE_STATUS_PROCESS(buf);
-				Structure[] serviceStatuses = serviceStatus.toArray(srvCount.getValue());
-				for (int i = 0; i < serviceStatuses.length; i++) {
-					XWinsvc.ENUM_SERVICE_STATUS_PROCESS serviceInfo = (XWinsvc.ENUM_SERVICE_STATUS_PROCESS) serviceStatuses[i];
-					Win32Service service = new Win32Service(serviceInfo);
+				ENUM_SERVICE_STATUS_PROCESS[] srvs = smgr.enumServicesStatusExProcess(WinNT.SERVICE_WIN32,
+						Winsvc.SERVICE_STATE_ALL, null);
+				for (ENUM_SERVICE_STATUS_PROCESS srv : srvs) {
+					Win32Service service = new Win32Service(srv.lpDisplayName);
 					addService(oldServices, newServices, addServices, updateServices, service);
 				}
 
-			} finally {
-				advapi32.CloseServiceHandle(serviceManager);
-			}
+//				XAdvapi32 advapi32 = XAdvapi32.INSTANCE;
+//				SC_HANDLE serviceManager = Win32ServiceService.getManager(null, Winsvc.SC_MANAGER_ENUMERATE_SERVICE);
+//				try {
+//					Memory buf = null;
+//					int service_data_size = 0;
+//					int info = Winsvc.SC_ENUM_PROCESS_INFO;
+//
+//					boolean retVal;
+//
+//					IntByReference bytesNeeded = new IntByReference(0);
+//					IntByReference srvCount = new IntByReference(0);
+//					IntByReference resumeHandle = new IntByReference(0);
+//
+//					int srvType = WinNT.SERVICE_WIN32;
+//					int srvState = Winsvc.SERVICE_STATE_ALL;
+//
+//					/* Get the required memory size by calling with null data and size of 0 */
+//
+//					retVal = Advapi32.INSTANCE.EnumServicesStatusEx(serviceManager, info, srvType, srvState, buf,
+//							service_data_size, bytesNeeded, srvCount, resumeHandle, null);
+//
+//					int err = Native.getLastError();
+//
+//					if ((!retVal) || err == Kernel32.ERROR_MORE_DATA) {
+//						/* Need more space */
+//
+//						int bytesCount = bytesNeeded.getValue();
+//
+//						buf = new Memory(bytesCount);
+//						buf.clear();
+//						service_data_size = bytesCount;
+//
+//						resumeHandle.setValue(0);
+//
+//						retVal = Advapi32.INSTANCE.EnumServicesStatusEx(serviceManager, info, srvType, srvState, buf,
+//								service_data_size, bytesNeeded, srvCount, resumeHandle, null);
+//
+//						if (!retVal) {
+//							err = Native.getLastError();
+//							throw new IOException(String.format("Failed to enumerate services. %d. %s", err,
+//									Kernel32Util.formatMessageFromLastErrorCode(err)));
+//
+//						}
+//					} else
+//						throw new IOException(String.format("Failed to enumerate services. %d. %s", err,
+//								Kernel32Util.formatMessageFromLastErrorCode(err)));
+//
+//					XWinsvc.ENUM_SERVICE_STATUS_PROCESS serviceStatus = new XWinsvc.ENUM_SERVICE_STATUS_PROCESS(buf);
+//					Structure[] serviceStatuses = serviceStatus.toArray(srvCount.getValue());
+//					for (int i = 0; i < serviceStatuses.length; i++) {
+//						XWinsvc.ENUM_SERVICE_STATUS_PROCESS serviceInfo = (XWinsvc.ENUM_SERVICE_STATUS_PROCESS) serviceStatuses[i];
+//						Win32Service service = new Win32Service(serviceInfo);
+//						addService(oldServices, newServices, addServices, updateServices, service);
+//					}
+//
+//				} finally {
+//					advapi32.CloseServiceHandle(serviceManager);
+//				}
 
-			services = newServices;
-			for (Service s : oldServices) {
-				if (newServices.indexOf(s) == -1) {
-					fireServiceRemoved(s);
+				services = newServices;
+				for (Service s : oldServices) {
+					if (newServices.indexOf(s) == -1) {
+						fireServiceRemoved(s);
+					}
 				}
+				for (Service s : addServices) {
+					fireServiceAdded(s);
+				}
+				for (Service s : updateServices) {
+					fireStateChange(s);
+				}
+			} finally {
+				smgr.close();
 			}
-			for (Service s : addServices) {
-				fireServiceAdded(s);
-			}
-			for (Service s : updateServices) {
-				fireStateChange(s);
-			}
-		} catch (Exception e) {
-			// TODO
-			e.printStackTrace();
 		}
 	}
 
@@ -218,120 +210,36 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 		}
 	}
 
-	public static class Win32Service extends AbstractService {
-		public Win32Service(XWinsvc.ENUM_SERVICE_STATUS_PROCESS nativeService) {
-			super(nativeService.lpServiceName.getWideString(0));
+	class Win32Service extends AbstractService {
+		public Win32Service(String name) {
+			super(name);
 		}
 
 		@Override
 		public Status getStatus() {
-
-			XAdvapi32 advapi32 = XAdvapi32.INSTANCE;
-			SC_HANDLE serviceManager = getManager(null, WinNT.GENERIC_READ);
-
+			W32Service srv = smgr.openService(getNativeName(), WinNT.GENERIC_READ);
 			try {
+				SERVICE_STATUS_PROCESS q = srv.queryStatus();
 
-				SC_HANDLE service = advapi32.OpenService(serviceManager, getNativeName(), WinNT.GENERIC_READ);
-				if (service != null) {
-					try {
-
-						IntByReference pcbBytesNeeded = new IntByReference();
-
-						/* Get size */
-
-//						if (!advapi32.QueryServiceConfig(service, null, 0, pcbBytesNeeded)) {
-//
-//							/* Data */
-//
-//							int cbBufSize = pcbBytesNeeded.getValue();
-//							if (cbBufSize > 8192)
-//								cbBufSize = 8192;
-//
-//							Memory buffer = new Memory(cbBufSize);
-//
-//							buffer.clear();
-//
-//							if (advapi32.QueryServiceConfig(service, buffer, cbBufSize, pcbBytesNeeded)) {
-//
-//								QUERY_SERVICE_CONFIG lpServiceConfig = new QUERY_SERVICE_CONFIG();
-//
-//								lpServiceConfig.init(buffer);
-//
-//								if (lpServiceConfig.dwStartType == Advapi32.SERVICE_DISABLED)
-//
-//									result |= Service.STATE_DISABLED;
-//
-//								if (lpServiceConfig.dwStartType == Advapi32.SERVICE_BOOT_START
-//										| lpServiceConfig.dwStartType == Advapi32.SERVICE_SYSTEM_START
-//
-//										| lpServiceConfig.dwStartType == Advapi32.SERVICE_AUTO_START)
-//
-//									result |= Service.STATE_AUTOMATIC;
-//
-//								if (lpServiceConfig.dwStartType == Advapi32.SERVICE_DEMAND_START)
-//
-//									result |= Service.STATE_MANUAL;
-//
-//								if ((lpServiceConfig.dwServiceType & Advapi32.SERVICE_INTERACTIVE_PROCESS) != 0)
-//
-//									result |= Service.STATE_INTERACTIVE;
-//
-//							}
-//
-//							else {
-//								int err = Native.getLastError();
-//								throw new IOException(String.format("Failed to get buffer size. %d. %s", err,
-//										Kernel32Util.formatMessageFromLastErrorCode(err)));
-//							}
-//						} else {
-//							int err = Native.getLastError();
-//							throw new IOException(String.format("Failed to query service config. %d. %s", err,
-//									Kernel32Util.formatMessageFromLastErrorCode(err)));
-//
-//						}
-
-						if (!advapi32.QueryServiceStatusEx(service, (byte) advapi32.SC_STATUS_PROCESS_INFO, null, 0,
-								pcbBytesNeeded)) {
-
-							int cbBufSize = pcbBytesNeeded.getValue();
-
-							Memory buffer = new Memory(cbBufSize);
-							buffer.clear();
-
-							if (advapi32.QueryServiceStatusEx(service, (byte) advapi32.SC_STATUS_PROCESS_INFO, buffer,
-									cbBufSize, pcbBytesNeeded)) {
-
-								SERVICE_STATUS_PROCESS lpBuffer = new SERVICE_STATUS_PROCESS();
-
-								lpBuffer.init(buffer);
-
-								if (lpBuffer.dwCurrentState == Winsvc.SERVICE_RUNNING)
-									return Status.STARTED;
-
-								if (lpBuffer.dwCurrentState == Winsvc.SERVICE_PAUSED)
-									return Status.PAUSED;
-
-							}
-
-							else {
-								int err = Native.getLastError();
-								throw new IOException(String.format("Failed to get buffer size. %d. %s", err,
-										Kernel32Util.formatMessageFromLastErrorCode(err)));
-							}
-						} else {
-							int err = Native.getLastError();
-							throw new IOException(String.format("Failed to get service state. %d. %s", err,
-									Kernel32Util.formatMessageFromLastErrorCode(err)));
-						}
-					} finally {
-						advapi32.CloseServiceHandle(service);
-					}
-				}
+				if (q.dwCurrentState == Winsvc.SERVICE_RUNNING)
+					return Status.STARTED;
+				else if (q.dwCurrentState == Winsvc.SERVICE_START_PENDING)
+					return Status.STARTING;
+				else if (q.dwCurrentState == Winsvc.SERVICE_PAUSE_PENDING)
+					return Status.PAUSING;
+				else if (q.dwCurrentState == Winsvc.SERVICE_PAUSED)
+					return Status.PAUSED;
+				else if (q.dwCurrentState == Winsvc.SERVICE_CONTINUE_PENDING)
+					return Status.UNPAUSING;
+				else if (q.dwCurrentState == Winsvc.SERVICE_STOP_PENDING)
+					return Status.STOPPING;
+				else if (q.dwCurrentState == Winsvc.SERVICE_STOPPED)
+					return Status.STOPPED;
+				else
+					return Status.UNKNOWN;
 			} finally {
-				advapi32.CloseServiceHandle(serviceManager);
+				srv.close();
 			}
-			return Status.STOPPED;
-
 		}
 	}
 
