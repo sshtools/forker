@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
@@ -29,6 +30,7 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 	private static final long POLL_DELAY = 1000;
 	private List<Service> services = new ArrayList<>();
 	private W32ServiceManager smgr;
+	private ScheduledFuture<?> task;
 	final static Logger LOG = Logger.getLogger(Win32ServiceService.class.getName());
 
 	@Override
@@ -40,7 +42,7 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 	public void configure(ServicesContext app) {
 		smgr = new W32ServiceManager();
 		load();
-		app.schedule(new Runnable() {
+		task = app.schedule(new Runnable() {
 			@Override
 			public String toString() {
 				return "LoadWin32Services";
@@ -51,6 +53,12 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 				load();
 			}
 		}, POLL_DELAY, POLL_DELAY, TimeUnit.MILLISECONDS);
+	}
+
+	@Override
+	public void close() throws IOException {
+		if(task != null)
+			task.cancel(false);
 	}
 
 	@Override
