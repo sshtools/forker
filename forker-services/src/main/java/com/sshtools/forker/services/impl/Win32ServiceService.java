@@ -18,6 +18,7 @@ import com.sun.jna.Native;
 import com.sun.jna.platform.win32.Advapi32;
 import com.sun.jna.platform.win32.W32Service;
 import com.sun.jna.platform.win32.W32ServiceManager;
+import com.sun.jna.platform.win32.Win32Exception;
 import com.sun.jna.platform.win32.WinNT;
 import com.sun.jna.platform.win32.Winsvc;
 import com.sun.jna.platform.win32.Winsvc.ENUM_SERVICE_STATUS_PROCESS;
@@ -54,54 +55,88 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 
 	@Override
 	public void restartService(Service service) throws Exception {
-		if(service.getStatus().isRunning())
+		if (service.getStatus().isRunning())
 			stopService(service);
 		startService(service);
 	}
 
 	@Override
 	public void pauseService(Service service) throws Exception {
-		W32Service srv = smgr.openService(service.getNativeName(), WinNT.GENERIC_EXECUTE);
-		try {
-			srv.pauseService();
-		} finally {
-			srv.close();
+
+		synchronized (smgr) {
+			smgr.open(WinNT.GENERIC_EXECUTE);
+			try {
+				smgr.open(WinNT.GENERIC_EXECUTE);
+				W32Service srv = smgr.openService(service.getNativeName(), WinNT.GENERIC_EXECUTE);
+				try {
+					srv.pauseService();
+				} finally {
+					srv.close();
+				}
+			} finally {
+				smgr.close();
+			}
 		}
+
 	}
 
 	@Override
 	public void unpauseService(Service service) throws Exception {
-		W32Service srv = smgr.openService(service.getNativeName(), WinNT.GENERIC_EXECUTE);
-		try {
-			srv.continueService();
-		} finally {
-			srv.close();
+		synchronized (smgr) {
+			smgr.open(WinNT.GENERIC_EXECUTE);
+			try {
+				smgr.open(WinNT.GENERIC_EXECUTE);
+				W32Service srv = smgr.openService(service.getNativeName(), WinNT.GENERIC_EXECUTE);
+				try {
+					srv.continueService();
+				} finally {
+					srv.close();
+				}
+			} finally {
+				smgr.close();
+			}
 		}
 	}
 
 	@Override
 	public void startService(Service service) throws Exception {
-		W32Service srv = smgr.openService(service.getNativeName(), WinNT.GENERIC_EXECUTE);
-		try {
-			srv.startService();
-		} finally {
-			srv.close();
+		synchronized (smgr) {
+			smgr.open(WinNT.GENERIC_EXECUTE);
+			try {
+				smgr.open(WinNT.GENERIC_EXECUTE);
+				W32Service srv = smgr.openService(service.getNativeName(), WinNT.GENERIC_EXECUTE);
+				try {
+					srv.startService();
+				} finally {
+					srv.close();
+				}
+			} finally {
+				smgr.close();
+			}
 		}
 	}
 
 	@Override
 	public void stopService(Service service) throws Exception {
-		W32Service srv = smgr.openService(service.getNativeName(), WinNT.GENERIC_EXECUTE);
-		try {
-			srv.stopService();
-		} finally {
-			srv.close();
+		synchronized (smgr) {
+			smgr.open(WinNT.GENERIC_EXECUTE);
+			try {
+				W32Service srv = smgr.openService(service.getNativeName(), WinNT.GENERIC_EXECUTE);
+				try {
+					srv.stopService();
+				} finally {
+					srv.close();
+				}
+			} finally {
+				smgr.close();
+			}
 		}
 	}
 
 	private void load() {
 		synchronized (smgr) {
 			try {
+				smgr.open(Winsvc.SC_MANAGER_ALL_ACCESS);
 				List<Service> oldServices = new ArrayList<>(services);
 				List<Service> newServices = new ArrayList<>();
 				List<Service> addServices = new ArrayList<>();
@@ -111,7 +146,7 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 				ENUM_SERVICE_STATUS_PROCESS[] srvs = smgr.enumServicesStatusExProcess(WinNT.SERVICE_WIN32,
 						Winsvc.SERVICE_STATE_ALL, null);
 				for (ENUM_SERVICE_STATUS_PROCESS srv : srvs) {
-					Win32Service service = new Win32Service(srv.lpDisplayName);
+					Win32Service service = new Win32Service(srv.lpServiceName);
 					addService(oldServices, newServices, addServices, updateServices, service);
 				}
 
@@ -217,28 +252,39 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 
 		@Override
 		public Status getStatus() {
-			W32Service srv = smgr.openService(getNativeName(), WinNT.GENERIC_READ);
-			try {
-				SERVICE_STATUS_PROCESS q = srv.queryStatus();
-
-				if (q.dwCurrentState == Winsvc.SERVICE_RUNNING)
-					return Status.STARTED;
-				else if (q.dwCurrentState == Winsvc.SERVICE_START_PENDING)
-					return Status.STARTING;
-				else if (q.dwCurrentState == Winsvc.SERVICE_PAUSE_PENDING)
-					return Status.PAUSING;
-				else if (q.dwCurrentState == Winsvc.SERVICE_PAUSED)
-					return Status.PAUSED;
-				else if (q.dwCurrentState == Winsvc.SERVICE_CONTINUE_PENDING)
-					return Status.UNPAUSING;
-				else if (q.dwCurrentState == Winsvc.SERVICE_STOP_PENDING)
-					return Status.STOPPING;
-				else if (q.dwCurrentState == Winsvc.SERVICE_STOPPED)
-					return Status.STOPPED;
-				else
+			synchronized (smgr) {
+				smgr.open(WinNT.GENERIC_READ);
+				try {
+					W32Service srv = smgr.openService(getNativeName(), WinNT.GENERIC_READ);
+					try {
+						SERVICE_STATUS_PROCESS q = srv.queryStatus();
+	
+						if (q.dwCurrentState == Winsvc.SERVICE_RUNNING)
+							return Status.STARTED;
+						else if (q.dwCurrentState == Winsvc.SERVICE_START_PENDING)
+							return Status.STARTING;
+						else if (q.dwCurrentState == Winsvc.SERVICE_PAUSE_PENDING)
+							return Status.PAUSING;
+						else if (q.dwCurrentState == Winsvc.SERVICE_PAUSED)
+							return Status.PAUSED;
+						else if (q.dwCurrentState == Winsvc.SERVICE_CONTINUE_PENDING)
+							return Status.UNPAUSING;
+						else if (q.dwCurrentState == Winsvc.SERVICE_STOP_PENDING)
+							return Status.STOPPING;
+						else if (q.dwCurrentState == Winsvc.SERVICE_STOPPED)
+							return Status.STOPPED;
+						else
+							return Status.UNKNOWN;
+					} finally {
+						srv.close();
+					}
+				}
+				catch(Win32Exception ew) {
 					return Status.UNKNOWN;
-			} finally {
-				srv.close();
+				}
+				finally {
+					smgr.close();
+				}
 			}
 		}
 	}

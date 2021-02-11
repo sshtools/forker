@@ -82,7 +82,7 @@ public abstract class AbstractService implements Service {
 
     @Override
     public String toString() {
-        return "AbstractService [nativeName=" + nativeName + ", status=" + status + "]";
+        return "AbstractService [nativeName=" + getNativeName() + ", status=" + getStatus() + "]";
     }
 
     protected void fireExtendedServiceStatusChanged(ExtendedServiceStatus newStatus) {
