@@ -6,10 +6,16 @@ import java.util.List;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
+import com.sun.jna.Structure.FieldOrder;
 import com.sun.jna.platform.win32.Advapi32;
 import com.sun.jna.platform.win32.WinBase.PROCESS_INFORMATION;
 import com.sun.jna.platform.win32.WinBase.STARTUPINFO;
+import com.sun.jna.platform.win32.WinDef.DWORD;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
+import com.sun.jna.platform.win32.Winsvc.ChangeServiceConfig2Info;
+import com.sun.jna.platform.win32.Winsvc.SC_HANDLE;
+import com.sun.jna.platform.win32.Winsvc.SERVICE_FAILURE_ACTIONS;
+import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.win32.W32APIOptions;
 
 /**
@@ -549,4 +555,38 @@ public interface XAdvapi32 extends Advapi32 {
 			return Arrays.asList(new String[] { "Value" });
 		}
     }
+	
+	boolean QueryServiceConfig(SC_HANDLE hService, QUERY_SERVICE_CONFIG lpServiceConfig, int cbBufSize,
+			IntByReference pcbBytesNeeded);
+	
+	SC_HANDLE OpenSCManagerW(
+			  String lpMachineName,
+			  String lpDatabaseName,
+			  DWORD  dwDesiredAccess
+			);
+
+	class QUERY_SERVICE_CONFIG extends Structure {
+		public DWORD dwServiceType;
+		public DWORD dwStartType;
+		public DWORD dwErrorControl;
+		public char[] lpBinaryPathName;
+		public char[] lpLoadOrderGroup;
+		public DWORD dwTagId;
+		public char[] lpDependencies;
+		public char[] lpServiceStartName;
+		public char[] lpDisplayName;
+
+		QUERY_SERVICE_CONFIG() {
+		}
+
+		QUERY_SERVICE_CONFIG(int size) {
+			lpBinaryPathName = new char[256];
+			lpLoadOrderGroup = new char[256];
+			lpDependencies = new char[256];
+			lpServiceStartName = new char[256];
+			lpDisplayName = new char[256];
+
+			allocateMemory(size);
+		}
+	}
 }

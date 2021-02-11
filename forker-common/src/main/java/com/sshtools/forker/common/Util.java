@@ -121,7 +121,7 @@ public class Util {
 				}
 			}
 		} else {
-			throw new UnsupportedOperationException();
+			throw new UnsupportedOperationException("Cannot get username for ID " + id + ", I do not know how to do that on this platform.");
 		}
 		return null;
 	}

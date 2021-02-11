@@ -91,25 +91,25 @@ public class WinRunAs extends JFrame {
 		 * https://blogs.msdn.microsoft.com/oldnewthing/20110707-00/?p=10223/
 		 */
 
-		HANDLEByReference token = new HANDLEByReference();
-		if (!XAdvapi32.INSTANCE.LogonUser(username, domain, new String(password), WinBase.LOGON32_LOGON_BATCH,
-				WinBase.LOGON32_PROVIDER_DEFAULT, token)) {
-			throw new IOException("Logon failed.");
-		}
+//		HANDLEByReference token = new HANDLEByReference();
+//		if (!XAdvapi32.INSTANCE.LogonUser(username, domain, new String(password), WinBase.LOGON32_LOGON_INTERACTIVE,
+//				WinBase.LOGON32_PROVIDER_DEFAULT, token)) {
+//			throw new IOException("Logon failed.");
+//		}
 
 		try {
-			PointerByReference env = new PointerByReference();
-			if (!Userenv.INSTANCE.CreateEnvironmentBlock(env, token.getValue(), true)) {
-				throwLastError();
-			}
+//			PointerByReference env = new PointerByReference();
+//			if (!Userenv.INSTANCE.CreateEnvironmentBlock(env, token.getValue(), true)) {
+//				throwLastError();
+//			}
 
 			try {
 
-				char[] profileDir = new char[256];
-				if (!Userenv.INSTANCE.GetUserProfileDirectoryW(token.getValue(), profileDir,
-						new IntByReference(profileDir.length))) {
-					throwLastError();
-				}
+//				char[] profileDir = new char[256];
+//				if (!Userenv.INSTANCE.GetUserProfileDirectoryW(token.getValue(), profileDir,
+//						new IntByReference(profileDir.length))) {
+//					throwLastError();
+//				}
 
 				/* Extract the command name, and remaining arguments */
 				List<String> cmdArgs = new ArrayList<String>(Arrays.asList(command));
@@ -161,12 +161,19 @@ public class WinRunAs extends JFrame {
 					final PROCESS_INFORMATION pinfo = new PROCESS_INFORMATION();
 
 					/* Start the process as the required user */
-					if (!(XAdvapi32.INSTANCE.CreateProcessWithLogonW(username,
-							domain == null ? System.getenv("COMPUTERNAME") : domain, new String(password),
-							XAdvapi32.LOGON_WITH_PROFILE, cmd, bui.toString(),
+					if (!(XAdvapi32.INSTANCE.CreateProcessWithLogonW(
+							username,
+							domain == null ? System.getenv("COMPUTERNAME") : domain, 
+							new String(password),
+							XAdvapi32.LOGON_WITH_PROFILE, 
+							cmd, 
+							bui.toString(),
 							XAdvapi32.CREATE_DEFAULT_ERROR_MODE | XAdvapi32.CREATE_UNICODE_ENVIRONMENT
 									| XAdvapi32.CREATE_NO_WINDOW,
-							env.getValue(), new String(profileDir), sinfo, pinfo))) {
+							/*env.getValue()*/null, 
+							/*new String(profileDir)*/null, 
+							sinfo, 
+							pinfo))) {
 						throwLastError();
 					}
 
@@ -262,7 +269,7 @@ public class WinRunAs extends JFrame {
 				// }
 			}
 		} finally {
-			Kernel32.INSTANCE.CloseHandle(token.getValue());
+//			Kernel32.INSTANCE.CloseHandle(token.getValue());
 		}
 	}
 

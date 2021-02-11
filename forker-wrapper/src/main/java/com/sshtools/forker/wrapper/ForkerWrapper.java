@@ -1348,8 +1348,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			Path root = cwd.toPath();
 			for (String el : classpath.split(CROSSPLATFORM_PATH_SEPARATOR)) {
 				logger.log(Level.INFO, "    " + el);
-				String basename = Paths.get(el).getFileName().toString();
-				if (basename.contains("*") || basename.contains("?")) {
+				if (el.contains("*") || el.contains("?")) {
 
 					Finder finder = new Finder(root, el, newClasspath);
 					Files.walkFileTree(root, finder);

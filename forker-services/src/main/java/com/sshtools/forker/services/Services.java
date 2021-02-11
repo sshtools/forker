@@ -6,6 +6,12 @@ public class Services {
 	private final static Object lock = new Object();
 	private static ServiceService service;
 
+	public static void main(String[] args) throws Exception {
+		for (Service srv : get().getServices()) {
+			System.out.println(srv);
+		}
+	}
+
 	public static ServiceService get() {
 		synchronized (lock) {
 			if (service == null) {
@@ -24,7 +30,7 @@ public class Services {
 				} catch (Exception e) {
 					throw new IllegalStateException("Failed to initialize services implementation.", e);
 				}
-				
+
 				// Now initialize
 				service.configure(new DefaultContext());
 			}

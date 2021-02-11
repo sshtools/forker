@@ -20,7 +20,8 @@ public class ForkerDaemonProcessFactory implements ForkerProcessFactory {
 
 	@Override
 	public ForkerProcess createProcess(ForkerBuilder builder, ForkerProcessListener listener) throws IOException {
-		if (builder.io() != IO.DEFAULT && !Boolean.getBoolean("forker.disableDaemon")) {
+		IO io = builder.io();
+		if (io != IO.DEFAULT && !Boolean.getBoolean("forker.disableDaemon")) {
 			
 
 			
@@ -49,7 +50,7 @@ public class ForkerDaemonProcessFactory implements ForkerProcessFactory {
 				// ProcessBuilder
 			}
 
-			if (builder.io() == IO.DAEMON) {
+			if (io == IO.DAEMON) {
 				throw new IOException("Mode explicitly request daemon, but daemon process failed.");
 			}
 		}

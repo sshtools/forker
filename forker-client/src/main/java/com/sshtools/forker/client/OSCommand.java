@@ -651,7 +651,7 @@ public class OSCommand {
 	 * @return whether or not elevation was previously set
 	 */
 	public static boolean elevate() {
-		boolean res = !Boolean.TRUE.equals(elevated.get());
+		boolean res = Boolean.TRUE.equals(elevated.get());
 		elevated.set(Boolean.TRUE);
 		return res;
 	}
