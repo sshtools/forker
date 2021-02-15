@@ -31,6 +31,10 @@ public interface ServiceService extends Closeable {
 
 	Service getService(String name) throws IOException;
 
+	default boolean hasService(String name) throws IOException {
+		return getService(name) != null;
+	}
+
 	default void close() throws IOException {
 	}
 }

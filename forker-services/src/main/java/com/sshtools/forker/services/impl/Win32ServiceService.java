@@ -72,9 +72,8 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 	public void pauseService(Service service) throws Exception {
 
 		synchronized (smgr) {
-			smgr.open(WinNT.GENERIC_EXECUTE);
+			smgr.open(WinNT.GENERIC_EXECUTE | WinNT.GENERIC_READ);
 			try {
-				smgr.open(WinNT.GENERIC_EXECUTE);
 				W32Service srv = smgr.openService(service.getNativeName(), WinNT.GENERIC_EXECUTE);
 				try {
 					srv.pauseService();
@@ -91,9 +90,8 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 	@Override
 	public void unpauseService(Service service) throws Exception {
 		synchronized (smgr) {
-			smgr.open(WinNT.GENERIC_EXECUTE);
+			smgr.open(WinNT.GENERIC_EXECUTE | WinNT.GENERIC_READ);
 			try {
-				smgr.open(WinNT.GENERIC_EXECUTE);
 				W32Service srv = smgr.openService(service.getNativeName(), WinNT.GENERIC_EXECUTE);
 				try {
 					srv.continueService();
@@ -109,10 +107,9 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 	@Override
 	public void startService(Service service) throws Exception {
 		synchronized (smgr) {
-			smgr.open(WinNT.GENERIC_EXECUTE);
+			smgr.open(WinNT.GENERIC_ALL);
 			try {
-				smgr.open(WinNT.GENERIC_EXECUTE);
-				W32Service srv = smgr.openService(service.getNativeName(), WinNT.GENERIC_EXECUTE);
+				W32Service srv = smgr.openService(service.getNativeName(), WinNT.GENERIC_ALL);
 				try {
 					srv.startService();
 				} finally {
@@ -127,7 +124,7 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 	@Override
 	public void stopService(Service service) throws Exception {
 		synchronized (smgr) {
-			smgr.open(WinNT.GENERIC_EXECUTE);
+			smgr.open(WinNT.GENERIC_EXECUTE | WinNT.GENERIC_READ);
 			try {
 				W32Service srv = smgr.openService(service.getNativeName(), WinNT.GENERIC_EXECUTE);
 				try {
