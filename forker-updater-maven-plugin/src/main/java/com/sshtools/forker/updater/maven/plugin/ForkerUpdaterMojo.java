@@ -182,6 +182,9 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 	@Parameter(defaultValue = "true", property = "updateableBootstrap")
 	private boolean updateableBootstrap;
 
+	@Parameter(defaultValue = "true", property = "updateable")
+	private boolean updateable;
+
 	@Parameter(defaultValue = "true", property = "include")
 	private boolean includeProject;
 
@@ -684,11 +687,19 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 				out.println("    fi");
 				out.println("done");
 			} else {
-				if (useForkerModules)
-					out.println(
-							"${JAVA_EXE} ${VM_OPTIONS} -m com.sshtools.forker.updater/com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
-				else
-					out.println("${JAVA_EXE} ${VM_OPTIONS} com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
+				if(updateable) {
+					if (useForkerModules)
+						out.println(
+								"${JAVA_EXE} ${VM_OPTIONS} -m com.sshtools.forker.updater/com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
+					else
+						out.println("${JAVA_EXE} ${VM_OPTIONS} com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
+				}
+				else {
+					if (useForkerModules)
+						out.println("${JAVA_EXE} ${VM_OPTIONS} -m com.sshtools.forker.wrapper/com.sshtools.forker.wrapper.ForkerWrapper ${APP_ARGS} $@");
+					else
+						out.println("${JAVA_EXE} ${VM_OPTIONS} com.sshtools.forker.wrapper.ForkerWrapper ${APP_ARGS} $@");
+				}
 			}
 		}
 		scriptPath.toFile().setExecutable(true);
