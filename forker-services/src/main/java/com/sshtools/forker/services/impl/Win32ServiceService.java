@@ -124,9 +124,11 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 	@Override
 	public void stopService(Service service) throws Exception {
 		synchronized (smgr) {
-			smgr.open(WinNT.GENERIC_EXECUTE | WinNT.GENERIC_READ);
+			smgr.open(Winsvc.SC_MANAGER_ALL_ACCESS);
 			try {
-				W32Service srv = smgr.openService(service.getNativeName(), WinNT.GENERIC_EXECUTE);
+				W32Service srv = smgr.openService(service.getNativeName(), Winsvc.SERVICE_STOP | 
+						Winsvc.SERVICE_QUERY_STATUS | 
+						Winsvc.SERVICE_ENUMERATE_DEPENDENTS);
 				try {
 					srv.stopService();
 				} finally {
