@@ -131,9 +131,18 @@ public class Replace {
 		m.appendTail(work);
 	}
 
-	public static String replaceProperties(String value, Map<String, String> props) {
+	public static String replaceProperties(String value, Map<String, String> props, boolean normalize) {
 		Replace replace = new Replace();
-		replace.pattern("\\$\\{(.*?)\\}", (p, m, r) -> props.get(m.group().substring(2, m.group().length() - 1)));
+		replace.pattern("\\$\\{(.*?)\\}", (p, m, r) -> { 
+			String key = m.group().substring(2, m.group().length() - 1);
+			String val = props.get(key);
+			if(normalize) {
+				if(key.equals("user.home") || key.equals("installer.home")) {
+					val = val.replace("\\", "/");
+				}
+			}
+			return val;
+		});
 		return replace.replace(value);
 	}
 

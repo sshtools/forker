@@ -335,7 +335,7 @@ public class Updater extends ForkerWrapper {
 			}
 		} else
 			props.put("installer.home", System.getProperty("user.home"));
-		installLocation = Replace.replaceProperties(installLocation, props);
+		installLocation = Replace.replaceProperties(installLocation, props, true);
 		session.updater(this);
 		session.manifest(new AppManifest(cwd().resolve("manifest.xml")));
 		session.base(Paths.get(installLocation));

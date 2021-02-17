@@ -890,7 +890,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			if (CommandLine.printHelpIfRequested(cmd)) {
 				System.exit(0);
 			}
-			for(String cfg : wrapper.getConfiguration().getOptionValues("configuration")) {
+			for (String cfg : wrapper.getConfiguration().getOptionValues("configuration")) {
 				wrapper.readConfigFile(new File(cfg));
 			}
 			String cfgDir = wrapper.getConfiguration().getOptionValue("configuration-directory", null);
@@ -1346,7 +1346,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		StringBuilder newClasspath = new StringBuilder();
 		if (StringUtils.isNotBlank(classpath)) {
 			Path root = cwd.toPath();
-			for (String el : classpath.split(CROSSPLATFORM_PATH_SEPARATOR)) {
+			for (String el : splitCrossPlatformPath(classpath)) {
 				logger.log(Level.INFO, "    " + el);
 				if (el.contains("*") || el.contains("?")) {
 
@@ -1390,6 +1390,42 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		} else
 			classpath = newClasspath.toString();
 		return classpath;
+	}
+
+	static String[] splitCrossPlatformPath(String paths) {
+		if (paths.contains("|")) {
+			/* Generic path */
+			return paths.split("\\|");
+		} else if (paths.contains("\\") || paths.contains(";")) {
+			/* Windows path */
+			return paths.split(";");
+		} else {
+			/* Windows forward slash path with drive */
+			StringBuilder el = new StringBuilder();
+			char[] chars = paths.toCharArray();
+			List<String> parts = new ArrayList<>();
+			for (int i = 0; i < chars.length; i++) {
+				char c = chars[i];
+				if (el.length() == 0 && Character.isAlphabetic(c) && i < chars.length - 2 && chars[i + 1] == ':'
+						&& (chars[i + 2] == '/' || chars[i + 2] == '\\')) {
+					/* This an the next two characters is a path with a drive */
+					el.append(c);
+					el.append(chars[++i]);
+					el.append(chars[++i]);
+				}
+				else if(c == ':') {
+					/* Colon that isn't part of the part, must be a colon separated path with forward slashes */
+					parts.add(el.toString());
+					el.setLength(0);;
+				}
+				else
+					el.append(c);
+			}
+			if(el.length() > 0)
+				parts.add(el.toString());
+			return parts.toArray(new String[0]);
+		}
+
 	}
 
 	protected void startForkerDaemon() throws IOException {
@@ -1788,6 +1824,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				return file.getPath();
 			} else if (key.equals("directory")) {
 				return file.getParentFile().getPath();
+			} else if (key.equals("user.home")) {
+				return System.getProperty(key).replace("\\", "/");
 			} else
 				return System.getProperty(key);
 		});
@@ -2021,7 +2059,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	}
 
 	private int maybeRestart(int retval, int lastRetVal) throws IOException, InterruptedException {
-		
+
 		logger.info(String.format("App has exited with %d.", retval));
 
 		for (WrapperPlugin plugin : plugins) {
@@ -2130,7 +2168,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			err = errlog;
 		}
 		if (err == null) {
-			if(out instanceof SinkOutputStream)
+			if (out instanceof SinkOutputStream)
 				logger.info("Sinking all stderr");
 			else
 				logger.info("Sending stderr to stdout");
