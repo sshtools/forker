@@ -124,52 +124,132 @@ import picocli.CommandLine.ParseResult;
 @MXBean
 public class ForkerWrapper implements ForkerWrapperMXBean {
 
+	/** The Constant CONTINUE_UPGRADE. */
 	public final static int CONTINUE_UPGRADE = Integer.MIN_VALUE;
+	
+	/** The Constant USER_INTERACTION. */
 	public final static int USER_INTERACTION = Integer.MIN_VALUE + 2;
+	
+	/** The Constant EXIT_AFTER_UPGRADE. */
 	public final static int EXIT_AFTER_UPGRADE = Integer.MIN_VALUE + 1;
+	
+	/** The Constant EXIT_OK. */
 	public final static int EXIT_OK = 0;
+	
+	/** The Constant EXIT_ERROR. */
 	public final static int EXIT_ERROR = 1;
+	
+	/** The Constant EXIT_ARGUMENT_SYNTAX. */
 	public final static int EXIT_ARGUMENT_SYNTAX = 2;
 
+	/** The Constant WRAPPED_MODULE_NAME. */
 	public final static String WRAPPED_MODULE_NAME = "com.sshtools.forker.wrapped";
+	
+	/** The Constant WRAPPED_CLASS_NAME. */
 	public final static String WRAPPED_CLASS_NAME = "com.sshtools.forker.wrapped.Wrapped";
+	
+	/** The Constant WRAPPED_MX_BEAN_NAME. */
 	public final static String WRAPPED_MX_BEAN_NAME = "WrappedMXBean";
+	
+	/** The Constant EXITED_WRAPPER. */
 	public final static String EXITED_WRAPPER = "exited-wrapper";
+	
+	/** The Constant EXITING_WRAPPER. */
 	public final static String EXITING_WRAPPER = "exiting-wrapper";
+	
+	/** The Constant STARTING_FORKER_DAEMON. */
 	public final static String STARTING_FORKER_DAEMON = "starting-forker-daemon";
+	
+	/** The Constant STARTED_FORKER_DAEMON. */
 	public final static String STARTED_FORKER_DAEMON = "started-forker-daemon";
+	
+	/** The Constant STARTING_APPLICATION. */
 	public final static String STARTING_APPLICATION = "starting-application";
+	
+	/** The Constant STARTED_APPLICATION. */
 	public final static String STARTED_APPLICATION = "started-application";
+	
+	/** The Constant RESTARTING_APPLICATION. */
 	public final static String RESTARTING_APPLICATION = "restarting-application";
+	
+	/** The Constant APPPLICATION_STOPPED. */
 	public final static String APPPLICATION_STOPPED = "application-stopped";
+	
+	/** The Constant EVENT_NAMES. */
 	public final static String[] EVENT_NAMES = { EXITED_WRAPPER, EXITING_WRAPPER, STARTING_FORKER_DAEMON,
 			STARTED_FORKER_DAEMON, STARTED_APPLICATION, STARTING_APPLICATION, RESTARTING_APPLICATION,
 			APPPLICATION_STOPPED };
+	
+	/** The Constant CROSSPLATFORM_PATH_SEPARATOR. */
 	private static final String CROSSPLATFORM_PATH_SEPARATOR = ";|:";
 
+	/** The app. */
 	private WrappedApplication app = new WrappedApplication();
+	
+	/** The configuration. */
 	private Configuration configuration = new Configuration();
+	
+	/** The daemon. */
 	private Forker daemon;
+	
+	/** The cookie. */
 	private Instance cookie;
+	
+	/** The process. */
 	private Process process;
+	
+	/** The temp restart on exit. */
 	private boolean tempRestartOnExit;
+	
+	/** The inited. */
 	private boolean inited;
+	
+	/** The default out. */
 	private PrintStream defaultOut = System.out;
+	
+	/** The default err. */
 	private PrintStream defaultErr = System.err;
+	
+	/** The default in. */
 	private InputStream defaultIn = System.in;
+	
+	/** The stopping. */
 	private boolean stopping = false;
+	
+	/** The prevent restart. */
 	private boolean preventRestart = false;
+	
+	/** The files. */
 	private Set<File> files = new LinkedHashSet<>();
+	
+	/** The config change. */
 	private ScheduledExecutorService configChange;
+	
+	/** The change task. */
 	private ScheduledFuture<?> changeTask;
+	
+	/** The monitor thread. */
 	private Thread monitorThread;
+	
+	/** The file mon thread. */
 	private Thread fileMonThread;
+	
+	/** The plugins. */
 	private List<WrapperPlugin> plugins = new ArrayList<>();
+	
+	/** The system properties. */
 	private Properties systemProperties = new Properties();
 
+	/** The logger. */
 	protected Logger logger = Logger.getGlobal();
+	
+	/** The using wrapped. */
 	private boolean usingWrapped;
+	
+	/** The jmx connection to wrapped. */
 	private MBeanServerConnection jmxConnectionToWrapped;
+	
+	/** The jmx object name. */
 	private ObjectName jmxObjectName;
 
 	{
@@ -179,63 +259,133 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
+	/**
+	 * Ping.
+	 */
 	@Override
 	public void ping() {
 		if (logger.isLoggable(Level.FINE))
 			logger.log(Level.FINE, "Ping from JMX client.");
 	}
 
+	/**
+	 * Gets the system properties.
+	 *
+	 * @return the system properties
+	 */
 	public Properties getSystemProperties() {
 		return systemProperties;
 	}
 
+	/**
+	 * Gets the cmd.
+	 *
+	 * @return the cmd
+	 */
 	public ParseResult getCmd() {
 		return configuration.getCmd();
 	}
 
+	/**
+	 * Gets the wrapped application.
+	 *
+	 * @return the wrapped application
+	 */
 	public WrappedApplication getWrappedApplication() {
 		return app;
 	}
 
+	/**
+	 * Gets the default in.
+	 *
+	 * @return the default in
+	 */
 	public InputStream getDefaultIn() {
 		return defaultIn;
 	}
 
+	/**
+	 * Sets the default in.
+	 *
+	 * @param defaultIn the new default in
+	 */
 	public void setDefaultIn(InputStream defaultIn) {
 		this.defaultIn = defaultIn;
 	}
 
+	/**
+	 * Gets the default out.
+	 *
+	 * @return the default out
+	 */
 	public PrintStream getDefaultOut() {
 		return defaultOut;
 	}
 
+	/**
+	 * Sets the default out.
+	 *
+	 * @param defaultOut the new default out
+	 */
 	public void setDefaultOut(PrintStream defaultOut) {
 		this.defaultOut = defaultOut;
 	}
 
+	/**
+	 * Gets the default err.
+	 *
+	 * @return the default err
+	 */
 	public PrintStream getDefaultErr() {
 		return defaultErr;
 	}
 
+	/**
+	 * Sets the default err.
+	 *
+	 * @param defaultErr the new default err
+	 */
 	public void setDefaultErr(PrintStream defaultErr) {
 		this.defaultErr = defaultErr;
 	}
 
+	/**
+	 * Gets the arguments.
+	 *
+	 * @return the arguments
+	 */
 	@Override
 	public String[] getArguments() {
 		return app.getArguments();
 	}
 
+	/**
+	 * Gets the classname.
+	 *
+	 * @return the classname
+	 */
 	@Override
 	public String getClassname() {
 		return app.getClassname();
 	}
 
+	/**
+	 * Gets the module.
+	 *
+	 * @return the module
+	 */
 	@Override
 	public String getModule() {
 		return app.getModule();
 	}
 
+	/**
+	 * Relativize.
+	 *
+	 * @param context the context
+	 * @param path the path
+	 * @return the file
+	 */
 	public File relativize(File context, String path) {
 		File p = new File(path);
 		try {
@@ -248,26 +398,55 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
+	/**
+	 * Restart.
+	 *
+	 * @throws InterruptedException the interrupted exception
+	 */
 	@Override
 	public void restart() throws InterruptedException {
 		restart(true);
 	}
 
+	/**
+	 * Restart.
+	 *
+	 * @param wait the wait
+	 * @throws InterruptedException the interrupted exception
+	 */
 	@Override
 	public void restart(boolean wait) throws InterruptedException {
 		stop(true, true);
 	}
 
+	/**
+	 * Stop.
+	 *
+	 * @throws InterruptedException the interrupted exception
+	 */
 	@Override
 	public void stop() throws InterruptedException {
 		stop(true);
 	}
 
+	/**
+	 * Stop.
+	 *
+	 * @param wait the wait
+	 * @throws InterruptedException the interrupted exception
+	 */
 	@Override
 	public void stop(boolean wait) throws InterruptedException {
 		stop(wait, false);
 	}
 
+	/**
+	 * Start.
+	 *
+	 * @return the int
+	 * @throws IOException Signals that an I/O exception has occurred.
+	 * @throws InterruptedException the interrupted exception
+	 */
 	@SuppressWarnings("resource")
 	public int start() throws IOException, InterruptedException {
 		if (!inited)
@@ -413,6 +592,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
+	/**
+	 * Shutdown wrapped.
+	 *
+	 * @return the int
+	 */
 	protected int shutdownWrapped() {
 		try {
 			return (Integer) executeJmxCommandInApp("shutdown");
@@ -426,6 +610,28 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
+	/**
+	 * Forked.
+	 *
+	 * @param javaExe the java exe
+	 * @param wrapperClasspath the wrapper classpath
+	 * @param wrapperModulepath the wrapper modulepath
+	 * @param forkerClasspath the forker classpath
+	 * @param forkerModulepath the forker modulepath
+	 * @param bootClasspath the boot classpath
+	 * @param nativeMain the native main
+	 * @param useDaemon the use daemon
+	 * @param daemonize the daemonize
+	 * @param times the times
+	 * @param lastRetVal the last ret val
+	 * @param quietStdErr the quiet std err
+	 * @param quietStdOut the quiet std out
+	 * @param logoverwrite the logoverwrite
+	 * @return the int
+	 * @throws IOException Signals that an I/O exception has occurred.
+	 * @throws UnsupportedEncodingException the unsupported encoding exception
+	 * @throws InterruptedException the interrupted exception
+	 */
 	protected int forked(String javaExe, String wrapperClasspath, String wrapperModulepath, String forkerClasspath,
 			String forkerModulepath, String bootClasspath, final boolean nativeMain, final boolean useDaemon,
 			boolean daemonize, int times, int lastRetVal, boolean quietStdErr, boolean quietStdOut,
@@ -461,6 +667,17 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return retval;
 	}
 
+	/**
+	 * No fork.
+	 *
+	 * @param useDaemon the use daemon
+	 * @param wrapperClasspath the wrapper classpath
+	 * @param forkerClasspath the forker classpath
+	 * @param times the times
+	 * @param lastRetVal the last ret val
+	 * @return the int
+	 * @throws IOException Signals that an I/O exception has occurred.
+	 */
 	protected int noFork(boolean useDaemon, String wrapperClasspath, String forkerClasspath, int times, int lastRetVal)
 			throws IOException {
 		if (StringUtils.isNotBlank(app.getModule()))
@@ -708,6 +925,12 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 	}
 
+	/**
+	 * Gets the app threads.
+	 *
+	 * @param threads the threads
+	 * @return the app threads
+	 */
 	protected Set<Thread> getAppThreads(Thread[] threads) {
 		Thread[] nowThreads = new Thread[Thread.activeCount()];
 		Thread.enumerate(nowThreads);
@@ -716,6 +939,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return remaining;
 	}
 
+	/**
+	 * Gets the lock file.
+	 *
+	 * @return the lock file
+	 */
 	protected File getLockFile() {
 		if (isSingleInstancePerUser())
 			return new File(new File(System.getProperty("java.io.tmpdir")),
@@ -725,6 +953,20 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					"forker-wrapper-" + app.getClassname() + ".lock");
 	}
 
+	/**
+	 * Execute jmx command in app.
+	 *
+	 * @param method the method
+	 * @param args the args
+	 * @return the object
+	 * @throws MalformedObjectNameException the malformed object name exception
+	 * @throws AttachNotSupportedException the attach not supported exception
+	 * @throws IOException Signals that an I/O exception has occurred.
+	 * @throws MalformedURLException the malformed URL exception
+	 * @throws InstanceNotFoundException the instance not found exception
+	 * @throws MBeanException the m bean exception
+	 * @throws ReflectionException the reflection exception
+	 */
 	protected Object executeJmxCommandInApp(String method, Object... args)
 			throws MalformedObjectNameException, AttachNotSupportedException, IOException, MalformedURLException,
 			InstanceNotFoundException, MBeanException, ReflectionException {
@@ -740,6 +982,14 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		throw new IllegalArgumentException("Could not find remote app.");
 	}
 
+	/**
+	 * Check JMX connection to wrapped.
+	 *
+	 * @throws MalformedObjectNameException the malformed object name exception
+	 * @throws AttachNotSupportedException the attach not supported exception
+	 * @throws IOException Signals that an I/O exception has occurred.
+	 * @throws MalformedURLException the malformed URL exception
+	 */
 	protected void checkJMXConnectionToWrapped()
 			throws MalformedObjectNameException, AttachNotSupportedException, IOException, MalformedURLException {
 		if (jmxConnectionToWrapped == null) {
@@ -769,22 +1019,47 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
+	/**
+	 * Checks if is log overwrite.
+	 *
+	 * @return true, if is log overwrite
+	 */
 	private boolean isLogOverwrite() {
 		return configuration.getSwitch("log-overwrite", false);
 	}
 
+	/**
+	 * Checks if is quiet stdout.
+	 *
+	 * @return true, if is quiet stdout
+	 */
 	private boolean isQuietStdout() {
 		return isQuiet() || configuration.getSwitch("quiet-stdout", false);
 	}
 
+	/**
+	 * Checks if is quiet stderr.
+	 *
+	 * @return true, if is quiet stderr
+	 */
 	private boolean isQuietStderr() {
 		return isQuiet() || configuration.getSwitch("quiet-stderr", false);
 	}
 
+	/**
+	 * Checks if is daemon.
+	 *
+	 * @return true, if is daemon
+	 */
 	private boolean isDaemon() {
 		return configuration.getSwitch("daemon", false);
 	}
 
+	/**
+	 * Resolve wrapper classpath.
+	 *
+	 * @return the string
+	 */
 	private String resolveWrapperClasspath() {
 		String forkerClasspath = System.getProperty("java.class.path");
 		String wrapperClasspath = configuration.getOptionValue("classpath", forkerClasspath);
@@ -797,21 +1072,41 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return wrapperClasspath;
 	}
 
+	/**
+	 * Resolve wrapper modulepath.
+	 *
+	 * @return the string
+	 */
 	private String resolveWrapperModulepath() {
 		String forkerModulepath = System.getProperty("java.module.path");
 		String wrapperClasspath = configuration.getOptionValue("modulepath", forkerModulepath);
 		return wrapperClasspath;
 	}
 
+	/**
+	 * Checks if is native main.
+	 *
+	 * @return true, if is native main
+	 */
 	private boolean isNativeMain() {
 		return configuration.getSwitch("native", false);
 	}
 
+	/**
+	 * Checks if is use daemon.
+	 *
+	 * @return true, if is use daemon
+	 */
 	private boolean isUseDaemon() {
 		boolean nativeMain = isNativeMain();
 		return !nativeMain && !configuration.getSwitch("no-forker-daemon", nativeMain);
 	}
 
+	/**
+	 * Resolve cwd.
+	 *
+	 * @return the file
+	 */
 	protected File resolveCwd() {
 		String cwdpath = configuration.getOptionValue("cwd", null);
 		File cwd = new File(System.getProperty("user.dir"));
@@ -823,19 +1118,39 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return cwd;
 	}
 
+	/**
+	 * Gets the arg mode.
+	 *
+	 * @return the arg mode
+	 */
 	public ArgMode getArgMode() {
 		return ArgMode.valueOf(configuration.getOptionValue("argmode", ArgMode.DEFAULT.name()));
 	}
 
+	/**
+	 * Gets the argfile mode.
+	 *
+	 * @return the argfile mode
+	 */
 	public ArgfileMode getArgfileMode() {
 		return ArgfileMode.valueOf(configuration.getOptionValue("argfilemode", ArgfileMode.COMPACT.name()));
 	}
 
+	/**
+	 * Gets the app name.
+	 *
+	 * @return the app name
+	 */
 	public static String getAppName() {
 		String an = System.getenv("FORKER_APPNAME");
 		return an == null || an.length() == 0 ? ForkerWrapper.class.getName() : an;
 	}
 
+	/**
+	 * The main method.
+	 *
+	 * @param args the arguments
+	 */
 	public static void main(String[] args) {
 		ForkerWrapper wrapper = new ForkerWrapper();
 		wrapper.getWrappedApplication().setArguments(args);
@@ -864,6 +1179,13 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		wrapperMain(args, wrapper, opts);
 	}
 
+	/**
+	 * Wrapper main.
+	 *
+	 * @param args the args
+	 * @param wrapper the wrapper
+	 * @param opts the opts
+	 */
 	public static void wrapperMain(String[] args, ForkerWrapper wrapper, CommandSpec opts) {
 		CommandLine cl = new CommandLine(opts);
 		cl.setTrimQuotes(true);
@@ -926,10 +1248,20 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 	}
 
+	/**
+	 * Gets the configuration.
+	 *
+	 * @return the configuration
+	 */
 	public Configuration getConfiguration() {
 		return configuration;
 	}
 
+	/**
+	 * Inits the.
+	 *
+	 * @param cmd the cmd
+	 */
 	public void init(ParseResult cmd) {
 		if (!inited) {
 			configuration.init(cmd);
@@ -945,15 +1277,30 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
+	/**
+	 * Sets the log level.
+	 *
+	 * @param lvl the new log level
+	 */
 	@Override
 	public void setLogLevel(String lvl) {
 		setLogLevel(Level.parse(lvl));
 	}
 
+	/**
+	 * Gets the logger.
+	 *
+	 * @return the logger
+	 */
 	public Logger getLogger() {
 		return logger;
 	}
 
+	/**
+	 * Sets the log level.
+	 *
+	 * @param lvl the new log level
+	 */
 	public void setLogLevel(Level lvl) {
 		Logger logger = this.logger;
 		do {
@@ -965,12 +1312,22 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		} while (logger != null);
 	}
 
+	/**
+	 * Reconfigure logging.
+	 */
 	private void reconfigureLogging() {
 		String levelName = configuration.getOptionValue("level", "WARNING");
 		Level lvl = Level.parse(levelName);
 		setLogLevel(lvl);
 	}
 
+	/**
+	 * Stop.
+	 *
+	 * @param wait the wait
+	 * @param restart the restart
+	 * @throws InterruptedException the interrupted exception
+	 */
 	protected void stop(boolean wait, boolean restart) throws InterruptedException {
 		stopping = true;
 		preventRestart = !restart;
@@ -983,6 +1340,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
+	/**
+	 * Gets the JVM path.
+	 *
+	 * @return the JVM path
+	 */
 	protected String getJVMPath() {
 		String javaExe = OS.getJavaPath();
 		String altJava = configuration.getOptionValue("java", null);
@@ -1032,6 +1394,13 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return javaExe;
 	}
 
+	/**
+	 * Event.
+	 *
+	 * @param name the name
+	 * @param args the args
+	 * @throws IOException Signals that an I/O exception has occurred.
+	 */
 	protected void event(String name, String... args) throws IOException {
 		String eventHandler = configuration.getOptionValue("on-" + name, null);
 		logger.info(String.format("Event " + name + ": %s", Arrays.asList(args)));
@@ -1083,6 +1452,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
+	/**
+	 * Adds the options.
+	 *
+	 * @param options the options
+	 */
 	protected void addOptions(CommandSpec options) {
 
 		for (WrapperPlugin plugin : plugins) {
@@ -1325,6 +1699,16 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		options.name(getAppName());
 	}
 
+	/**
+	 * Builds the path.
+	 *
+	 * @param cwd the cwd
+	 * @param defaultClasspath the default classpath
+	 * @param classpath the classpath
+	 * @param appendByDefault the append by default
+	 * @return the string
+	 * @throws IOException Signals that an I/O exception has occurred.
+	 */
 	protected static String buildPath(File cwd, String defaultClasspath, String classpath, boolean appendByDefault)
 			throws IOException {
 		boolean append = appendByDefault;
@@ -1396,6 +1780,12 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return classpath;
 	}
 
+	/**
+	 * Split cross platform path.
+	 *
+	 * @param paths the paths
+	 * @return the string[]
+	 */
 	static String[] splitCrossPlatformPath(String paths) {
 		if (paths.contains("|")) {
 			/* Generic path */
@@ -1432,6 +1822,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 	}
 
+	/**
+	 * Start forker daemon.
+	 *
+	 * @throws IOException Signals that an I/O exception has occurred.
+	 */
 	protected void startForkerDaemon() throws IOException {
 		/*
 		 * Prepare to start a forker daemon. The client application may (if it wishes)
@@ -1459,10 +1854,26 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}.start();
 	}
 
+	/**
+	 * Checks if is no fork.
+	 *
+	 * @return true, if is no fork
+	 */
 	protected boolean isNoFork() {
 		return configuration.getSwitch("no-fork", false);
 	}
 
+	/**
+	 * Daemonize.
+	 *
+	 * @param javaExe the java exe
+	 * @param forkerClasspath the forker classpath
+	 * @param forkerModulepath the forker modulepath
+	 * @param daemonize the daemonize
+	 * @param pidfile the pidfile
+	 * @return true, if successful
+	 * @throws IOException Signals that an I/O exception has occurred.
+	 */
 	protected boolean daemonize(String javaExe, String forkerClasspath, String forkerModulepath, boolean daemonize,
 			String pidfile) throws IOException {
 		if (daemonize && configuration.getOptionValue("fallback-active", null) == null) {
@@ -1535,6 +1946,13 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return false;
 	}
 
+	/**
+	 * Write lines.
+	 *
+	 * @param file the file
+	 * @param lines the lines
+	 * @throws IOException Signals that an I/O exception has occurred.
+	 */
 	private static void writeLines(File file, List<String> lines) throws IOException {
 		try (PrintWriter w = new PrintWriter(new FileWriter(file), true)) {
 			for (String line : lines)
@@ -1542,6 +1960,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
+	/**
+	 * Adds the shutdown hook.
+	 *
+	 * @param useDaemon the use daemon
+	 */
 	protected void addShutdownHook(final boolean useDaemon) {
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			@Override
@@ -1623,6 +2046,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		});
 	}
 
+	/**
+	 * Monitor configuration files.
+	 */
 	protected void monitorConfigurationFiles() {
 		if (configuration.getSwitch("monitor-configuration", false) && fileMonThread == null) {
 			fileMonThread = new Thread() {
@@ -1690,6 +2116,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
+	/**
+	 * Monitor wrapped JMX application.
+	 */
 	protected void monitorWrappedJMXApplication() {
 		if (!isNoFork() && usingWrapped && monitorThread == null) {
 			monitorThread = new Thread() {
@@ -1737,6 +2166,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
+	/**
+	 * Monitor wrapped application.
+	 */
 	protected void monitorWrappedApplication() {
 		if (!usingWrapped && isUseDaemon() && Integer.parseInt(configuration.getOptionValue("timeout", "60")) > 0
 				&& monitorThread == null) {
@@ -1781,16 +2213,35 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
+	/**
+	 * Append path.
+	 *
+	 * @param newClasspath the new classpath
+	 * @param el the el
+	 */
 	protected static void appendPath(StringBuilder newClasspath, String el) {
 		if (newClasspath.length() > 0)
 			newClasspath.append(File.pathSeparator);
 		newClasspath.append(el);
 	}
 
+	/**
+	 * Read config file.
+	 *
+	 * @param file the file
+	 * @throws IOException Signals that an I/O exception has occurred.
+	 */
 	public void readConfigFile(File file) throws IOException {
 		readConfigFile(file, configuration.getProperties());
 	}
 
+	/**
+	 * Read config file.
+	 *
+	 * @param file the file
+	 * @param properties the properties
+	 * @throws IOException Signals that an I/O exception has occurred.
+	 */
 	protected void readConfigFile(File file, List<KeyValuePair> properties) throws IOException {
 		synchronized (files) {
 			if (files.contains(file)) {
@@ -1818,6 +2269,13 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
+	/**
+	 * Replace properties.
+	 *
+	 * @param file the file
+	 * @param line the line
+	 * @return the string
+	 */
 	protected String replaceProperties(File file, String line) {
 		Replace replace = new Replace();
 		replace.pattern("\\$\\{(.*?)\\}", (p, m, r) -> {
@@ -1836,10 +2294,23 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return replace.replace(line);
 	}
 
+	/**
+	 * On before process.
+	 *
+	 * @param task the task
+	 * @return true, if successful
+	 */
 	protected boolean onBeforeProcess(Callable<Void> task) {
 		return true;
 	}
 
+	/**
+	 * Make directory for file.
+	 *
+	 * @param file the file
+	 * @return the file
+	 * @throws IOException Signals that an I/O exception has occurred.
+	 */
 	private File makeDirectoryForFile(File file) throws IOException {
 		File dir = file.getParentFile();
 		if (dir != null && !dir.exists() && !dir.mkdirs())
@@ -1847,10 +2318,23 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return file;
 	}
 
+	/**
+	 * New buffer.
+	 *
+	 * @return the byte[]
+	 */
 	private byte[] newBuffer() {
 		return new byte[Integer.parseInt(configuration.getOptionValue("buffer-size", "1024"))];
 	}
 
+	/**
+	 * Copy.
+	 *
+	 * @param in the in
+	 * @param out the out
+	 * @param buf the buf
+	 * @throws IOException Signals that an I/O exception has occurred.
+	 */
 	private void copy(final InputStream in, final OutputStream out, byte[] buf) throws IOException {
 		int r;
 		while ((r = in.read(buf, 0, buf.length)) != -1) {
@@ -1859,6 +2343,13 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
+	/**
+	 * Copy runnable.
+	 *
+	 * @param in the in
+	 * @param out the out
+	 * @return the runnable
+	 */
 	private Runnable copyRunnable(final InputStream in, final OutputStream out) {
 		return new Runnable() {
 			@Override
@@ -1872,6 +2363,13 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		};
 	}
 
+	/**
+	 * Inits the temp folder.
+	 *
+	 * @param tempFolder the temp folder
+	 * @param cwd the cwd
+	 * @throws IOException Signals that an I/O exception has occurred.
+	 */
 	private void initTempFolder(String tempFolder, File cwd) throws IOException {
 
 		File tempFile = new File(tempFolder);
@@ -1906,6 +2404,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
+	/**
+	 * Del tree.
+	 *
+	 * @param file the file
+	 */
 	private void delTree(File file) {
 
 		File[] children = file.listFiles();
@@ -1921,6 +2424,13 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
+	/**
+	 * Process.
+	 *
+	 * @param task the task
+	 * @return the int
+	 * @throws Exception the exception
+	 */
 	protected int process(Callable<Integer> task) throws Exception {
 		for (WrapperPlugin plugin : plugins) {
 			plugin.beforeProcess();
@@ -1938,11 +2448,21 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 	}
 
+	/**
+	 * Continue processing.
+	 *
+	 * @throws IOException Signals that an I/O exception has occurred.
+	 */
 	protected void continueProcessing() throws IOException {
 		app.set(configuration.getOptionValue("main", null), configuration.getOptionValue("jar", null),
 				configuration.getRemaining(), configuration.getOptionValues("apparg"), getArgMode());
 	}
 
+	/**
+	 * Configuration file changed.
+	 *
+	 * @param file the file
+	 */
 	private void configurationFileChanged(File file) {
 		synchronized (configuration.getCfgLock()) {
 			if (configChange == null) {
@@ -2042,26 +2562,63 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 	}
 
+	/**
+	 * Checks if is no forker classpath.
+	 *
+	 * @return true, if is no forker classpath
+	 */
 	private boolean isNoForkerClasspath() {
 		return configuration.getSwitch("no-forker-classpath", false);
 	}
 
+	/**
+	 * Checks if is quiet.
+	 *
+	 * @return true, if is quiet
+	 */
 	private boolean isQuiet() {
 		return configuration.getSwitch("quiet", false);
 	}
 
+	/**
+	 * Checks if is single instance.
+	 *
+	 * @return true, if is single instance
+	 */
 	private boolean isSingleInstance() {
 		return configuration.getSwitch("single-instance", false) || isSingleInstancePerUser();
 	}
 
+	/**
+	 * Checks if is single instance per user.
+	 *
+	 * @return true, if is single instance per user
+	 */
 	private boolean isSingleInstancePerUser() {
 		return configuration.getSwitch("single-instance-per-user", false);
 	}
 
+	/**
+	 * On maybe restart.
+	 *
+	 * @param retval the retval
+	 * @param lastRetVal the last ret val
+	 * @return the boolean
+	 * @throws Exception the exception
+	 */
 	protected Boolean onMaybeRestart(int retval, int lastRetVal) throws Exception {
 		return null;
 	}
 
+	/**
+	 * Maybe restart.
+	 *
+	 * @param retval the retval
+	 * @param lastRetVal the last ret val
+	 * @return the int
+	 * @throws IOException Signals that an I/O exception has occurred.
+	 * @throws InterruptedException the interrupted exception
+	 */
 	private int maybeRestart(int retval, int lastRetVal) throws IOException, InterruptedException {
 
 		logger.info(String.format("App has exited with %d.", retval));
@@ -2113,6 +2670,20 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return lastRetVal;
 	}
 
+	/**
+	 * Capture streams.
+	 *
+	 * @param cwd the cwd
+	 * @param useDaemon the use daemon
+	 * @param daemonize the daemonize
+	 * @param quietStdErr the quiet std err
+	 * @param quietStdOut the quiet std out
+	 * @param logoverwrite the logoverwrite
+	 * @return the int
+	 * @throws IOException Signals that an I/O exception has occurred.
+	 * @throws UnsupportedEncodingException the unsupported encoding exception
+	 * @throws InterruptedException the interrupted exception
+	 */
 	private int captureStreams(File cwd, final boolean useDaemon, boolean daemonize, boolean quietStdErr,
 			boolean quietStdOut, boolean logoverwrite)
 			throws IOException, UnsupportedEncodingException, InterruptedException {
@@ -2213,6 +2784,22 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return retval;
 	}
 
+	/**
+	 * Builds the command.
+	 *
+	 * @param javaExe the java exe
+	 * @param forkerClasspath the forker classpath
+	 * @param forkerModulepath the forker modulepath
+	 * @param wrapperClasspath the wrapper classpath
+	 * @param wrapperModulePath the wrapper module path
+	 * @param bootClasspath the boot classpath
+	 * @param nativeMain the native main
+	 * @param useDaemon the use daemon
+	 * @param times the times
+	 * @param lastRetVal the last ret val
+	 * @return the forker builder
+	 * @throws IOException Signals that an I/O exception has occurred.
+	 */
 	private ForkerBuilder buildCommand(String javaExe, String forkerClasspath, String forkerModulepath,
 			String wrapperClasspath, String wrapperModulePath, String bootClasspath, final boolean nativeMain,
 			final boolean useDaemon, int times, int lastRetVal) throws IOException {
@@ -2463,6 +3050,12 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return appBuilder;
 	}
 
+	/**
+	 * Name value.
+	 *
+	 * @param spec the spec
+	 * @return the string[]
+	 */
 	private String[] nameValue(String spec) {
 		String key = spec;
 		String value = "";
@@ -2474,6 +3067,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return new String[] { key, value };
 	}
 
+	/**
+	 * Adds the debug options.
+	 *
+	 * @param command the command
+	 */
 	private void addDebugOptions(List<Argument> command) {
 		String spec = configuration.getOptionValue("debug", "").trim();
 		if (!spec.equals("false")) {
@@ -2513,6 +3111,12 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 	}
 
+	/**
+	 * Checks if is using client.
+	 *
+	 * @param path the path
+	 * @return true, if is using client
+	 */
 	private boolean isUsingClient(String path) {
 		if (path == null)
 			return false;
@@ -2523,6 +3127,12 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return false;
 	}
 
+	/**
+	 * Checks if is using wrapped.
+	 *
+	 * @param path the path
+	 * @return true, if is using wrapped
+	 */
 	private boolean isUsingWrapped(String path) {
 		if (path == null)
 			return false;
@@ -2533,18 +3143,38 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return false;
 	}
 
+	/**
+	 * The Class Finder.
+	 */
 	static class Finder extends SimpleFileVisitor<Path> {
 
+		/** The matcher. */
 		private final PathMatcher matcher;
+		
+		/** The new classpath. */
 		private StringBuilder newClasspath;
+		
+		/** The root. */
 		private Path root;
 
+		/**
+		 * Instantiates a new finder.
+		 *
+		 * @param root the root
+		 * @param pattern the pattern
+		 * @param newClasspath the new classpath
+		 */
 		Finder(Path root, String pattern, StringBuilder newClasspath) {
 			this.root = root;
 			this.newClasspath = newClasspath;
 			matcher = FileSystems.getDefault().getPathMatcher("glob:" + pattern.replace("\\", "\\\\"));
 		}
 
+		/**
+		 * Find.
+		 *
+		 * @param file the file
+		 */
 		void find(Path file) {
 			Path name = root.relativize(file);
 			if (name != null && matcher.matches(name)) {
@@ -2552,21 +3182,45 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			}
 		}
 
+		/**
+		 * Done.
+		 */
 		void done() {
 		}
 
+		/**
+		 * Visit file.
+		 *
+		 * @param file the file
+		 * @param attrs the attrs
+		 * @return the file visit result
+		 */
 		@Override
 		public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
 			find(file);
 			return FileVisitResult.CONTINUE;
 		}
 
+		/**
+		 * Pre visit directory.
+		 *
+		 * @param dir the dir
+		 * @param attrs the attrs
+		 * @return the file visit result
+		 */
 		@Override
 		public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
 			find(dir);
 			return FileVisitResult.CONTINUE;
 		}
 
+		/**
+		 * Visit file failed.
+		 *
+		 * @param file the file
+		 * @param exc the exc
+		 * @return the file visit result
+		 */
 		@Override
 		public FileVisitResult visitFileFailed(Path file, IOException exc) {
 			return FileVisitResult.CONTINUE;

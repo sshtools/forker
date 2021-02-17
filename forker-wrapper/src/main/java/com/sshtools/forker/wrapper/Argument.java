@@ -1,23 +1,50 @@
 package com.sshtools.forker.wrapper;
 
+/**
+ * The Class Argument.
+ */
 public class Argument {
 
+	/** The type. */
 	private ArgumentType type;
+	
+	/** The value. */
 	private String value;
 
+	/**
+	 * Instantiates a new argument.
+	 *
+	 * @param value the value
+	 */
 	public Argument(String value) {
 		this(ArgumentType.OPTION, value);
 	}
 
+	/**
+	 * Instantiates a new argument.
+	 *
+	 * @param type the type
+	 * @param value the value
+	 */
 	public Argument(ArgumentType type, String value) {
 		this.type = type;
 		this.value = value;
 	}
 
+	/**
+	 * Type.
+	 *
+	 * @return the argument type
+	 */
 	public ArgumentType type() {
 		return type;
 	}
 
+	/**
+	 * To arg file line.
+	 *
+	 * @return the string
+	 */
 	public String toArgFileLine() {
 		switch (type) {
 		case QUOTED:
@@ -39,6 +66,13 @@ public class Argument {
 		}
 	}
 
+	/**
+	 * Quote.
+	 *
+	 * @param value the value
+	 * @param escapeBackslashes the escape backslashes
+	 * @return the string
+	 */
 	protected String quote(String value, boolean escapeBackslashes) {
 		if (hasWhitespace(value)) {
 			return "\"" + value.replace("\\", "\\\\") + "\"";
@@ -46,10 +80,21 @@ public class Argument {
 			return value;
 	}
 
+	/**
+	 * Checks for whitespace.
+	 *
+	 * @param v the v
+	 * @return true, if successful
+	 */
 	protected boolean hasWhitespace(String v) {
 		return v.contains(" ") || v.contains("\t") || v.contains("\n") || v.contains("\r");
 	}
 
+	/**
+	 * To process build argument.
+	 *
+	 * @return the string
+	 */
 	public String toProcessBuildArgument() {
 		/*
 		 * ProcessBuilder type arguments (i.e. as added to the List<String> arguments)
