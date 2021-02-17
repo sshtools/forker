@@ -1325,9 +1325,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		options.name(getAppName());
 	}
 
-	protected String buildPath(File cwd, String defaultClasspath, String classpath, boolean appendByDefault)
+	protected static String buildPath(File cwd, String defaultClasspath, String classpath, boolean appendByDefault)
 			throws IOException {
-		logger.log(Level.INFO, "Building path ..");
 		boolean append = appendByDefault;
 		boolean prepend = false;
 		if (classpath != null) {
@@ -1345,33 +1344,38 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 		StringBuilder newClasspath = new StringBuilder();
 		if (StringUtils.isNotBlank(classpath)) {
-			Path root = cwd.toPath();
 			for (String el : splitCrossPlatformPath(classpath)) {
-				logger.log(Level.INFO, "    " + el);
+				el = el.replace('/', File.separatorChar);
 				if (el.contains("*") || el.contains("?")) {
-
-					Finder finder = new Finder(root, el, newClasspath);
+					Path root = cwd.toPath();
+					
+					/* If the element path is an absolute pattern, then we must discover the best
+					 * root to use. Using CWD won't work for example if the absolute path pattern
+					 * is outside of CWD.
+					 * 
+					 * To do this we find the first occurrence of a wild card separator, and 
+					 * use the first WHOLE path up to this point.
+					 * 
+					 * If this path is absolute, we then use that as the root for the wildcard 
+					 * matching and make the element path relative to that.
+					 */
+					int firstSingleIdx = el.indexOf('?');
+					int firstAnyIdx = el.indexOf('*');
+					int firstWildcardIdx = Math.min(firstAnyIdx == -1 ? Integer.MAX_VALUE : firstAnyIdx, 
+							firstSingleIdx == -1 ? Integer.MAX_VALUE : firstSingleIdx);
+					String elRootPath = el.substring(0, firstWildcardIdx);
+					int lastSeparator = elRootPath.lastIndexOf(File.separatorChar);
+					if(lastSeparator != -1) {
+						elRootPath = elRootPath.substring(0, lastSeparator);
+						Path possiblePath = Paths.get(elRootPath);
+						if(possiblePath.isAbsolute()) {
+							root = possiblePath;
+							el = el.substring(lastSeparator + 1);
+						}
+					}
+					Finder finder = new Finder(root, el, newClasspath);					
 					Files.walkFileTree(root, finder);
-
-//					String dirname = FilenameUtils.getFullPathNoEndSeparator(el);
-//					File dir = relativize(cwd, dirname);
-//					if (dir.isDirectory()) {
-//						File[] files = dir.listFiles();
-//						if (files != null) {
-//							for (File file : files) {
-//								if (FilenameUtils.wildcardMatch(file.getName(), basename)) {
-//									if (newClasspath.length() > 0)
-//										newClasspath.append(File.pathSeparator);
-//									logger.log(Level.INFO, "        " + file.getAbsolutePath());
-//									newClasspath.append(file.getAbsolutePath());
-//								}
-//							}
-//						} else {
-//							appendPath(newClasspath, el);
-//						}
-//					} else {
-//						appendPath(newClasspath, el);
-//					}
+					
 				} else {
 					appendPath(newClasspath, el);
 				}
@@ -2529,7 +2533,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		Finder(Path root, String pattern, StringBuilder newClasspath) {
 			this.root = root;
 			this.newClasspath = newClasspath;
-			matcher = FileSystems.getDefault().getPathMatcher("glob:" + pattern);
+			matcher = FileSystems.getDefault().getPathMatcher("glob:" + pattern.replace("\\", "\\\\"));
 		}
 
 		void find(Path file) {
