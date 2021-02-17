@@ -2231,27 +2231,27 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		 */
 		ArgfileMode argfileMode = getArgfileMode();
 		logger.log(Level.INFO, String.format("Argfile mode is %s", argfileMode));
-		List<String> tail = new ArrayList<>();
-		List<String> head = new ArrayList<>();
-		List<String> command = new ArrayList<>();
+		List<Argument> tail = new ArrayList<>();
+		List<Argument> head = new ArrayList<>();
+		List<Argument> command = new ArrayList<>();
 
 		if (!nativeMain) {
 
 			/* This is launching a Java class, so construct the classpath */
-			head.add(javaExe);
+			head.add(new Argument(ArgumentType.QUOTED, javaExe));
 			logger.log(Level.INFO, "Building classpath");
 			String classpath = buildPath(cwd, isNoForkerClasspath() ? null : forkerClasspath, wrapperClasspath, true);
 			if (classpath != null && !classpath.equals("")) {
-				command.add("-classpath");
-				command.add("\"" + classpath + "\"");
+				command.add(new Argument(ArgumentType.OPTION, "-classpath"));
+				command.add(new Argument(ArgumentType.QUOTED, classpath));
 				isUsingWrappedOnClasspath = isUsingWrapped(classpath);
 			}
 
 			logger.log(Level.INFO, "Building modulepath");
 			modulepath = buildPath(cwd, isNoForkerClasspath() ? null : forkerModulepath, wrapperModulePath, true);
 			if (modulepath != null && !modulepath.equals("")) {
-				command.add("-p");
-				command.add("\"" + modulepath + "\"");
+				command.add(new Argument(ArgumentType.OPTION, "-p"));
+				command.add(new Argument(ArgumentType.QUOTED, modulepath));
 				isUsingWrappedOnModulepath = isUsingWrapped(modulepath);
 			}
 
@@ -2260,25 +2260,23 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				if (val.startsWith("-Xbootclasspath"))
 					hasBootCp = true;
 				if (val.startsWith("-D")) {
-					int idx = val.indexOf("=");
-					/* Make sure jvmarg's are quoted */
-					if (idx != -1 && !val.substring(idx + 1).startsWith("\"")) {
-						val = val.substring(0, idx) + "=\"" + val.substring(idx + 1) + "\"";
-					}
+					command.add(new Argument(ArgumentType.VALUED_OPTION, val));
 				}
-				command.add(val);
+				else
+					command.add(new Argument(ArgumentType.OPTION, val));
 			}
 			for (Object key : systemProperties.keySet()) {
-				command.add("-D" + key + "=\"" + systemProperties.getProperty((String) key) + "\"");
+				command.add(new Argument(ArgumentType.VALUED_OPTION, "-D" + key + "=" + systemProperties.getProperty((String) key)));
 			}
 
 			for (String val : configuration.getOptionValues("system")) {
 				int idx = val.indexOf("=");
 				/* Make sure jvmarg's are quoted */
 				if (idx != -1 && !val.substring(idx + 1).startsWith("\"")) {
-					val = val.substring(0, idx) + "=\"" + val.substring(idx + 1) + "\"";
+					command.add(new Argument(ArgumentType.VALUED_OPTION, val = val.substring(0, idx) + "=" + val.substring(idx + 1)));
 				}
-				command.add("-D" + val);
+				else
+					command.add(new Argument(ArgumentType.OPTION, "-D" + val));
 			}
 
 			if (configuration.getSwitch("debug", false)) {
@@ -2293,11 +2291,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					 * for it
 					 */
 					if (bootClasspath != null && bootClasspath.startsWith("+"))
-						command.add("-Xbootclasspath/a:" + bootcp);
+						command.add(new Argument(ArgumentType.VALUED_EXTENDED_OPTION, "-Xbootclasspath/a:" + bootcp));
 					else if (bootClasspath != null && bootClasspath.startsWith("-"))
-						command.add("-Xbootclasspath/p:" + bootcp);
+						command.add(new Argument(ArgumentType.VALUED_EXTENDED_OPTION, "-Xbootclasspath/p:" + bootcp));
 					else
-						command.add("-Xbootclasspath:" + bootcp);
+						command.add(new Argument(ArgumentType.VALUED_EXTENDED_OPTION, "-Xbootclasspath:" + bootcp));
 				}
 			}
 
@@ -2321,9 +2319,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				appBuilder.environment().put("FORKER_INFO_ATTEMPTS", String.valueOf(times));
 			} else {
 				if (lastRetVal > -1) {
-					command.add(String.format("-Dforker.info.lastExitCode=%d", lastRetVal));
+					command.add(new Argument(String.format("-Dforker.info.lastExitCode=%d", lastRetVal)));
 				}
-				command.add(String.format("-Dforker.info.attempts=%d", times));
+				command.add(new Argument(String.format("-Dforker.info.attempts=%d", times)));
 			}
 		}
 
@@ -2332,88 +2330,99 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		 * classpath and execute the application via that, passing the forker daemon
 		 * cookie via stdin. *
 		 */
-		List<String> headArgs = new ArrayList<>();
+		List<Argument> headArgs = new ArrayList<>();
 		if (useDaemon) {
 			if (isUsingWrappedOnModulepath) {
 				if (modulepath != null && isUsingClient(modulepath)) {
-					command.add("--add-modules");
-					command.add(com.sshtools.forker.client.Forker.class.getPackageName());
+					command.add(new Argument("--add-modules"));
+					command.add(new Argument(com.sshtools.forker.client.Forker.class.getPackageName()));
 				}
-				headArgs.add(WRAPPED_MODULE_NAME + "/" + WRAPPED_CLASS_NAME);
-				headArgs.add(com.sshtools.forker.client.Forker.class.getName());
+				headArgs.add(new Argument(WRAPPED_MODULE_NAME + "/" + WRAPPED_CLASS_NAME));
+				headArgs.add(new Argument(com.sshtools.forker.client.Forker.class.getName()));
 
 			} else if (isUsingWrappedOnClasspath) {
-				headArgs.add(WRAPPED_CLASS_NAME);
-				headArgs.add(com.sshtools.forker.client.Forker.class.getName());
+				headArgs.add(new Argument(WRAPPED_CLASS_NAME));
+				headArgs.add(new Argument(com.sshtools.forker.client.Forker.class.getName()));
 			} else {
 				if (modulepath != null && isUsingClient(modulepath)) {
-					headArgs.add("-m");
-					headArgs.add(com.sshtools.forker.client.Forker.class.getPackageName() + "/"
-							+ com.sshtools.forker.client.Forker.class.getName());
+					headArgs.add(new Argument("-m"));
+					headArgs.add(new Argument(com.sshtools.forker.client.Forker.class.getPackageName() + "/"
+							+ com.sshtools.forker.client.Forker.class.getName()));
 				} else
-					headArgs.add(com.sshtools.forker.client.Forker.class.getName());
+					headArgs.add(new Argument(com.sshtools.forker.client.Forker.class.getName()));
 			}
-			headArgs.add(String.valueOf(OS.isAdministrator()));
-			tail.add(app.getClassname());
+			headArgs.add(new Argument(String.valueOf(OS.isAdministrator())));
+			tail.add(new Argument(app.getClassname()));
 			if (app.hasArguments())
-				tail.addAll(Arrays.asList(app.getArguments()));
+				for(String arg : app.getArguments())
+					tail.add(new Argument(arg));
 		} else {
 			/*
 			 * Otherwise we are just running the application directly or via Wrapped
 			 */
 			if (modulepath != null && StringUtils.isNotBlank(app.getModule())) {
-				command.add("--add-modules");
-				command.add(app.getModule());
+				command.add(new Argument("--add-modules"));
+				command.add(new Argument(app.getModule()));
 			}
 
 			if (isUsingWrappedOnModulepath) {
-				headArgs.add("-m");
-				headArgs.add(WRAPPED_MODULE_NAME + "/" + WRAPPED_CLASS_NAME);
-				tail.add(app.getClassname());
+				headArgs.add(new Argument("-m"));
+				headArgs.add(new Argument(WRAPPED_MODULE_NAME + "/" + WRAPPED_CLASS_NAME));
+				tail.add(new Argument(app.getClassname()));
 			} else if (isUsingWrappedOnClasspath) {
-				headArgs.add(WRAPPED_CLASS_NAME);
-				tail.add(app.getClassname());
+				headArgs.add(new Argument(WRAPPED_CLASS_NAME));
+				tail.add(new Argument(app.getClassname()));
 			} else {
 				if (StringUtils.isNotBlank(app.getModule())) {
-					headArgs.add("-m");
-					tail.add(app.fullClassAndModule());
+					headArgs.add(new Argument("-m"));
+					tail.add(new Argument(app.fullClassAndModule()));
 				} else
-					tail.add(app.getClassname());
+					tail.add(new Argument(app.getClassname()));
 			}
-			if (app.hasArguments())
-				tail.addAll(Arrays.asList(app.getArguments()));
+			if (app.hasArguments()) {
+				for(String arg : app.getArguments())
+					tail.add(new Argument(arg));
+			}
 		}
-
-		appBuilder.command().addAll(head);
+		for(Argument arg : head) {
+			appBuilder.command().add(arg.toProcessBuildArgument());
+		}
 		if (argfileMode.equals(ArgfileMode.ARGFILE) || argfileMode.equals(ArgfileMode.COMPACT)) {
 			String argfilePath = configuration.getOptionValue("argfile", "");
 			if (argfilePath.equals("")) {
 				try (PrintWriter w = new PrintWriter(new FileWriter(new File(cwd, "app.args")), true)) {
-					for (String arg : command) {
-						w.println(arg);
+					for (Argument arg : command) {
+						w.println(arg.toArgFileLine());
 					}
 					argfilePath = "app.args";
 				} catch (IOException ioe) {
 					argfilePath = File.createTempFile("app", "args").getAbsolutePath();
 					try (PrintWriter w = new PrintWriter(new FileWriter(argfilePath), true)) {
-						for (String arg : command) {
-							w.println(arg);
+						for (Argument arg : command) {
+							w.println(arg.toArgFileLine());
 						}
 					}
 				}
 			} else {
 				try (PrintWriter w = new PrintWriter(new FileWriter(argfilePath), true)) {
-					for (String arg : command) {
-						w.println(arg);
+					for (Argument arg : command) {
+						w.println(arg.toArgFileLine());
 					}
 				}
 			}
 			appBuilder.command().add("@" + argfilePath);
 		} else {
-			appBuilder.command().addAll(command);
+			for(Argument arg : headArgs) {
+				appBuilder.command().add(arg.toProcessBuildArgument());
+			}
 		}
-		appBuilder.command().addAll(headArgs);
-		appBuilder.command().addAll(tail);
+
+		for(Argument arg : headArgs) {
+			appBuilder.command().add(arg.toProcessBuildArgument());
+		}
+		for(Argument arg : tail) {
+			appBuilder.command().add(arg.toProcessBuildArgument());
+		}
 
 		/* Process priority */
 		String priStr = configuration.getOptionValue("priority", null);
@@ -2465,7 +2474,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		return new String[] { key, value };
 	}
 
-	private void addDebugOptions(List<String> command) {
+	private void addDebugOptions(List<Argument> command) {
 		String spec = configuration.getOptionValue("debug", "").trim();
 		if (!spec.equals("false")) {
 			Map<String, String> debugProperties = new LinkedHashMap<>();
@@ -2493,7 +2502,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				propStr.append("=");
 				propStr.append(en.getValue());
 			}
-			command.add("-Xrunjdwp:" + propStr.toString());
+			command.add(new Argument("-Xrunjdwp:" + propStr.toString()));
 			logger.log(Level.WARNING,
 					String.format("Remote debugging enabled on port %s", debugProperties.get("address")));
 			if ("y".equals(debugProperties.get("suspend"))) {
