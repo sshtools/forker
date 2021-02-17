@@ -1502,7 +1502,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				}
 				if (StringUtils.isNotBlank(forkerClasspath)) {
 					fb.command().add("-classpath");
-					fb.command().add(forkerClasspath);
+					fb.command().add("\"" + forkerClasspath + "\"");
 				}
 				for (String s : Arrays.asList("java.library.path", "jna.library.path")) {
 					if (System.getProperty(s) != null)
