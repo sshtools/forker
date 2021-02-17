@@ -1502,7 +1502,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				}
 				if (StringUtils.isNotBlank(forkerClasspath)) {
 					fb.command().add("-classpath");
-					fb.command().add("\"" + forkerClasspath + "\"");
+					fb.command().add(forkerClasspath);
 				}
 				for (String s : Arrays.asList("java.library.path", "jna.library.path")) {
 					if (System.getProperty(s) != null)
@@ -2243,7 +2243,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			String classpath = buildPath(cwd, isNoForkerClasspath() ? null : forkerClasspath, wrapperClasspath, true);
 			if (classpath != null && !classpath.equals("")) {
 				command.add("-classpath");
-				command.add(classpath);
+				command.add("\"" + classpath + "\"");
 				isUsingWrappedOnClasspath = isUsingWrapped(classpath);
 			}
 
@@ -2251,7 +2251,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			modulepath = buildPath(cwd, isNoForkerClasspath() ? null : forkerModulepath, wrapperModulePath, true);
 			if (modulepath != null && !modulepath.equals("")) {
 				command.add("-p");
-				command.add(modulepath);
+				command.add("\"" + modulepath + "\"");
 				isUsingWrappedOnModulepath = isUsingWrapped(modulepath);
 			}
 
