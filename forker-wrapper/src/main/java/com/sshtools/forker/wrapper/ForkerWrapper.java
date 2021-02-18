@@ -2298,7 +2298,10 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				else
 					return "other";
 			} else if (key.equals("arch")) {
-				return System.getProperty("os.arch");
+				String arch = System.getProperty("os.arch");
+				if(arch.equals("amd64"))
+					return "x86_64";
+				return arch;
 			} else
 				return System.getProperty(key);
 		});
