@@ -2288,6 +2288,17 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				return file.getParentFile().getPath();
 			} else if (key.equals("user.home")) {
 				return System.getProperty(key).replace("\\", "/");
+			} else if (key.equals("os")) {
+				if(SystemUtils.IS_OS_WINDOWS)
+					return "win";
+				else if(SystemUtils.IS_OS_MAC_OSX)
+					return "osx";
+				else if(SystemUtils.IS_OS_LINUX)
+					return "linux";
+				else
+					return "other";
+			} else if (key.equals("arch")) {
+				return System.getProperty("os.arch");
 			} else
 				return System.getProperty(key);
 		});
