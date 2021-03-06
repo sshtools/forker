@@ -18,6 +18,7 @@ import com.sun.jna.platform.win32.Winsvc.SC_HANDLE;
 import com.sun.jna.platform.win32.Winsvc.SERVICE_FAILURE_ACTIONS;
 import com.sun.jna.platform.win32.Winsvc.SERVICE_STATUS_HANDLE;
 import com.sun.jna.ptr.IntByReference;
+import com.sun.jna.ptr.PointerByReference;
 import com.sun.jna.win32.W32APIOptions;
 
 /**
@@ -587,6 +588,9 @@ public interface XAdvapi32 extends Advapi32 {
 
 	boolean QueryServiceConfig(SC_HANDLE hService, QUERY_SERVICE_CONFIG lpServiceConfig, int cbBufSize,
 			IntByReference pcbBytesNeeded);
+	
+	boolean ConvertStringSecurityDescriptorToSecurityDescriptor(String sddl, int sddlVersion, PointerByReference psd,
+                                                            IntByReference length);
 
 	SC_HANDLE OpenSCManagerW(String lpMachineName, String lpDatabaseName, DWORD dwDesiredAccess);
 
