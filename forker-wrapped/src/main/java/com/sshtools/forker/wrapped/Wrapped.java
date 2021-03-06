@@ -1,6 +1,7 @@
 package com.sshtools.forker.wrapped;
 
 import java.lang.management.ManagementFactory;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -27,6 +28,7 @@ public class Wrapped implements WrappedMXBean {
 	private Thread monitor;
 	private boolean runMonitor = true;
 	private Object monitorLock = new Object();
+	private Method mainMethod;
 
 	public static Wrapped get() {
 		return instance;
@@ -77,7 +79,8 @@ public class Wrapped implements WrappedMXBean {
 		Class<?> clazz = loader.loadClass(classname);
 
 		/* Launch */
-		clazz.getMethod("main", String[].class).invoke(null, new Object[] { argList.toArray(new String[0]) });
+		mainMethod = clazz.getMethod("main", String[].class);
+		mainMethod.invoke(null, new Object[] { argList.toArray(new String[0]) });
 	}
 
 	protected void startMonitor() {
@@ -119,10 +122,19 @@ public class Wrapped implements WrappedMXBean {
 
 	@Override
 	public int launch(String[] xargs) {
-		for (int i = launchListeners.size() - 1; i >= 0; i--) {
-			int ret = launchListeners.get(i).launch(xargs);
-			if (ret != Integer.MIN_VALUE)
-				return ret;
+		if(launchListeners.size() == 0) {
+			try {
+				mainMethod.invoke(null, (Object)xargs);
+			} catch (Exception e) {
+				throw new IllegalStateException("Failed to launch.", e);
+			}
+		}
+		else {
+			for (int i = launchListeners.size() - 1; i >= 0; i--) {
+				int ret = launchListeners.get(i).launch(xargs);
+				if (ret != Integer.MIN_VALUE)
+					return ret;
+			}
 		}
 		return 0;
 	}
