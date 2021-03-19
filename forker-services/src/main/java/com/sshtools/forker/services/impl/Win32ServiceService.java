@@ -17,6 +17,7 @@ import com.sshtools.forker.services.ServiceService;
 import com.sshtools.forker.services.ServicesContext;
 import com.sun.jna.Native;
 import com.sun.jna.platform.win32.Advapi32;
+import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.platform.win32.W32Service;
 import com.sun.jna.platform.win32.W32ServiceManager;
 import com.sun.jna.platform.win32.Win32Exception;
@@ -111,7 +112,17 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 			try {
 				W32Service srv = smgr.openService(service.getNativeName(), WinNT.GENERIC_ALL);
 				try {
-					srv.startService();
+					srv.waitForNonPendingState();
+			        if (srv.queryStatus().dwCurrentState == Winsvc.SERVICE_RUNNING) {
+			            return;
+			        }
+			        if (!Advapi32.INSTANCE.StartService(srv.getHandle(), 0, null)) {
+			            throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+			        }
+			        timedWaitForNonPendingState(srv, 10000);
+			        if (srv.queryStatus().dwCurrentState != Winsvc.SERVICE_RUNNING) {
+			            throw new RuntimeException("Unable to start the service");
+			        }
 				} finally {
 					srv.close();
 				}
@@ -120,6 +131,68 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 			}
 		}
 	}
+	
+    void timedWaitForNonPendingState(W32Service srv, long timeout) {
+
+        SERVICE_STATUS_PROCESS status = srv.queryStatus();
+        status.dwWaitHint = (int)timeout;
+
+        int previousCheckPoint = status.dwCheckPoint;
+        int checkpointStartTickCount = Kernel32.INSTANCE.GetTickCount();
+
+        while (isPendingState(status.dwCurrentState)) {
+
+            // if the checkpoint advanced, start new tick count
+            if (status.dwCheckPoint != previousCheckPoint) {
+                previousCheckPoint = status.dwCheckPoint;
+                checkpointStartTickCount = Kernel32.INSTANCE.GetTickCount();
+            }
+
+            // if the time that passed is greater than the wait hint - throw timeout exception
+            if (Kernel32.INSTANCE.GetTickCount() - checkpointStartTickCount > status.dwWaitHint) {
+                throw new RuntimeException("Timeout waiting for service to change to a non-pending state.");
+            }
+
+            int dwWaitTime = sanitizeWaitTime(status.dwWaitHint);
+
+            try {
+                Thread.sleep(dwWaitTime);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
+            status = srv.queryStatus();
+            status.dwWaitHint = (int)timeout;
+        }
+    }
+
+    private boolean isPendingState(int state) {
+        switch (state) {
+            case Winsvc.SERVICE_CONTINUE_PENDING:
+            case Winsvc.SERVICE_STOP_PENDING:
+            case Winsvc.SERVICE_PAUSE_PENDING:
+            case Winsvc.SERVICE_START_PENDING:
+                return true;
+            default:
+                return false;
+        }
+    }
+    
+    /**
+     * do not wait longer than the wait hint. A good interval is one-tenth the
+     * wait hint, but no less than 1 second and no more than 10 seconds.
+     */
+    int sanitizeWaitTime(int dwWaitHint) {
+        int dwWaitTime = dwWaitHint / 10;
+
+        if (dwWaitTime < 1000) {
+            dwWaitTime = 1000;
+        } else if (dwWaitTime > 10000) {
+            dwWaitTime = 10000;
+        }
+        return dwWaitTime;
+    }
+
 
 	@Override
 	public void stopService(Service service) throws Exception {
