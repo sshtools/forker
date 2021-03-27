@@ -1643,7 +1643,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		options.addOption(OptionSpec.builder("-A", "--apparg").paramLabel("apparg").type(String.class).description(
 				"Application arguments. How these are treated depends on argmode, but by default the will be overridden by any command line arguments passed in.")
 				.build());
-		options.addOption(OptionSpec.builder("-H", "--splashes").paramLabel("image-path").type(String.class).description(
+		options.addOption(OptionSpec.builder("-H", "--splash").paramLabel("image-path").type(String.class).description(
 				"Specify a splash image. May be specified multiple times, the first existing file will be found, and added the appropriate option added to the launcher. ")
 				.build());
 		options.addOption(OptionSpec.builder("-P", "--priority").paramLabel("priority").type(String.class)
@@ -2501,7 +2501,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					boolean wasDaemon = isDaemon();
 					String wasPidfile = configuration.getOptionValue("pidfile", null);
 					List<String> wasJvmArgs = configuration.getOptionValues("jvmarg");
-					List<String> wasSplashes = configuration.getOptionValues("splashes");
+					List<String> wasSplashes = configuration.getOptionValues("splash");
 					List<String> wasSyspropArgs = configuration.getOptionValues("system");
 					boolean wasSingleInstance = isSingleInstance();
 					boolean wasQuietStdErr = isQuietStderr();
@@ -2538,7 +2538,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 							|| !Objects.equals(wasBootClasspath, configuration.getOptionValue("boot-classpath", null))
 							|| !Objects.equals(wasNativeMain, isNativeMain())
 							|| !Objects.equals(wasJvmArgs, configuration.getOptionValues("jvmarg"))
-							|| !Objects.equals(wasSplashes, configuration.getOptionValues("splashes"))
+							|| !Objects.equals(wasSplashes, configuration.getOptionValues("splash"))
 							|| !Objects.equals(wasSyspropArgs, configuration.getOptionValues("system"))
 							|| !Objects.equals(wasSingleInstance, isSingleInstance())) {
 						fullRestart = restart = true;
@@ -2861,7 +2861,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				isUsingWrappedOnModulepath = isUsingWrapped(modulepath);
 			}
 
-			for (String val : configuration.getOptionValues("splashes")) {
+			for (String val : configuration.getOptionValues("splash")) {
 				if(new File(val).exists()) {
 					command.add(new Argument(ArgumentType.VALUED_OPTION, "-splash:" + val));
 					break;
