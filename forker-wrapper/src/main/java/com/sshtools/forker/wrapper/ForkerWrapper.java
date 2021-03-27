@@ -2862,7 +2862,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			}
 
 			for (String val : configuration.getOptionValues("splash")) {
+				val = val.replace('/', File.separatorChar);
+				val = val.replace('\\', File.separatorChar);
+				logger.log(Level.INFO, "Looking for splash @ " + val);
 				if(new File(val).exists()) {
+					logger.log(Level.INFO, "Using splash @ " + val);
 					command.add(new Argument(ArgumentType.VALUED_OPTION, "-splash:" + val));
 					break;
 				}
