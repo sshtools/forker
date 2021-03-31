@@ -74,15 +74,11 @@ import com.sshtools.forker.client.EffectiveUserFactory;
 import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.client.OSCommand;
 import com.sshtools.forker.common.CSystem;
-import com.sshtools.forker.common.Cookie.Instance;
 import com.sshtools.forker.common.IO;
 import com.sshtools.forker.common.OS;
 import com.sshtools.forker.common.Priority;
 import com.sshtools.forker.common.Util;
 import com.sshtools.forker.common.Util.TeeOutputStream;
-import com.sshtools.forker.daemon.CommandHandler;
-import com.sshtools.forker.daemon.Forker;
-import com.sshtools.forker.daemon.Forker.Client;
 import com.sshtools.forker.wrapper.JVM.Version;
 import com.sun.tools.attach.AttachNotSupportedException;
 import com.sun.tools.attach.VirtualMachine;
@@ -180,20 +176,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			STARTED_FORKER_DAEMON, STARTED_APPLICATION, STARTING_APPLICATION, RESTARTING_APPLICATION,
 			APPPLICATION_STOPPED };
 	
-	/** The Constant CROSSPLATFORM_PATH_SEPARATOR. */
-	private static final String CROSSPLATFORM_PATH_SEPARATOR = ";|:";
-
 	/** The app. */
 	private WrappedApplication app = new WrappedApplication();
 	
 	/** The configuration. */
 	private Configuration configuration = new Configuration();
-	
-	/** The daemon. */
-	private Forker daemon;
-	
-	/** The cookie. */
-	private Instance cookie;
 	
 	/** The process. */
 	private Process process;
@@ -449,8 +436,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	 */
 	@SuppressWarnings("resource")
 	public int start() throws IOException, InterruptedException {
-		if (!inited)
+		if (!inited) {
 			init(null);
+		}
 
 		for (WrapperPlugin plugin : plugins) {
 			plugin.start();
@@ -467,7 +455,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		String forkerModulepath = System.getProperty("java.module.path");
 		String bootClasspath = configuration.getOptionValue("boot-classpath", null);
 		final boolean nativeMain = configuration.getSwitch("native", false);
-		final boolean useDaemon = !nativeMain && !configuration.getSwitch("no-forker-daemon", nativeMain);
+		if(configuration.getSwitch("no-forker-daemon", false)) {
+			logger.log(Level.WARNING, String.format("no-forker-daemon option is no longer required, forker-daemon no longer exists."));
+		}
 		List<String> jvmArgs = configuration.getOptionValues("jvmarg");
 		List<String> systemProperties = configuration.getOptionValues("system");
 		if (nativeMain && StringUtils.isNotBlank(configuration.getOptionValue("classpath", null))) {
@@ -504,7 +494,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		FileLock lock = null;
 		FileChannel lockChannel = null;
 		File lockFile = getLockFile();
-		addShutdownHook(useDaemon);
 		try {
 			if (isSingleInstance()) {
 				lockChannel = new RandomAccessFile(lockFile, "rw").getChannel();
@@ -558,8 +547,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					retval = noFork(daemonize, wrapperClasspath, forkerClasspath, times, lastRetVal);
 				} else {
 					retval = forked(javaExe, wrapperClasspath, wrapperModulepath, forkerClasspath, forkerModulepath,
-							bootClasspath, nativeMain, useDaemon, daemonize, times, lastRetVal, quietStdErr,
-							quietStdOut, logoverwrite);
+							bootClasspath, nativeMain, daemonize, times, lastRetVal, quietStdErr, quietStdOut,
+							logoverwrite);
 
 				}
 
@@ -620,7 +609,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	 * @param forkerModulepath the forker modulepath
 	 * @param bootClasspath the boot classpath
 	 * @param nativeMain the native main
-	 * @param useDaemon the use daemon
 	 * @param daemonize the daemonize
 	 * @param times the times
 	 * @param lastRetVal the last ret val
@@ -633,22 +621,15 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	 * @throws InterruptedException the interrupted exception
 	 */
 	protected int forked(String javaExe, String wrapperClasspath, String wrapperModulepath, String forkerClasspath,
-			String forkerModulepath, String bootClasspath, final boolean nativeMain, final boolean useDaemon,
-			boolean daemonize, int times, int lastRetVal, boolean quietStdErr, boolean quietStdOut,
-			boolean logoverwrite) throws IOException, UnsupportedEncodingException, InterruptedException {
+			String forkerModulepath, String bootClasspath, final boolean nativeMain, boolean daemonize,
+			int times, int lastRetVal, boolean quietStdErr, boolean quietStdOut, boolean logoverwrite) throws IOException, UnsupportedEncodingException, InterruptedException {
 		int retval;
 		/* Build the command to launch the application itself */
 		ForkerBuilder appBuilder = buildCommand(javaExe, forkerClasspath, forkerModulepath, wrapperClasspath,
-				wrapperModulepath, bootClasspath, nativeMain, useDaemon, times, lastRetVal);
+				wrapperModulepath, bootClasspath, nativeMain, times, lastRetVal);
 		for (WrapperPlugin plugin : plugins) {
 			if (plugin.buildCommand(appBuilder))
 				break;
-		}
-
-		daemon = null;
-		cookie = null;
-		if (useDaemon) {
-			startForkerDaemon();
 		}
 
 		monitorConfigurationFiles();
@@ -663,7 +644,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		event(STARTED_APPLICATION, app.fullClassAndModule());
 
 		/* The process is now started, capture the streams and log or sink them */
-		retval = captureStreams(resolveCwd(), useDaemon, daemonize, quietStdErr, quietStdOut, logoverwrite);
+		retval = captureStreams(resolveCwd(), daemonize, quietStdErr, quietStdOut, logoverwrite);
 		return retval;
 	}
 
@@ -1078,7 +1059,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	 * @return the string
 	 */
 	private String resolveWrapperModulepath() {
-		String forkerModulepath = System.getProperty("java.module.path");
+		String forkerModulepath = System.getProperty("jdk.module.path");
 		String wrapperClasspath = configuration.getOptionValue("modulepath", forkerModulepath);
 		return wrapperClasspath;
 	}
@@ -1826,38 +1807,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	}
 
 	/**
-	 * Start forker daemon.
-	 *
-	 * @throws IOException Signals that an I/O exception has occurred.
-	 */
-	protected void startForkerDaemon() throws IOException {
-		/*
-		 * Prepare to start a forker daemon. The client application may (if it wishes)
-		 * include the forker-client module and use the daemon to execute administrator
-		 * commands and perform other forker daemon operations.
-		 */
-		daemon = new Forker();
-		daemon.setIsolated(true);
-		/* Prepare command permissions if there are any */
-		CommandHandler cmd = daemon.getHandler(CommandHandler.class);
-		CheckCommandPermission permi = cmd.getExecutor(CheckCommandPermission.class);
-		permi.setAllow(configuration.getOptionValues("allow-execute"));
-		permi.setReject(configuration.getOptionValues("reject-execute"));
-		cookie = daemon.prepare();
-		event(STARTING_FORKER_DAEMON, cookie.getCookie(), String.valueOf(cookie.getPort()));
-		new Thread() {
-			@Override
-			public void run() {
-				try {
-					daemon.start(cookie);
-					event(STARTED_FORKER_DAEMON, cookie.getCookie(), String.valueOf(cookie.getPort()));
-				} catch (IOException e) {
-				}
-			}
-		}.start();
-	}
-
-	/**
 	 * Checks if is no fork.
 	 *
 	 * @return true, if is no fork
@@ -1966,9 +1915,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	/**
 	 * Adds the shutdown hook.
 	 *
-	 * @param useDaemon the use daemon
 	 */
-	protected void addShutdownHook(final boolean useDaemon) {
+	protected void addShutdownHook() {
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			@Override
 			public void run() {
@@ -1979,34 +1927,16 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 				logger.info("In Shutdown Hook");
 				Process p = process;
-				Forker f = daemon;
 				if (p != null && usingWrapped) {
 					logger.info("Shutting down via JMX as host applicaction is using the forker-wrapped module.");
 					shutdownWrapped();
 					p = null;
 				}
-				if (p != null && useDaemon && f != null) {
-					/*
-					 * Close the client control connection. This will cause the wrapped process to
-					 * System.exit(), and so cleanly shutdown
-					 */
-					List<Client> clients = f.getClients();
-					synchronized (clients) {
-						for (Client c : clients) {
-							if (c.getType() == 2) {
-								try {
-									logger.info("Closing control connection");
-									c.close();
-								} catch (IOException e) {
-								}
-							}
-						}
-					}
-				} else {
-					/* Not using daemon, so just destroy process */
-					if (p != null)
-						p.destroy();
-				}
+				
+				/* Not using daemon, so just destroy process */
+				if (p != null)
+					p.destroy();
+				
 				if (p != null) {
 					final Thread current = Thread.currentThread();
 					Thread exitWaitThread = null;
@@ -2186,21 +2116,21 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					logger.info("Monitoring pings from wrapped application");
 					try {
 						while (!stopping) {
-							if (process != null && daemon != null) {
-								WrapperHandler wrapper = daemon.getHandler(WrapperHandler.class);
-								int timeout = Integer.parseInt(configuration.getOptionValue("timeout", "60"));
-								if (wrapper.getLastPing() > 0
-										&& (wrapper.getLastPing() + timeout * 1000) <= System.currentTimeMillis()) {
-									logger.warning(String.format(
-											"Process has not sent a ping in %d seconds, attempting to terminate",
-											timeout));
-									tempRestartOnExit = true;
-									/*
-									 * TODO may need to be more forceful than this, e.g. OS kill
-									 */
-									process.destroy();
-								}
-							}
+//							if (process != null && daemon != null) {
+//								WrapperHandler wrapper = daemon.getHandler(WrapperHandler.class);
+//								int timeout = Integer.parseInt(configuration.getOptionValue("timeout", "60"));
+//								if (wrapper.getLastPing() > 0
+//										&& (wrapper.getLastPing() + timeout * 1000) <= System.currentTimeMillis()) {
+//									logger.warning(String.format(
+//											"Process has not sent a ping in %d seconds, attempting to terminate",
+//											timeout));
+//									tempRestartOnExit = true;
+//									/*
+//									 * TODO may need to be more forceful than this, e.g. OS kill
+//									 */
+//									process.destroy();
+//								}
+//							}
 							Thread.sleep(1000);
 						}
 					} catch (InterruptedException ie) {
@@ -2693,7 +2623,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	 * Capture streams.
 	 *
 	 * @param cwd the cwd
-	 * @param useDaemon the use daemon
 	 * @param daemonize the daemonize
 	 * @param quietStdErr the quiet std err
 	 * @param quietStdOut the quiet std out
@@ -2703,15 +2632,10 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	 * @throws UnsupportedEncodingException the unsupported encoding exception
 	 * @throws InterruptedException the interrupted exception
 	 */
-	private int captureStreams(File cwd, final boolean useDaemon, boolean daemonize, boolean quietStdErr,
-			boolean quietStdOut, boolean logoverwrite)
+	private int captureStreams(File cwd, boolean daemonize, boolean quietStdErr, boolean quietStdOut,
+			boolean logoverwrite)
 			throws IOException, UnsupportedEncodingException, InterruptedException {
 		int retval;
-		if (useDaemon) {
-			process.getOutputStream().write(cookie.toString().getBytes("UTF-8"));
-			process.getOutputStream().write("\r\n".getBytes("UTF-8"));
-			process.getOutputStream().flush();
-		}
 		String logpath = configuration.getOptionValue("log", null);
 		String errpath = configuration.getOptionValue("errors", null);
 		if (errpath == null)
@@ -2784,7 +2708,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				if (!stopping)
 					throw ioe;
 			}
-			retval = process.waitFor();
+			finally {
+				retval = process.waitFor();
+			}
 		} finally {
 			if (inThread != null) {
 				inThread.interrupt();
@@ -2795,9 +2721,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			}
 			if (errlog != null && errlog != outlog && !errlog.equals(defaultErr)) {
 				errlog.close();
-			}
-			if (daemon != null) {
-				daemon.shutdown(true);
 			}
 		}
 		return retval;
@@ -2821,7 +2744,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	 */
 	private ForkerBuilder buildCommand(String javaExe, String forkerClasspath, String forkerModulepath,
 			String wrapperClasspath, String wrapperModulePath, String bootClasspath, final boolean nativeMain,
-			final boolean useDaemon, int times, int lastRetVal) throws IOException {
+			int times, int lastRetVal) throws IOException {
 
 		ForkerBuilder appBuilder = new ForkerBuilder();
 		String modulepath = null;
@@ -2942,65 +2865,35 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			}
 		}
 
-		/*
-		 * If the daemon should be used, we assume that forker-client is on the
-		 * classpath and execute the application via that, passing the forker daemon
-		 * cookie via stdin. *
-		 */
 		List<Argument> headArgs = new ArrayList<>();
-		if (useDaemon) {
-			if (isUsingWrappedOnModulepath) {
-				if (modulepath != null && isUsingClient(modulepath)) {
-					command.add(new Argument("--add-modules"));
-					command.add(new Argument(com.sshtools.forker.client.Forker.class.getPackageName()));
-				}
-				headArgs.add(new Argument(WRAPPED_MODULE_NAME + "/" + WRAPPED_CLASS_NAME));
-				headArgs.add(new Argument(com.sshtools.forker.client.Forker.class.getName()));
 
-			} else if (isUsingWrappedOnClasspath) {
-				headArgs.add(new Argument(WRAPPED_CLASS_NAME));
-				headArgs.add(new Argument(com.sshtools.forker.client.Forker.class.getName()));
-			} else {
-				if (modulepath != null && isUsingClient(modulepath)) {
-					headArgs.add(new Argument("-m"));
-					headArgs.add(new Argument(com.sshtools.forker.client.Forker.class.getPackageName() + "/"
-							+ com.sshtools.forker.client.Forker.class.getName()));
-				} else
-					headArgs.add(new Argument(com.sshtools.forker.client.Forker.class.getName()));
-			}
-			headArgs.add(new Argument(String.valueOf(OS.isAdministrator())));
-			tail.add(new Argument(app.getClassname()));
-			if (app.hasArguments())
-				for(String arg : app.getArguments())
-					tail.add(new Argument(arg));
-		} else {
-			/*
-			 * Otherwise we are just running the application directly or via Wrapped
-			 */
-			if (modulepath != null && StringUtils.isNotBlank(app.getModule())) {
-				command.add(new Argument("--add-modules"));
-				command.add(new Argument(app.getModule()));
-			}
-
-			if (isUsingWrappedOnModulepath) {
-				headArgs.add(new Argument("-m"));
-				headArgs.add(new Argument(WRAPPED_MODULE_NAME + "/" + WRAPPED_CLASS_NAME));
-				tail.add(new Argument(app.getClassname()));
-			} else if (isUsingWrappedOnClasspath) {
-				headArgs.add(new Argument(WRAPPED_CLASS_NAME));
-				tail.add(new Argument(app.getClassname()));
-			} else {
-				if (StringUtils.isNotBlank(app.getModule())) {
-					headArgs.add(new Argument("-m"));
-					tail.add(new Argument(app.fullClassAndModule()));
-				} else
-					tail.add(new Argument(app.getClassname()));
-			}
-			if (app.hasArguments()) {
-				for(String arg : app.getArguments())
-					tail.add(new Argument(arg));
-			}
+		/*
+		 * We are just running the application directly or via Wrapped
+		 */
+		if (modulepath != null && StringUtils.isNotBlank(app.getModule())) {
+			command.add(new Argument("--add-modules"));
+			command.add(new Argument(app.getModule()));
 		}
+
+		if (isUsingWrappedOnModulepath) {
+			headArgs.add(new Argument("-m"));
+			headArgs.add(new Argument(WRAPPED_MODULE_NAME + "/" + WRAPPED_CLASS_NAME));
+			tail.add(new Argument(app.getClassname()));
+		} else if (isUsingWrappedOnClasspath) {
+			headArgs.add(new Argument(WRAPPED_CLASS_NAME));
+			tail.add(new Argument(app.getClassname()));
+		} else {
+			if (StringUtils.isNotBlank(app.getModule())) {
+				headArgs.add(new Argument("-m"));
+				tail.add(new Argument(app.fullClassAndModule()));
+			} else
+				tail.add(new Argument(app.getClassname()));
+		}
+		if (app.hasArguments()) {
+			for(String arg : app.getArguments())
+				tail.add(new Argument(arg));
+		}
+
 		for(Argument arg : head) {
 			appBuilder.command().add(arg.toProcessBuildArgument());
 		}
@@ -3139,22 +3032,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			}
 		}
 
-	}
-
-	/**
-	 * Checks if is using client.
-	 *
-	 * @param path the path
-	 * @return true, if is using client
-	 */
-	private boolean isUsingClient(String path) {
-		if (path == null)
-			return false;
-		for (String p : path.split(File.pathSeparator)) {
-			if (p.matches(".*forker-client.*\\.jar"))
-				return true;
-		}
-		return false;
 	}
 
 	/**

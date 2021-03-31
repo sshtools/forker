@@ -164,6 +164,42 @@ public interface CSystem extends Library {
 	int geteuid();
 
 	/**
+	 * Sets the effective group ID of the calling process. If the calling process 
+	 * is privileged (more precisely: has the CAP_SETGID capability in its user namespace), 
+	 * the real GID and saved set-group-ID are also set.
+	 * 
+	 * @param gid
+	 *            gid
+	 * @return On success, zero is returned. On error, -1 is returned, and errno
+	 *         is set appropriately.
+	 */
+	int setgid(int gid);
+
+	/**
+	 * Set effective user or group ID.
+	 * 
+	 * @param egid
+	 *            egid
+	 * @return On success, zero is returned. On error, -1 is returned, and errno
+	 *         is set appropriately.
+	 */
+	int setegid(int egid);
+
+	/**
+	 * Returns the real group ID of the calling process.
+	 * 
+	 * @return real group ID of the calling process..
+	 */
+	int getgid();
+
+	/**
+	 * Returns the effective group ID of the calling process.
+	 * 
+	 * @return effective group ID of the calling process..
+	 */
+	int getegid();
+
+	/**
 	 * Creates a new process by duplicating the calling process. The new
 	 * process, referred to as the child, is an exact duplicate of the calling
 	 * process, referred to as the parent, except for the following points:

@@ -2,12 +2,11 @@ package com.sshtools.forker.examples;
 
 import java.io.IOException;
 
-import com.sshtools.forker.client.Forker;
 import com.sshtools.forker.client.ShellBuilder;
-import com.sshtools.forker.client.impl.ForkerDaemonProcess.Listener;
 import com.sshtools.forker.common.OS;
 import com.sshtools.forker.common.Util;
-import com.sshtools.forker.pty.PTYExecutor;
+import com.sshtools.forker.pty.PTYProcess;
+import com.sshtools.forker.pty.PTYProcess.PTYProcessListener;
 
 /**
  * This example shows how to create an interactive shell. 
@@ -23,20 +22,16 @@ public class Shell {
 		 */
 		OS.unbufferedStdin();
 		
-		/* PTY requires the daemon, so load it now (or connect to an existing one if you
-		 * have started it yourself). */
-		Forker.loadDaemon();
-//		Forker.connectDaemon(new Instance("NOAUTH:57872"));
 		
 		/* ShellBuilder is a specialisation of ForkerBuilder */
 		ShellBuilder shell = new ShellBuilder();
-		shell.io(PTYExecutor.PTY);
+		shell.io(PTYProcess.PTY);
 		
 		/* Demonstrate we are actually in a different shell by setting PS1 */
 		shell.environment().put("MYENV", "An environment variable");
 		
 		/* Start the shell, giving it a window size listener */
-		final Process p = shell.start(new Listener() {
+		final Process p = shell.start(new PTYProcessListener() {
 			@Override
 			public void windowSizeChanged(int ptyWidth, int ptyHeight) {
 				System.out.println("Window size changed to " + ptyWidth + " x " + ptyHeight);

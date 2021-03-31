@@ -23,20 +23,17 @@ import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.UIManager;
 
-import com.sshtools.forker.common.Userenv;
 import com.sshtools.forker.common.Util;
 import com.sshtools.forker.common.XAdvapi32;
 import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.platform.win32.Kernel32Util;
 import com.sun.jna.platform.win32.Shell32;
-import com.sun.jna.platform.win32.WinBase;
 import com.sun.jna.platform.win32.WinBase.PROCESS_INFORMATION;
 import com.sun.jna.platform.win32.WinBase.SECURITY_ATTRIBUTES;
 import com.sun.jna.platform.win32.WinBase.STARTUPINFO;
 import com.sun.jna.platform.win32.WinDef.INT_PTR;
 import com.sun.jna.platform.win32.WinNT.HANDLEByReference;
 import com.sun.jna.ptr.IntByReference;
-import com.sun.jna.ptr.PointerByReference;
 
 /**
  * A helper application to launch a command as another user on Windows

@@ -4,12 +4,11 @@ import java.io.Console;
 import java.io.IOException;
 
 import com.sshtools.forker.client.EffectiveUserFactory.DefaultEffectiveUserFactory;
-import com.sshtools.forker.client.Forker;
 import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.client.ShellBuilder;
 import com.sshtools.forker.common.OS;
 import com.sshtools.forker.common.Util;
-import com.sshtools.forker.pty.PTYExecutor;
+import com.sshtools.forker.pty.PTYProcess;
 
 /**
  * Launch an interactive login shell as a particular user using a Pseudo
@@ -27,13 +26,7 @@ public class ShellAsUser {
 		 */
 		OS.unbufferedStdin();
 
-		/*
-		 * Run the daemon itself as an administrator. This should popup a
-		 * password request (if supported on platform)
-		 */
-		Forker.loadDaemon(true);
-
-		ForkerBuilder shell = new ShellBuilder().loginShell(true).io(PTYExecutor.PTY).redirectErrorStream(true);
+		ForkerBuilder shell = new ShellBuilder().loginShell(true).io(PTYProcess.PTY).redirectErrorStream(true);
 
 		/*
 		 * Run the shell as the user that launches this class. Any valid UID

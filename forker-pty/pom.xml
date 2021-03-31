@@ -26,7 +26,7 @@
 	<dependencies>
 		<dependency>
 			<groupId>${project.groupId}</groupId>
-			<artifactId>forker-daemon</artifactId>
+			<artifactId>forker-client</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>

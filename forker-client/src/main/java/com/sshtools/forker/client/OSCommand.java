@@ -63,26 +63,76 @@ public class OSCommand {
 	 * If it works for you now, it may not work in the future. It may help you find
 	 * a more robust solution for your application.
 	 * 
-	 * @param appClass main class, this will be what is launched and should
-	 *                      contain a main(String[]) method
-	 * @param args          original command line arguments to pass back on the
-	 *                      re-launched application.
+	 * @param args original command line arguments to pass back on the re-launched
+	 *             application.
+	 */
+	public static void restartAsAdministrator(String[] args) {
+		restartAsAdministrator(null, args);
+	}
+
+	/**
+	 * A very simplistic mechanism for restarting an application as an administrator
+	 * (on supported platforms).
+	 * <p>
+	 * If it works for you now, it may not work in the future. It may help you find
+	 * a more robust solution for your application.
+	 * 
+	 * @param appClass main class, this will be what is launched and should contain
+	 *                 a main(String[]) method
+	 * @param args     original command line arguments to pass back on the
+	 *                 re-launched application.
 	 */
 	public static void restartAsAdministrator(Class<?> appClass, String[] args) {
+		restartAsAdministrator(null, appClass, args);
+	}
+
+	/**
+	 * A very simplistic mechanism for restarting an application as an administrator
+	 * (on supported platforms).
+	 * <p>
+	 * If it works for you now, it may not work in the future. It may help you find
+	 * a more robust solution for your application.
+	 * 
+	 * @param module   the module name or null
+	 * @param appClass main class, this will be what is launched and should contain
+	 *                 a main(String[]) method
+	 * @param args     original command line arguments to pass back on the
+	 *                 re-launched application.
+	 */
+	public static void restartAsAdministrator(String module, Class<?> appClass, String[] args) {
 		if (System.getProperty("forker.restartingAsAdministrator") != null)
 			return;
+		
+		// TODO jdk.module.upgrade.path  The upgrade module path
 
 		List<String> aargs = new ArrayList<>();
 		String forkerClasspath = System.getProperty("java.class.path");
+		String modulepath = System.getProperty("jdk.module.path");
 		aargs.add(OS.getJavaPath());
-		aargs.add("-classpath");
-		aargs.add(forkerClasspath);
+		if (StringUtils.isNotBlank(forkerClasspath)) {
+			aargs.add("-classpath");
+			aargs.add(forkerClasspath);
+		}
+		if (StringUtils.isNotBlank(modulepath)) {
+			aargs.add("-p");
+			aargs.add(modulepath);
+		}
 		for (String s : Arrays.asList("java.library.path", "jna.library.path")) {
 			if (System.getProperty(s) != null)
 				aargs.add("-D" + s + "=" + System.getProperty(s));
 		}
 		aargs.add("-Dforker.restartingAsAdministrator=true");
-		aargs.add(appClass.getName());
+		if (module == null)
+			module = System.getProperty("jdk.module.main");
+		String clazzname = System.getProperty("jdk.module.main.class", null);
+		if (appClass != null)
+			clazzname = appClass.getName();
+		if (module != null) {
+			aargs.add("-m");
+			aargs.add(module + "/" + clazzname);
+		} else
+			aargs.add(clazzname);
+		aargs.addAll(Arrays.asList(args));
 		try {
 			OSCommand.admin(aargs);
 		} catch (IOException e) {
@@ -460,7 +510,7 @@ public class OSCommand {
 		if (cwd != null) {
 			builder.directory(cwd);
 		}
-		if(IO.SINK != builder.io())
+		if (IO.SINK != builder.io())
 			builder.redirectErrorStream(true);
 		Process process = builder.start();
 		InputStream inputStream = process.getInputStream();
@@ -527,17 +577,17 @@ public class OSCommand {
 	 * This is achieved by trying to reconstruct the java command that was used to
 	 * launch this application from system properties and arguments.
 	 * <p>
-	 * NOTE: MUST must called from the callers main() method (as
-	 * the stack is examined to determine the main class to load). If you are
-	 * calling from elsewhere, use the alternative version of the method that takes
-	 * a main classname argument.
+	 * NOTE: MUST must called from the callers main() method (as the stack is
+	 * examined to determine the main class to load). If you are calling from
+	 * elsewhere, use the alternative version of the method that takes a main
+	 * classname argument.
 	 * 
 	 * @param args application arguments
 	 * @return elevated app launched
 	 * @throws IOException on error
 	 */
 	public static boolean elevateApp(String[] args) throws IOException {
-		return elevateApp(args, (Set<String>)null);
+		return elevateApp(args, (Set<String>) null);
 	}
 
 	/**
@@ -547,12 +597,12 @@ public class OSCommand {
 	 * This is achieved by trying to reconstruct the java command that was used to
 	 * launch this application from system properties and arguments.
 	 * <p>
-	 * NOTE: MUST must called from the callers main() method (as
-	 * the stack is examined to determine the main class to load). If you are
-	 * calling from elsewhere, use the alternative version of the method that takes
-	 * a main classname argument.
+	 * NOTE: MUST must called from the callers main() method (as the stack is
+	 * examined to determine the main class to load). If you are calling from
+	 * elsewhere, use the alternative version of the method that takes a main
+	 * classname argument.
 	 * 
-	 * @param args application arguments
+	 * @param args                     application arguments
 	 * @param systemPropertiesToPassOn which system properties to pass on
 	 * @return elevated app launched
 	 * @throws IOException on error
@@ -593,13 +643,14 @@ public class OSCommand {
 	 * <code>true</code> is returned then the caller should immediately
 	 * System.exit() as an elevated copy should be starting.
 	 * 
-	 * @param args          application arguments
-	 * @param mainClassName main class name
+	 * @param args                     application arguments
+	 * @param mainClassName            main class name
 	 * @param systemPropertiesToPassOn which system properties to pass on
 	 * @return elevated app launched
 	 * @throws IOException on error
 	 */
-	public static boolean elevateApp(String[] args, String mainClassName, Set<String> systemPropertiesToPassOn) throws IOException {
+	public static boolean elevateApp(String[] args, String mainClassName, Set<String> systemPropertiesToPassOn)
+			throws IOException {
 		if (OS.isAdministrator())
 			return false;
 		else {
@@ -613,7 +664,7 @@ public class OSCommand {
 					vargs.add(cp);
 				}
 				Set<String> p = new LinkedHashSet<>();
-				if(systemPropertiesToPassOn != null) {
+				if (systemPropertiesToPassOn != null) {
 					systemPropertiesToPassOn.addAll(systemPropertiesToPassOn);
 				}
 				p.addAll(Arrays.asList("java.library.path", "jna.library.path", "java.security.policy"));
@@ -716,18 +767,17 @@ public class OSCommand {
 	 * @return command exists on path
 	 */
 	public static boolean hasCommand(String command) {
-		if("false".equals(System.getProperty("forker.noCommandExistenceCache", "false"))) {
-			synchronized(commandCache) {
-				Boolean val = commandCache.get(command); 
-				if(val == null) {
+		if ("false".equals(System.getProperty("forker.noCommandExistenceCache", "false"))) {
+			synchronized (commandCache) {
+				Boolean val = commandCache.get(command);
+				if (val == null) {
 					boolean exists = doHasCommand(command);
 					commandCache.put(command, exists);
 					return exists;
 				}
 				return val;
 			}
-		}
-		else
+		} else
 			return doHasCommand(command);
 	}
 
@@ -948,7 +998,7 @@ public class OSCommand {
 		if (cwd != null) {
 			pb.directory(cwd);
 		}
-		if(IO.SINK != pb.io())
+		if (IO.SINK != pb.io())
 			pb.redirectErrorStream(true);
 		Process p = pb.start();
 		Util.copy(p.getInputStream(), out);
@@ -1031,7 +1081,7 @@ public class OSCommand {
 		if (cwd != null) {
 			pb.directory(cwd);
 		}
-		if(IO.SINK != pb.io())
+		if (IO.SINK != pb.io())
 			pb.redirectErrorStream(true);
 		final Process p = pb.start();
 		final BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
@@ -1109,7 +1159,7 @@ public class OSCommand {
 			if (cwd != null) {
 				pb.directory(cwd);
 			}
-			if(IO.SINK != pb.io())
+			if (IO.SINK != pb.io())
 				pb.redirectErrorStream(true);
 			Process p = pb.start();
 			Collection<String> lines = Util.readLines(p.getInputStream());
@@ -1179,7 +1229,7 @@ public class OSCommand {
 			if (cwd != null) {
 				pb.directory(cwd);
 			}
-			if(IO.SINK != pb.io())
+			if (IO.SINK != pb.io())
 				pb.redirectErrorStream(true);
 			checkElevationAndEnvironment(pb);
 			Process p = pb.start();
@@ -1226,15 +1276,8 @@ public class OSCommand {
 			pb.environment().putAll(env);
 		}
 		if (Boolean.TRUE.equals(elevated.get())) {
-			if (Forker.isDaemonRunning()) {
-				pb.effectiveUser(new EffectiveUserFactory.POSIXUIDEffectiveUser(0));
-			} else {
-				pb.effectiveUser(sudoPassword == null ? EffectiveUserFactory.getDefault().administrator()
-						: new SudoFixedPasswordUser(sudoPassword));
-			}
-		} else {
-			if (Forker.isDaemonRunningAsAdministrator())
-				pb.effectiveUser(new EffectiveUserFactory.POSIXUsernameEffectiveUser(System.getProperty("user.name")));
+			pb.effectiveUser(sudoPassword == null ? EffectiveUserFactory.getDefault().administrator()
+					: new SudoFixedPasswordUser(sudoPassword));
 		}
 	}
 

@@ -42,20 +42,6 @@
 		
 		<dependency>
 			<groupId>com.sshtools</groupId>
-			<artifactId>forker-daemon</artifactId>
-			<version>${project.version}</version>
-			<type>jar</type>
-			<scope>compile</scope>
-		</dependency>
-		<dependency>
-			<groupId>com.sshtools</groupId>
-			<artifactId>forker-daemon</artifactId>
-			<version>${project.version}</version>
-			<classifier>javadoc</classifier>
-		</dependency>
-		
-		<dependency>
-			<groupId>com.sshtools</groupId>
 			<artifactId>forker-wrapper</artifactId>
 			<version>${project.version}</version>
 			<type>jar</type>

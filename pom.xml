@@ -69,7 +69,6 @@
 	<modules>
 		<module>forker-updater-maven-plugin</module>
 		<module>forker-common</module>
-		<module>forker-daemon</module>
 		<module>forker-updater</module>
 		<module>forker-updater-console</module>
 		<module>forker-updater-swt</module>

@@ -12,7 +12,6 @@ import java.util.Map;
 
 import org.apache.commons.lang3.SystemUtils;
 
-import com.sshtools.forker.client.impl.ForkerDaemonProcess;
 import com.sshtools.forker.client.ui.AskPass;
 import com.sshtools.forker.client.ui.AskPassConsole;
 import com.sshtools.forker.client.ui.WinRunAs;
@@ -139,6 +138,8 @@ public abstract class EffectiveUserFactory {
 			String javaExe = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
 			if (SystemUtils.IS_OS_WINDOWS)
 				javaExe += ".exe";
+			
+			
 			String cp = null;
 			String fullCp = System.getProperty("java.class.path", "");
 			for (String p : fullCp.split(File.pathSeparator)) {
@@ -146,12 +147,38 @@ public abstract class EffectiveUserFactory {
 					cp = p;
 				}
 			}
-			if (cp == null) {
+			
+			String mp = null;
+			String fullMp = System.getProperty("jdk.module.path", "");
+			for (String p : fullMp.split(File.pathSeparator)) {
+				if (p.contains("forker-client")) {
+					mp = p;
+				}
+			}
+			if (mp == null && cp == null) {
 				// Couldn't find just forker-common for some reason, just
 				// add everything
 				cp = fullCp;
 			}
-			return "\"" + javaExe + "\" -classpath \"" + cp + "\" " + clazz.getName();
+			StringBuilder b = new StringBuilder();
+			b.append("\"");
+			b.append(javaExe);
+			b.append("\" ");
+			if(cp != null) {
+				b.append(" -classpath \"");
+				b.append(cp);
+				b.append("\"");
+			}
+			if(mp != null) {
+				b.append(" -p \"");
+				b.append(mp);
+				b.append("\"");
+			}
+			b.append(" ");
+			if(mp != null)
+				b.append("-m com.sshtools.forker.client/");
+			b.append(clazz.getName());
+			return b.toString();
 		}
 	}
 
@@ -222,9 +249,7 @@ public abstract class EffectiveUserFactory {
 				public void elevate(ForkerBuilder builder, Process process, Command command) {
 					if (elevated)
 						throw new IllegalStateException("Already elevated.");
-					if ((Forker.isDaemonRunning() && !Forker.isDaemonRunningAsAdministrator()
-							&& process instanceof ForkerDaemonProcess)
-							|| (!OS.isAdministrator() && !(process instanceof ForkerDaemonProcess))) {
+					if (!OS.isAdministrator()) {
 						user.elevate(builder, process, command);
 						elevated = true;
 					}
@@ -602,33 +627,25 @@ public abstract class EffectiveUserFactory {
 
 		@Override
 		public void elevate(ForkerBuilder builder, Process process, Command command) {
-			if (process instanceof ForkerDaemonProcess) {
-				if (setRemote)
-					descend(builder, process, command);
-				was = command.getRunAs();
-				command.setRunAs(username);
-				setRemote = true;
+			List<String> cmd = builder.command();
+			original = new ArrayList<String>(cmd);
+			cmd.clear();
+			cmd.add(OS.getJavaPath());
+			cmd.add("-classpath");
+			cmd.add(Forker.getForkerClasspath());
+			cmd.add(WinRunAs.class.getName());
+			if (username.equals(OS.getAdministratorUsername()) && command.getIO() == IO.SINK) {
+				cmd.add("--uac");
 			} else {
-				List<String> cmd = builder.command();
-				original = new ArrayList<String>(cmd);
-				cmd.clear();
-				cmd.add(OS.getJavaPath());
-				cmd.add("-classpath");
-				cmd.add(Forker.getForkerClasspath());
-				cmd.add(WinRunAs.class.getName());
-				if (username.equals(OS.getAdministratorUsername()) && command.getIO() == IO.SINK) {
-					cmd.add("--uac");
-				} else {
-					cmd.add("--username");
-					cmd.add(username);
-					if (password != null) {
-						command.getEnvironment().put("W32RUNAS_PASSWORD", new String(password));
-					}
+				cmd.add("--username");
+				cmd.add(username);
+				if (password != null) {
+					command.getEnvironment().put("W32RUNAS_PASSWORD", new String(password));
 				}
-				cmd.add("--");
-				cmd.addAll(original);
-				System.out.println(cmd);
 			}
+			cmd.add("--");
+			cmd.addAll(original);
+			System.out.println(cmd);
 		}
 	}
 
@@ -958,15 +975,10 @@ public abstract class EffectiveUserFactory {
 
 		@Override
 		public void elevate(ForkerBuilder builder, Process process, Command command) {
-			if (process instanceof ForkerDaemonProcess) {
-				command.setRunAs(String.valueOf(value));
-				setRemote = true;
-			} else {
-				if (was != Integer.MIN_VALUE)
-					throw new IllegalStateException();
-				was = CSystem.INSTANCE.geteuid();
-				doSet(value);
-			}
+			if (was != Integer.MIN_VALUE)
+				throw new IllegalStateException();
+			was = CSystem.INSTANCE.geteuid();
+			doSet(value);
 		}
 
 		public T getValue() {

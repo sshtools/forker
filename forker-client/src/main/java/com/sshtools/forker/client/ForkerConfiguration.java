@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.ServiceLoader;
 
 import com.sshtools.forker.client.impl.DefaultProcessFactory;
-import com.sshtools.forker.client.impl.ForkerDaemonProcessFactory;
 import com.sshtools.forker.client.impl.LocalProcessFactory;
 import com.sshtools.forker.client.impl.POpenProcessFactory;
 import com.sshtools.forker.client.impl.SystemProcessFactory;
@@ -31,7 +30,6 @@ public abstract class ForkerConfiguration {
 		processFactories.add(new POpenProcessFactory());
 		processFactories.add(new SystemProcessFactory());
 		processFactories.add(new DefaultProcessFactory());
-		processFactories.add(new ForkerDaemonProcessFactory());
 		processFactories.add(new LocalProcessFactory());
 	}
 

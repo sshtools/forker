@@ -13,6 +13,7 @@ public class WrapperTest {
 		// fw.setProperty("quiet", true);
 		// fw.setProperty("level", "SEVERE");
 
+		fw.getWrappedApplication().setModule(WrappedTest.class.getPackageName());
 		fw.getWrappedApplication().setClassname(WrappedTest.class.getName());
 		fw.getWrappedApplication().setArguments("arg1");
 

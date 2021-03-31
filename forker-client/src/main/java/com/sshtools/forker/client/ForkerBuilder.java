@@ -55,7 +55,6 @@ public class ForkerBuilder {
 			throw new NullPointerException();
 		this.configuration = configuration;
 		this.command.getArguments().addAll(command);
-		initBuilder();
 	}
 
 	/**
@@ -69,7 +68,6 @@ public class ForkerBuilder {
 	public ForkerBuilder(ForkerConfiguration configuration, String... command) {
 		this.configuration = configuration;
 		this.command.getArguments().addAll(Arrays.asList(command));
-		initBuilder();
 	}
 
 	/**
@@ -492,11 +490,6 @@ public class ForkerBuilder {
 		return new IOException(
 				"Cannot run program \"" + prog + "\"" + (dir == null ? "" : " (in directory \"" + dir + "\")") + exceptionInfo,
 				cause);
-	}
-
-	protected void initBuilder() {
-		if (Forker.isDaemonRunning())
-			this.command.setIO(IO.DAEMON);
 	}
 
 	protected Process startLocalProcess() throws IOException {

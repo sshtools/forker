@@ -109,7 +109,7 @@ public class Configuration {
 	public List<String> getOptionValues(String key) {
 		synchronized (cfgLock) {
 			String os = getOsPrefix();
-			OptionSpec matchedOption = cmd.matchedOption(key);
+			OptionSpec matchedOption = cmd == null ? null : cmd.matchedOption(key);
 			if (matchedOption != null) {
 				return matchedOption.originalStringValues();
 			}
@@ -205,9 +205,11 @@ public class Configuration {
 
 	public void init(ParseResult cmd) {
 		this.cmd = cmd;
-		for(PositionalParamSpec p : cmd.matchedPositionals()) {
-			remaining.addAll(p.stringValues());
+		if(cmd != null) {
+			for(PositionalParamSpec p : cmd.matchedPositionals()) {
+				remaining.addAll(p.stringValues());
+			}
+			remaining.addAll(cmd.unmatched());
 		}
-		remaining.addAll(cmd.unmatched());
 	}
 }
