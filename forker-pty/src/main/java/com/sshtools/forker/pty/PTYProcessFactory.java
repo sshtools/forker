@@ -19,7 +19,7 @@ public class PTYProcessFactory implements ForkerProcessFactory {
 
 	@Override
 	public ForkerProcess createProcess(ForkerBuilder builder, ForkerProcessListener listener) throws IOException {
-		if (SystemUtils.IS_OS_UNIX && builder.io() == IO.SINK) {
+		if (SystemUtils.IS_OS_UNIX  && builder.io() == PTYProcess.PTY) {
 			if(listener instanceof NonBlockingProcessListener) {
 				throw new IllegalArgumentException(String.format("%s is not supported by %s, is your I/O mode set correctly (see %s.io(%s))", listener.getClass(), getClass(), ForkerBuilder.class, IO.class));
 			}

@@ -20,7 +20,7 @@ public class NativeForkWrapperTest {
 		fw.getWrappedApplication().setModule(NativeForkWrappedTest.class.getPackageName());
 		fw.getWrappedApplication().setClassname(NativeForkWrappedTest.class.getName());
 		fw.getWrappedApplication().setArguments("arg1");
-		fw.getConfiguration().setProperty("leve", "FINE");
+		fw.getConfiguration().setProperty("level", "FINE");
 		fw.getConfiguration().setProperty("native-fork", "true");
 		fw.getConfiguration().setProperty("daemon", "true");
 

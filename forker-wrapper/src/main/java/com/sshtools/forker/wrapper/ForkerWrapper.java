@@ -1456,18 +1456,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 						+ "the 'ShutdownListener' registered on the 'Wrapped' instance. If it is happy to stop, it should do it's "
 						+ "own clean up, then System.exit(). ")
 				.build());
-		options.addOption(OptionSpec.builder("-x", "--allow-execute").paramLabel("spec").type(String.class)
-				.description("The wrapped application can use it's wrapper to execute commands on it's behalf. If the "
-						+ "wrapper itself runs under an administrative user, and the application as a non-privileged user,"
-						+ "you may wish to restrict which commands may be run. One or more of these options specifies the "
-						+ "name of the command that may be run. The value may be a regular expression, see also 'prevent-execute'")
-				.build());
-		options.addOption(OptionSpec.builder("-X", "--reject-execute").paramLabel("pattern").type(String.class)
-				.description("The wrapped application can use it's wrapper to execute commands on it's behalf. If the "
-						+ "wrapper itself runs under an administrative user, and the application as a non-privileged user,"
-						+ "you may wish to restrict which commands may be run. One or more of these options specifies the "
-						+ "name of the commands that may NOT be run. The value may be a regular expression, see also 'allow-execute'")
-				.build());
 		options.addOption(OptionSpec.builder("-F", "--no-forker-classpath")
 				.description("When the forker daemon is being used, the wrappers own classpath will be appened to "
 						+ "to the application classpath. This option prevents that behaviour for example if "
@@ -1495,9 +1483,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				.description("How long (in seconds) to wait before attempting a restart.").build());
 		options.addOption(OptionSpec.builder("-d", "--daemon")
 				.description("Fork the process and exit, leaving it running in the background.").build());
-		options.addOption(OptionSpec.builder("-n", "--no-forker-daemon").description(
-				"Do not enable the forker daemon. This will prevent the forked application from executing elevated commands via the daemon and will also disable JVM timeout detection.")
-				.build());
 		options.addOption(OptionSpec.builder("-q", "--quiet")
 				.description("Do not output anything on stderr or stdout from the wrapped process.").build());
 		options.addOption(OptionSpec.builder("-z", "--quiet-stderr")
@@ -1680,6 +1665,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		options.addPositional(PositionalParamSpec.builder().paramLabel("arguments").type(String.class).arity("1..*")
 				.description("All other arguments to pass on to the wrapped application.").build());
 
+		/* TODO: remove this */
+		options.addOption(OptionSpec.builder("-n", "--no-forker-daemon").description(
+				"DEPRECATED: This option is no longer used and will be removed entirely in version 1.8.")
+				.build());
+		
 		options.name(getAppName());
 	}
 

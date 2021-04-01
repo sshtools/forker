@@ -4,6 +4,6 @@ import com.sshtools.forker.common.IO.DefaultIO;
 
 public final class PTYIO extends DefaultIO {
 	public PTYIO() {
-		super("PTY", false, true, true, true);
+		super("PTY", true, false, true, true);
 	}
 }
