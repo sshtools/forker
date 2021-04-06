@@ -17,7 +17,6 @@ import com.pty4j.util.Pair;
 import com.pty4j.util.PtyUtil;
 import com.pty4j.windows.WinPty;
 import com.pty4j.windows.WinPtyProcess;
-import com.sshtools.forker.client.EffectiveUser;
 import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.client.ForkerProcess;
 import com.sshtools.forker.client.ForkerProcessListener;
