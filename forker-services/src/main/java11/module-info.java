@@ -9,5 +9,6 @@ module com.sshtools.forker.services {
 	requires transitive org.freedesktop.dbus;
 	requires transitive de.thjom.java.systemd;
 	exports com.sshtools.forker.services;
+	exports com.sshtools.forker.services.impl;
 
 }

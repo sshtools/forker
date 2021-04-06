@@ -212,6 +212,19 @@ public interface CSystem extends Library {
 	int fork();
 
 	/**
+	 * The kill() function shall send a signal to a process or a group of processes 
+	 * specified by pid. The signal to be sent is specified by sig and is either 
+	 * one from the list given in <signal.h> or 0. If sig is 0 (the null signal), 
+	 * error checking is performed but no signal is actually sent. The null signal 
+	 * can be used to check the validity of pid. 
+	 *
+	 * @param pid PID
+	 * @param sig signal
+	 * @return Upon successful completion, 0 shall be returned. Otherwise, -1 shall be returned and errno set to indicate the error. 
+	 */
+	int kill(long pid, int sig);
+
+	/**
 	 * Operations on a process
 	 * 
 	 * @param option

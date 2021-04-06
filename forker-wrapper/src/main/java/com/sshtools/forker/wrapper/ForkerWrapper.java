@@ -494,6 +494,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		FileLock lock = null;
 		FileChannel lockChannel = null;
 		File lockFile = getLockFile();
+		addShutdownHook();
 		try {
 			if (isSingleInstance()) {
 				lockChannel = new RandomAccessFile(lockFile, "rw").getChannel();
@@ -1836,6 +1837,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				logger.info("Running in background using native fork");
 				int pid = CSystem.INSTANCE.fork();
 				if (pid > 0) {
+					logger.info(String.format("Forked to PID %d", pid));
 					if (pidfile != null) {
 						writeLines(makeDirectoryForFile(relativize(resolveCwd(), pidfile)),
 								Arrays.asList(String.valueOf(pid)));
@@ -1874,8 +1876,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				fb.background(true);
 				fb.io(IO.OUTPUT);
 				logger.info(String.format("Executing: %s", String.join(" ", fb.command())));
-				fb.start();
-				logger.info("Exiting initial runtime");
+				Process p = fb.start();
+				logger.info(String.format("Exiting initial runtime, forked process is %d", p.pid()));
 				return true;
 			}
 		} else {
@@ -1958,7 +1960,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 						} catch (IOException e1) {
 						}
 					} catch (InterruptedException e) {
-						p.destroy();
+						if(SystemUtils.IS_OS_UNIX) {
+							CSystem.INSTANCE.kill(p.pid(), 9);
+						}
+						else
+							p.destroy();
 					} finally {
 						if (exitWaitThread != null) {
 							exitWaitThread.interrupt();
@@ -2568,9 +2574,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				return retVal;
 		}
 
-		List<String> restartValues = Arrays.asList(configuration.getOptionValue("restart-on", "").split(","));
+		List<String> restartValues = Arrays.asList(configuration.getOptionValue("restart-on", "90,99").split(","));
 		List<String> dontRestartValues = new ArrayList<String>(
-				Arrays.asList(configuration.getOptionValue("dont-restart-on", "0,1,2").split(",")));
+				Arrays.asList(configuration.getOptionValue("dont-restart-on", "").split(",")));
 		dontRestartValues.removeAll(restartValues);
 		String strret = String.valueOf(retval);
 		event(APPPLICATION_STOPPED, strret, app.fullClassAndModule());
