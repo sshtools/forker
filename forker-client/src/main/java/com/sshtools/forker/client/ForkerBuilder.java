@@ -27,11 +27,6 @@ import com.sshtools.forker.common.Util;
  * provided for launching Java based processes using the same runtime (and
  * optionally classpath).
  * <p>
- * This class can also integrate with <i>Forker Daemon</i> to provide a way of
- * lowering fork costs of launching processes on Linux, pseudo terminals for
- * real interactive shells, persistent administrator access (
- * {@link Forker#loadDaemon(boolean)}) and access to administrator only files.
- * <p>
  * It can also integrate with <i>Forker Wrapper</i> to wrap Java or native
  * processes providing restart, logging, Java version detection and more.
  *
