@@ -12,8 +12,7 @@ import com.sshtools.forker.client.NonBlockingProcessListener;
 import com.sshtools.forker.common.IO;
 
 /**
- * Creates a {@link SystemProcess}.
- *
+ * Creates a {@link PTYProcess}.
  */
 public class PTYProcessFactory implements ForkerProcessFactory {
 
