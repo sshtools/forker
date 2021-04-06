@@ -214,7 +214,7 @@ public interface CSystem extends Library {
 	/**
 	 * The kill() function shall send a signal to a process or a group of processes 
 	 * specified by pid. The signal to be sent is specified by sig and is either 
-	 * one from the list given in <signal.h> or 0. If sig is 0 (the null signal), 
+	 * one from the list given in &lt;signal.h&gt; or 0. If sig is 0 (the null signal), 
 	 * error checking is performed but no signal is actually sent. The null signal 
 	 * can be used to check the validity of pid. 
 	 *
