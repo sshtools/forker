@@ -1,6 +1,6 @@
 package com.sshtools.forker.examples;
 
-/** This is the application that {@link NativeForkerWrapperTest} will launch */
+/** This is the application that {@link NativeForkWrapperTest} will launch */
 public class NativeForkWrappedTest {
 
 	public NativeForkWrappedTest() {

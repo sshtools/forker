@@ -1,6 +1,5 @@
 package com.sshtools.forker.examples;
 
-import com.sshtools.forker.client.OSCommand;
 import com.sshtools.forker.wrapper.ForkerWrapper;
 
 /**
