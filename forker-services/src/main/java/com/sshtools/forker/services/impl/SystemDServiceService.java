@@ -26,11 +26,11 @@ import java.util.logging.Logger;
 
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.output.NullOutputStream;
-import org.freedesktop.dbus.connections.impl.DBusConnection;
+import org.freedesktop.DBus.Properties;
+import org.freedesktop.DBus.Properties.PropertiesChanged;
+import org.freedesktop.dbus.DBusConnection;
+import org.freedesktop.dbus.DBusSigHandler;
 import org.freedesktop.dbus.exceptions.DBusException;
-import org.freedesktop.dbus.interfaces.DBusSigHandler;
-import org.freedesktop.dbus.interfaces.Properties;
-import org.freedesktop.dbus.interfaces.Properties.PropertiesChanged;
 
 import com.sshtools.forker.client.OSCommand;
 import com.sshtools.forker.services.AbstractService;
@@ -193,11 +193,8 @@ public class SystemDServiceService extends AbstractServiceService implements Ser
 			conn.addSigHandler(PropertiesChanged.class, new DBusSigHandler<PropertiesChanged>() {
 				@Override
 				public void handle(PropertiesChanged sig) {
-					if (sig.getInterfaceName().equals("org.freedesktop.systemd1.Service")) {
+					if (sig.getInterface().equals("org.freedesktop.systemd1.Service")) {
 						try {
-							LOG.info("Properties change: " + sig.getPath() + ", " + sig.getInterfaceName() + ", "
-									+ sig.getPropertiesChanged() + ", " + sig.getPropertiesRemoved());
-
 							Properties props = conn.getRemoteObject(Systemd.SERVICE_NAME, sig.getPath(),
 									Properties.class);
 							List<String> names = props.Get("org.freedesktop.systemd1.Unit", "Names");
