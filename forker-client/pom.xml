@@ -1,6 +1,6 @@
 <!--
 
-    Copyright © 2015 - 2018 SSHTOOLS Limited (support@sshtools.com)
+    Copyright © 2015 - 2021 SSHTOOLS Limited (support@sshtools.com)
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ Parts of the non-blocking API are based on NuProcess (https://github.com/brettwo
 	<parent>
 		<groupId>com.sshtools</groupId>
 		<artifactId>forker</artifactId>
-		<version>1.6.1</version>
+		<version>1.6.2</version>
 		<relativePath>..</relativePath>
 	</parent>
 
