@@ -1135,6 +1135,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	 */
 	public static void main(String[] args) {
 		ForkerWrapper wrapper = new ForkerWrapper();
+		wrapper.getWrappedApplication().setOriginalArgs(args);
 		wrapper.getWrappedApplication().setArguments(args);
 
 		CommandSpec opts = CommandSpec.create();
