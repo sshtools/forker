@@ -1875,7 +1875,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				// fb.command().add("--fderr=2");
 				fb.command().addAll(Arrays.asList(app.getOriginalArgs()));
 				fb.background(true);
-				fb.io(IO.OUTPUT);
 				logger.info(String.format("Executing: %s", String.join(" ", fb.command())));
 				Process p = fb.start();
 				logger.info(String.format("Exiting initial runtime, forked process is %d", p.pid()));
