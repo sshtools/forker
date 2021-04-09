@@ -85,4 +85,7 @@ public interface Kernel32 extends com.sun.jna.platform.win32.Kernel32 {
 	 */
 	HANDLE CreateNamedPipeW(WString name, int dwOpenMode, int dwPipeMode, int nMaxInstances,
 			int nOutBufferSize, int nInBufferSize, int nDefaultTimeOut, SECURITY_ATTRIBUTES securityAttributes);
+
+	/** BOOL SetCurrentDirectory( LPCTSTR lpPathName ); */
+	int SetCurrentDirectoryW(char[] pathName);
 }

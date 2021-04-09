@@ -263,6 +263,18 @@ public interface CSystem extends Library {
 	 * @return status
 	 */
 	int tcsetattr(int port, int mode, Termios termios);
+	
+	/**
+	 * This function shall cause the directory named by the pathname pointed to by
+	 * the path argument to become the current working directory; that is, the
+	 * starting point for path searches for pathnames not beginning with '/' .
+	 * 
+	 * @param path path
+	 * @return Upon successful completion, 0 shall be returned. Otherwise, -1 shall
+	 *         be returned, the current working directory shall remain unchanged,
+	 *         and errno shall be set to indicate the error.
+	 */
+	int chdir(String path);
 
 	/**
 	 * Represents a file pointer.

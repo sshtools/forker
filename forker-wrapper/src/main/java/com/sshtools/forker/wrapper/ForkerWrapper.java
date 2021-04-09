@@ -73,6 +73,7 @@ import org.apache.commons.lang3.SystemUtils;
 import com.sshtools.forker.client.EffectiveUserFactory;
 import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.client.OSCommand;
+import com.sshtools.forker.client.impl.jna.win32.Kernel32;
 import com.sshtools.forker.common.CSystem;
 import com.sshtools.forker.common.IO;
 import com.sshtools.forker.common.OS;
@@ -80,6 +81,7 @@ import com.sshtools.forker.common.Priority;
 import com.sshtools.forker.common.Util;
 import com.sshtools.forker.common.Util.TeeOutputStream;
 import com.sshtools.forker.wrapper.JVM.Version;
+import com.sun.jna.Native;
 import com.sun.tools.attach.AttachNotSupportedException;
 import com.sun.tools.attach.VirtualMachine;
 import com.sun.tools.attach.VirtualMachineDescriptor;
@@ -787,7 +789,22 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		usingWrapped = isUsingWrappedOnClasspath; // TODO || isUsingWrappedOnModulepath
 
 		/* Directory and IO */
-		// appBuilder.directory(cwd);
+		if(SystemUtils.IS_OS_UNIX) {
+			logger.info(String.format("chdir to %s", cwd));
+			if(CSystem.INSTANCE.chdir(cwd.getAbsolutePath()) != 0) {
+				throw new IllegalStateException(String.format("Failed to change directory to %s. %d", cwd, Native.getLastError()));
+			}
+			System.setProperty("user.dir", cwd.getAbsolutePath());
+		}
+		else if(SystemUtils.IS_OS_WINDOWS) {
+			logger.info(String.format("SetCurrentDirectoryW to %s", cwd));
+			if(Kernel32.INSTANCE.SetCurrentDirectoryW(cwd.getAbsolutePath().toCharArray()) == 0) {
+				throw new IllegalStateException(String.format("Failed to change directory to %s. %d", cwd, Native.getLastError()));
+			}
+			System.setProperty("user.dir", cwd.getAbsolutePath());
+		}
+		else
+			throw new UnsupportedOperationException(String.format("Cannot change directory.", cwd));
 
 		/* Environment variables */
 
@@ -1518,6 +1535,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 						+ "communicate things such as the last exited code (forker.info.lastExitCode), number "
 						+ "of times start via (forker.info.attempts) and more. This option prevents those being set.")
 				.build());
+		options.addOption(OptionSpec.builder("-nf", "--native-fork")
+				.description("Overwriite logfiles instead of appending.").build());
 		options.addOption(OptionSpec.builder("-o", "--log-overwrite")
 				.description("Overwriite logfiles instead of appending.").build());
 		options.addOption(OptionSpec.builder("-l", "--log").paramLabel("file").type(File.class).description(
@@ -1874,9 +1893,15 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				// fb.command().add("--fderr=2");
 				fb.command().addAll(Arrays.asList(app.getOriginalArgs()));
 				fb.background(true);
+				fb.io(IO.OUTPUT);
 				logger.info(String.format("Executing: %s", String.join(" ", fb.command())));
 				Process p = fb.start();
-				logger.info(String.format("Exiting initial runtime, forked process is %d", p.pid()));
+				try {
+					logger.info(String.format("Exiting initial runtime, forked process is %d", p.pid()));
+				}
+				catch(UnsupportedOperationException uoe) {
+					logger.info("Exiting initial runtime, PID cannot be determined.");
+				}
 				return true;
 			}
 		} else {
