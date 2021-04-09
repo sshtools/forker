@@ -13,8 +13,8 @@ public class WrappedApplication {
 
 	private String classname;
 	private String module;
-	private String[] arguments;
 	private String[] originalArgs;
+	private String[] arguments;
 
 	public void set(String main, String jar) throws IOException {
 		set(main, jar, null, null, null);
@@ -77,20 +77,12 @@ public class WrappedApplication {
 		this.module = module;
 	}
 
-	public void setArguments(String... arguments) {
-		this.arguments = arguments;
-	}
-
 	public String getClassname() {
 		return classname;
 	}
 
 	public String getModule() {
 		return module;
-	}
-
-	public String[] getArguments() {
-		return arguments;
 	}
 
 	private String readMain(String jar) throws IOException {
@@ -115,6 +107,10 @@ public class WrappedApplication {
 
 	public String fullClassAndModule() {
 		return StringUtils.isBlank(module) ? classname : module + "/" + classname;
+	}
+
+	public String[] getArguments() {
+		return arguments;
 	}
 
 	public List<String> getArgumentsList() {

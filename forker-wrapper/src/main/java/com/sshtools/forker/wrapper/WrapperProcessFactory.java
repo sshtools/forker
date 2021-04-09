@@ -202,7 +202,7 @@ public class WrapperProcessFactory implements ForkerProcessFactory {
 					wrapper.getConfiguration().getProperties().add(opt);
 				}
 				wrapper.getWrappedApplication().setClassname(allArgs.remove(0));
-				wrapper.getWrappedApplication().setArguments(allArgs.toArray(new String[0]));
+				wrapper.getConfiguration().setRemaining(allArgs.toArray(new String[0]));
 				WrapperProcessImpl wrapperProcessImpl = new WrapperProcessImpl(wrapper, builder.redirectErrorStream());
 				wrapperProcessImpl.start();
 				return wrapperProcessImpl;

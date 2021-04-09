@@ -1,6 +1,7 @@
 package com.sshtools.forker.wrapper;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -211,5 +212,10 @@ public class Configuration {
 			}
 			remaining.addAll(cmd.unmatched());
 		}
+	}
+
+	public void setRemaining(String... remaining) {
+		this.remaining.clear();
+		this.remaining.addAll(Arrays.asList(remaining));
 	}
 }

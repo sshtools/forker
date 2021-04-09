@@ -12,7 +12,7 @@ public class WrapperJavascriptTest {
 
 	public static void main(String[] args) throws Exception {
 		ForkerWrapper fw = new ForkerWrapper();
-		fw.getWrappedApplication().setArguments(args);
+		fw.getConfiguration().setRemaining(args);
 		fw.readConfigFile(new File("wrapper-javascript-test.cfg.js"));
 		
 		// Start and wait for wrapper to exit
