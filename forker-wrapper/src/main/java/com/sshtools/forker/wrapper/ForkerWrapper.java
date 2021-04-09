@@ -1869,7 +1869,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				 */
 				if (app.getOriginalArgs() == null)
 					throw new IllegalStateException("Original arguments must be set.");
-				ForkerBuilder fb = new ForkerBuilder(javaExe);
+				ForkerBuilder fb = new ForkerBuilder();
+				fb.command().add(javaExe);
 				if (StringUtils.isNotBlank(forkerModulepath)) {
 					fb.command().add("-p");
 					fb.command().add(forkerModulepath);
@@ -1893,7 +1894,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				// fb.command().add("--fderr=2");
 				fb.command().addAll(Arrays.asList(app.getOriginalArgs()));
 				fb.background(true);
-				fb.io(IO.OUTPUT);
+				fb.io(IO.IO);
 				logger.info(String.format("Executing: %s", String.join(" ", fb.command())));
 				Process p = fb.start();
 				try {
@@ -1911,6 +1912,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				writeLines(makeDirectoryForFile(relativize(resolveCwd(), pidfile)), Arrays.asList(String.valueOf(pid)));
 			}
 		}
+		logger.info("Continue fork");
 		return false;
 	}
 

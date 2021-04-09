@@ -115,7 +115,6 @@ public abstract class AbstractOSProcess extends ForkerProcess {
 			}
 			if (builder.background()) {
 				bui.append(")&");
-
 			}
 		} else {
 			throw new UnsupportedOperationException("OS not supported.");
