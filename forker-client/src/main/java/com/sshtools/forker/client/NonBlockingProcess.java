@@ -212,6 +212,11 @@ public abstract class NonBlockingProcess extends ForkerProcess {
 			return pipeErr;
 	}
 
+	@Override
+	public ProcessHandle toHandle() {
+		return ProcessHandle.of(getPID()).get();
+	}
+
 	/**
 	 * Get the process ID.
 	 * 

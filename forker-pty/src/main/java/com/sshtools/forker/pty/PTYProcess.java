@@ -97,6 +97,11 @@ public class PTYProcess extends ForkerProcess {
 	}
 
 	@Override
+	public ProcessHandle toHandle() {
+		return ProcessHandle.of(nativeProcess.getPid()).get();
+	}
+
+	@Override
 	public OutputStream getOutputStream() {
 		return nativeProcess.getOutputStream();
 	}

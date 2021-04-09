@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import com.sshtools.forker.client.EffectiveUser;
 import com.sshtools.forker.client.ForkerBuilder;
@@ -51,6 +52,21 @@ public class LocalProcess extends ForkerProcess {
 				effectiveUser.descend(builder, null, builder.getCommand());
 			}
 		}
+	}
+
+	@Override
+	public ProcessHandle toHandle() {
+		return nativeProcess.toHandle();
+	}
+
+	@Override
+	public Process destroyForcibly() {
+		return nativeProcess.destroyForcibly();
+	}
+
+	@Override
+	public boolean supportsNormalTermination() {
+		return nativeProcess.supportsNormalTermination();
 	}
 
 	@Override
