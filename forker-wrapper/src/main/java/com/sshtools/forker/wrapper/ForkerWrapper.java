@@ -1838,6 +1838,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	 */
 	protected boolean daemonize(String javaExe, String forkerClasspath, String forkerModulepath, boolean daemonize,
 			String pidfile) throws IOException {
+		int ppid = OS.getPID();
 		if (daemonize && configuration.getOptionValue("fallback-active", null) == null) {
 			if ("true".equals(configuration.getOptionValue("native-fork", "false"))) {
 				if (isNoFork())
@@ -1856,7 +1857,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				logger.info("Running in background using native fork");
 				int pid = CSystem.INSTANCE.fork();
 				if (pid > 0) {
-					logger.info(String.format("Forked to PID %d", pid));
+					logger.info(String.format("Forked to PID %d from %d", pid, ppid));
 					if (pidfile != null) {
 						writeLines(makeDirectoryForFile(relativize(resolveCwd(), pidfile)),
 								Arrays.asList(String.valueOf(pid)));
@@ -1907,9 +1908,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			}
 		} else {
 			if (pidfile != null) {
-				int pid = OS.getPID();
-				logger.info(String.format("Writing PID %d", pid));
-				writeLines(makeDirectoryForFile(relativize(resolveCwd(), pidfile)), Arrays.asList(String.valueOf(pid)));
+				logger.info(String.format("Writing PID %d", ppid));
+				writeLines(makeDirectoryForFile(relativize(resolveCwd(), pidfile)), Arrays.asList(String.valueOf(ppid)));
 			}
 		}
 		logger.info("Continue fork");
@@ -2835,7 +2835,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				int idx = val.indexOf("=");
 				/* Make sure jvmarg's are quoted */
 				if (idx != -1 && !val.substring(idx + 1).startsWith("\"")) {
-					command.add(new Argument(ArgumentType.VALUED_OPTION, val = val.substring(0, idx) + "=" + val.substring(idx + 1)));
+					command.add(new Argument(ArgumentType.VALUED_OPTION, "-D" + val.substring(0, idx) + "=" + val.substring(idx + 1)));
 				}
 				else
 					command.add(new Argument(ArgumentType.OPTION, "-D" + val));
