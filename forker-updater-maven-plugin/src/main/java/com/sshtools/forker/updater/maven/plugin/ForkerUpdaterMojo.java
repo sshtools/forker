@@ -188,9 +188,6 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 	@Parameter(defaultValue = "true", property = "include")
 	private boolean includeProject;
 
-	@Parameter(defaultValue = "false", property = "forkerDaemon")
-	private boolean forkerDaemon;
-
 	@Parameter(defaultValue = "2", property = "compress")
 	private int compress;
 
@@ -731,8 +728,6 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 			if (mp.size() > 0) {
 				out.println("modulepath " + String.join(File.pathSeparator, mp));
 			}
-			if (!forkerDaemon)
-				out.println("no-forker-daemon");
 			if (installLocation != null && !installLocation.equals(""))
 				out.println("install-location " + installLocation);
 			if (forkerArgs != null) {
