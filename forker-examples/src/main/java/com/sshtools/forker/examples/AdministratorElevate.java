@@ -1,12 +1,11 @@
 package com.sshtools.forker.examples;
 
-import org.apache.commons.lang3.SystemUtils;
-
 import com.sshtools.forker.client.EffectiveUser;
 import com.sshtools.forker.client.EffectiveUserFactory;
 import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.common.IO;
 import com.sshtools.forker.common.Util;
+import com.sun.jna.Platform;
 
 /**
  * Demonstrates elevating to administrator using {@link ForkerBuilder}.
@@ -19,10 +18,10 @@ public class AdministratorElevate {
 		
 		/* Create the builder */
 		ForkerBuilder builder = new ForkerBuilder().effectiveUser(administrator).io(IO.IO);
-		if (SystemUtils.IS_OS_LINUX) {
+		if (Platform.isLinux()) {
 			/* The linux example tries to list the shadow password file */
 			builder.redirectErrorStream(true).io(IO.IO).command("cat", "/etc/shadow");
-		} else if (SystemUtils.IS_OS_WINDOWS) {
+		} else if (Platform.isWindows()) {
 			/*
 			 * Windows try to create a filename protected by WRP
 			 * builder.command("dir", ">", "c:\\forker-test.exe");

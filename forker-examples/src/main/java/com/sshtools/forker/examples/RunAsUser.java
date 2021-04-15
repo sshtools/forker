@@ -1,12 +1,11 @@
 package com.sshtools.forker.examples;
 
-import org.apache.commons.lang3.SystemUtils;
-
 import com.sshtools.forker.client.EffectiveUser;
 import com.sshtools.forker.client.EffectiveUserFactory;
 import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.common.IO;
 import com.sshtools.forker.common.Util;
+import com.sun.jna.Platform;
 
 /**
  * Demonstrates running a command as another user.
@@ -27,7 +26,7 @@ public class RunAsUser {
 		ForkerBuilder builder = new ForkerBuilder().effectiveUser(user).
 				io(IO.IO).redirectErrorStream(true);
 		
-		if(SystemUtils.IS_OS_LINUX) {
+		if(Platform.isLinux()) {
 			// The linux example tries to list the users home directory
 			builder.command("id");
 		}

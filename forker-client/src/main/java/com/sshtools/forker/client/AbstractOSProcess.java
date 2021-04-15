@@ -4,9 +4,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Map;
 
-import org.apache.commons.lang3.SystemUtils;
-
+import com.sshtools.forker.common.OS;
 import com.sshtools.forker.common.Util;
+import com.sun.jna.Platform;
 
 /**
  * Abstract implementation for processes that use OS calls.
@@ -38,7 +38,7 @@ public abstract class AbstractOSProcess extends ForkerProcess {
 		// command line arguments
 		StringBuilder bui = new StringBuilder();
 
-		if (SystemUtils.IS_OS_WINDOWS) {
+		if (Platform.isWindows()) {
 			if (builder.background()) {
 				bui.append("start /b");
 
@@ -48,12 +48,6 @@ public abstract class AbstractOSProcess extends ForkerProcess {
 					bui.append("\"");
 				}
 
-				if (isLessThanWindows7()) {
-					// http://stackoverflow.com/questions/154075/using-the-dos-start-command-with-parameters-passed-to-the-started-program
-					// < Windows 7, if the first argument is quoted its the
-					// window title
-					bui.append(" \"\"");
-				}
 			} else {
 				bui.append("cmd /c");
 				if (builder.directory() != null) {
@@ -77,7 +71,7 @@ public abstract class AbstractOSProcess extends ForkerProcess {
 			if (!builder.background() && builder.directory() != null) {
 				bui.append("\"");
 			}
-		} else if (SystemUtils.IS_OS_MAC_OSX || SystemUtils.IS_OS_LINUX || SystemUtils.IS_OS_UNIX) {
+		} else if (OS.isUnix()) {
 			for (Map.Entry<String, String> en : builder.environment().entrySet()) {
 				if (bui.length() > 0) {
 					bui.append(";");
@@ -125,9 +119,5 @@ public abstract class AbstractOSProcess extends ForkerProcess {
 		return string;
 	}
 
-	private boolean isLessThanWindows7() {
-		return SystemUtils.IS_OS_WINDOWS_95 || SystemUtils.IS_OS_WINDOWS_98 || SystemUtils.IS_OS_WINDOWS_XP
-				|| SystemUtils.IS_OS_WINDOWS_2000 || SystemUtils.IS_OS_WINDOWS_ME || SystemUtils.IS_OS_WINDOWS_NT;
-	}
 
 }

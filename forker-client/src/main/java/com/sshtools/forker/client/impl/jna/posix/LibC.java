@@ -17,8 +17,6 @@ package com.sshtools.forker.client.impl.jna.posix;
 
 import java.nio.ByteBuffer;
 
-import org.apache.commons.lang3.SystemUtils;
-
 import com.sun.jna.Callback;
 import com.sun.jna.Library;
 import com.sun.jna.Native;
@@ -32,7 +30,7 @@ import com.sun.jna.ptr.IntByReference;
  */
 public class LibC {
 	static {
-		if (SystemUtils.IS_OS_MAC_OSX) {
+		if (Platform.isMac()) {
 			O_NONBLOCK = 0x0004; // MacOS X, Freebsd
 		} else {
 			O_NONBLOCK = 2048; // Linux

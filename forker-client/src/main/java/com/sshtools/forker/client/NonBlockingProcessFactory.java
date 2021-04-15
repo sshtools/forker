@@ -5,12 +5,11 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.lang3.SystemUtils;
-
 import com.sshtools.forker.client.impl.nonblocking.NonBlockingLinuxProcess;
 import com.sshtools.forker.client.impl.nonblocking.NonBlockingOsxProcess;
 import com.sshtools.forker.client.impl.nonblocking.NonBlockingWindowsProcess;
 import com.sshtools.forker.common.IO;
+import com.sun.jna.Platform;
 
 /**
  * Creates {@link NonBlockingProcess}.
@@ -194,11 +193,11 @@ public class NonBlockingProcessFactory implements ForkerProcessFactory {
 		}
 		NonBlockingProcess process;
 		try {
-			if (SystemUtils.IS_OS_LINUX && (builder.io() == IO.NON_BLOCKING))
+			if (Platform.isLinux() && (builder.io() == IO.NON_BLOCKING))
 				process = new NonBlockingLinuxProcess(builder, this, (NonBlockingProcessListener) listener);
-			else if (SystemUtils.IS_OS_MAC_OSX && (builder.io() == IO.NON_BLOCKING))
+			else if (Platform.isMac() && (builder.io() == IO.NON_BLOCKING))
 				process = new NonBlockingOsxProcess(builder, this, (NonBlockingProcessListener) listener);
-			else if (SystemUtils.IS_OS_WINDOWS && (builder.io() == IO.NON_BLOCKING))
+			else if (Platform.isWindows() && (builder.io() == IO.NON_BLOCKING))
 				process = new NonBlockingWindowsProcess(builder, this, (NonBlockingProcessListener) listener);
 			else
 				return null;

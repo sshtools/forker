@@ -2,9 +2,8 @@ package com.sshtools.forker.examples;
 
 import static com.sshtools.forker.client.OSCommand.run;
 
-import org.apache.commons.lang3.SystemUtils;
-
 import com.sshtools.forker.client.OSCommand;
+import com.sshtools.forker.common.OS;
 
 /**
  * Restart this application as an administrator.
@@ -12,7 +11,7 @@ import com.sshtools.forker.client.OSCommand;
 public class RestartAsAdministrator {
 	public static void main(String[] args) throws Exception {
 		OSCommand.restartAsAdministrator(RestartAsAdministrator.class, args);
-		if (SystemUtils.IS_OS_UNIX) {
+		if (OS.isUnix()) {
 			run("cat", "/etc/passwd");
 			run("id");
 		}

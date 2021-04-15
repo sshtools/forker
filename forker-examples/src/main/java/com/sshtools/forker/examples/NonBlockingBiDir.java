@@ -4,12 +4,12 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.ByteBuffer;
 
-import org.apache.commons.lang3.SystemUtils;
-
 import com.sshtools.forker.client.DefaultNonBlockingProcessListener;
 import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.client.NonBlockingProcess;
 import com.sshtools.forker.common.IO;
+import com.sshtools.forker.common.OS;
+import com.sun.jna.Platform;
 
 /**
  * This example demonstrates forking a non-blocking processing, reading it's
@@ -18,10 +18,10 @@ import com.sshtools.forker.common.IO;
 public class NonBlockingBiDir {
 	public static void main(String[] args) throws Exception {
 		ForkerBuilder builder = new ForkerBuilder().io(IO.NON_BLOCKING).redirectErrorStream(true);
-		if (SystemUtils.IS_OS_UNIX) {
+		if (OS.isUnix()) {
 			// The unix example uses wc to count lines of standard input
 			builder.command("wc", "-l");
-		} else if (SystemUtils.IS_OS_WINDOWS) {
+		} else if (Platform.isWindows()) {
 			// The windows example uses find to count lines of standard input
 			builder.command("find", "/c", "/v", "");
 		} else {

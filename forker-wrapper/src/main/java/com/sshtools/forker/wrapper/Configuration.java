@@ -7,7 +7,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.lang3.SystemUtils;
+import com.sshtools.forker.common.OS;
+import com.sun.jna.Platform;
 
 import picocli.CommandLine.Model.OptionSpec;
 import picocli.CommandLine.Model.PositionalParamSpec;
@@ -154,13 +155,13 @@ public class Configuration {
 	}
 
 	public String getOsPrefix() {
-		if (SystemUtils.IS_OS_WINDOWS)
+		if (Platform.isWindows())
 			return "windows";
-		else if (SystemUtils.IS_OS_MAC_OSX)
+		else if (Platform.isMac())
 			return "mac-osx";
-		else if (SystemUtils.IS_OS_LINUX)
+		else if (Platform.isLinux())
 			return "linux";
-		else if (SystemUtils.IS_OS_UNIX)
+		else if (OS.isUnix())
 			return "unix";
 		else
 			return "other";

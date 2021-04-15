@@ -2,12 +2,11 @@ package com.sshtools.forker.examples;
 
 import java.nio.ByteBuffer;
 
-import org.apache.commons.lang3.SystemUtils;
-
 import com.sshtools.forker.client.DefaultNonBlockingProcessListener;
 import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.client.NonBlockingProcess;
 import com.sshtools.forker.common.IO;
+import com.sshtools.forker.common.OS;
 
 /**
  * Simple non-blocking I/O example that reads the output of a command.
@@ -15,7 +14,7 @@ import com.sshtools.forker.common.IO;
 public class NonBlocking {
 	public static void main(String[] args) throws Exception {
 		ForkerBuilder builder = new ForkerBuilder().io(IO.NON_BLOCKING).redirectErrorStream(true);
-		if (SystemUtils.IS_OS_UNIX) {
+		if (OS.isUnix()) {
 			// The unix example tries to list the root directory
 			builder.command("ls", "-al", "/");
 		} else {

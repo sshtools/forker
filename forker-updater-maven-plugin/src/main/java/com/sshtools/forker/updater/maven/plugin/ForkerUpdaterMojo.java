@@ -60,6 +60,7 @@ import com.sshtools.forker.updater.AppManifest;
 import com.sshtools.forker.updater.AppManifest.Section;
 import com.sshtools.forker.updater.AppManifest.Type;
 import com.sshtools.forker.updater.Entry;
+import com.sun.jna.Platform;
 
 @Mojo(threadSafe = true, name = "updates", defaultPhase = LifecyclePhase.PACKAGE, requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME, requiresProject = true)
 public class ForkerUpdaterMojo extends AbstractMojo {
@@ -906,7 +907,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		}
 
 		// TODO: Check if there exist a more elegant way?
-		final String toolCommand = toolName + (SystemUtils.IS_OS_WINDOWS ? ".exe" : "");
+		final String toolCommand = toolName + (Platform.isWindows() ? ".exe" : "");
 
 		File toolExe;
 
@@ -917,7 +918,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 				toolExe = new File(toolExe, toolCommand);
 			}
 
-			if (SystemUtils.IS_OS_WINDOWS && toolExe.getName().indexOf('.') < 0) {
+			if (Platform.isWindows() && toolExe.getName().indexOf('.') < 0) {
 				toolExe = new File(toolExe.getPath() + ".exe");
 			}
 

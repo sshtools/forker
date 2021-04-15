@@ -6,7 +6,8 @@ import java.net.Socket;
 import java.util.Arrays;
 import java.util.List;
 
-import org.apache.commons.lang3.SystemUtils;
+import com.sshtools.forker.common.OS;
+import com.sun.jna.Platform;
 
 public class DefaultPipeFactory implements PipeFactory {
 
@@ -25,17 +26,17 @@ public class DefaultPipeFactory implements PipeFactory {
 	}
 
 	protected Socket socket(String name, Flag... flags) throws IOException {
-		if (SystemUtils.IS_OS_UNIX)
+		if (OS.isUnix())
 			return new UnixDomainSocket(toUnixName(name, flags), flags);
-		else if (SystemUtils.IS_OS_WINDOWS)
+		else if (Platform.isWindows())
 			return new NamedPipeSocket(toWindowsName(name, flags), flags);
 		throw new UnsupportedOperationException();
 	}
 
 	protected ServerSocket serverSocket(String name, Flag... flags) throws IOException {
-		if (SystemUtils.IS_OS_UNIX)
+		if (OS.isUnix())
 			return new UnixDomainServerSocket(toUnixName(name, flags), flags);
-		else if (SystemUtils.IS_OS_WINDOWS)
+		else if (Platform.isWindows())
 			return new NamedPipeServerSocket(toWindowsName(name, flags), flags);
 		throw new UnsupportedOperationException();
 	}

@@ -24,8 +24,6 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.logging.Level;
 
-import org.apache.commons.lang3.SystemUtils;
-
 import com.sshtools.forker.client.EffectiveUser;
 import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.client.IEventProcessor;
@@ -36,6 +34,7 @@ import com.sshtools.forker.client.impl.jna.posix.LibC;
 import com.sshtools.forker.client.impl.jna.posix.LibEpoll;
 import com.sshtools.forker.client.impl.jna.posix.LibJava10;
 import com.sshtools.forker.client.impl.jna.posix.LibJava8;
+import com.sshtools.forker.common.OS;
 import com.sun.jna.JNIEnv;
 import com.sun.jna.ptr.IntByReference;
 
@@ -93,7 +92,7 @@ public class NonBlockingLinuxProcess extends NonBlockingBasePosixProcess {
 				// https://github.com/JetBrains/jdk8u_jdk/blob/master/src/solaris/classes/java/lang/ProcessImpl.java#L96
 				createPipes();
 				int[] child_fds = { stdinWidow, stdoutWidow, stderrWidow };
-				if (!isAzul && SystemUtils.IS_JAVA_1_8) {
+				if (!isAzul && OS.isJava8()) {
 					pid = LibJava8.Java_java_lang_UNIXProcess_forkAndExec(JNIEnv.CURRENT, this,
 							LaunchMechanism.VFORK.ordinal() + 1, toCString(System.getProperty("java.home") + "/lib/jspawnhelper"), // used
 																																	// on

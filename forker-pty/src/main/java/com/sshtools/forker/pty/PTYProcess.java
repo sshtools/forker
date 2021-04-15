@@ -5,8 +5,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
 
-import org.apache.commons.lang3.SystemUtils;
-
 import com.pty4j.PtyProcess;
 import com.pty4j.WinSize;
 import com.pty4j.unix.PTYOutputStream;
@@ -21,6 +19,7 @@ import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.client.ForkerProcess;
 import com.sshtools.forker.client.ForkerProcessListener;
 import com.sshtools.forker.common.IO;
+import com.sshtools.forker.common.OS;
 import com.sun.jna.Platform;
 
 /**
@@ -48,11 +47,11 @@ public class PTYProcess extends ForkerProcess {
 			Class.forName(PtyUtil.class.getName() + "$1", true, PTYProcess.class.getClassLoader());
 			Class.forName(Pty.class.getName(), true, PTYProcess.class.getClassLoader());
 
-			if (SystemUtils.IS_OS_UNIX) {
+			if (OS.isUnix()) {
 				Class.forName(PtyHelpers.class.getName(), true, PTYProcess.class.getClassLoader());
 				Class.forName(UnixPtyProcess.class.getName(), true, PTYProcess.class.getClassLoader());
 				Class.forName(UnixPtyProcess.class.getName() + "$Reaper", true, PTYProcess.class.getClassLoader());
-			} else if (SystemUtils.IS_OS_WINDOWS) {
+			} else if (Platform.isWindows()) {
 				Class.forName(WinPtyProcess.class.getName(), true, PTYProcess.class.getClassLoader());
 				Class.forName(WinPty.class.getName(), true, PTYProcess.class.getClassLoader());
 			}

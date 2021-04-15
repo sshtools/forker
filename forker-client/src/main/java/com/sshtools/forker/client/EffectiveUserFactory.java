@@ -10,8 +10,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.lang3.SystemUtils;
-
 import com.sshtools.forker.client.ui.AskPass;
 import com.sshtools.forker.client.ui.AskPassConsole;
 import com.sshtools.forker.client.ui.WinRunAs;
@@ -21,6 +19,7 @@ import com.sshtools.forker.common.IO;
 import com.sshtools.forker.common.OS;
 import com.sshtools.forker.common.OS.Desktop;
 import com.sshtools.forker.common.Util;
+import com.sun.jna.Platform;
 
 /**
  * Responsible for creating {@link EffectiveUser} objects for use with
@@ -136,7 +135,7 @@ public abstract class EffectiveUserFactory {
 
 		protected String javaAskPassScript(Class<?> clazz) {
 			String javaExe = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
-			if (SystemUtils.IS_OS_WINDOWS)
+			if (Platform.isWindows())
 				javaExe += ".exe";
 			
 			
@@ -264,7 +263,7 @@ public abstract class EffectiveUserFactory {
 
 		@Override
 		public EffectiveUser getUserForUsername(String username) {
-			if (SystemUtils.IS_OS_LINUX) {
+			if (Platform.isLinux()) {
 				// If already administrator, just su or sudo should be
 				// sufficient is no password will be required
 				if (OS.isAdministrator()) {
@@ -297,9 +296,9 @@ public abstract class EffectiveUserFactory {
 						}
 					}
 				}
-			} else if (SystemUtils.IS_OS_MAC_OSX) {
+			} else if (Platform.isMac()) {
 				return new SUUser(username);
-			} else if (SystemUtils.IS_OS_WINDOWS) {
+			} else if (Platform.isWindows()) {
 				return new RunAsUser(username);
 			}
 			throw new UnsupportedOperationException(System.getProperty("os.name")
@@ -308,7 +307,7 @@ public abstract class EffectiveUserFactory {
 
 		protected EffectiveUser createAdministrator() {
 			String fixedPassword = getFixedPassword();
-			if (SystemUtils.IS_OS_LINUX) {
+			if (Platform.isLinux()) {
 				if (fixedPassword != null) {
 					return new SudoFixedPasswordUser(fixedPassword.toCharArray());
 				} else {
@@ -341,13 +340,13 @@ public abstract class EffectiveUserFactory {
 						return new SudoAskPassGuiUser();
 					}
 				}
-			} else if (SystemUtils.IS_OS_MAC_OSX) {
+			} else if (Platform.isMac()) {
 				if (fixedPassword != null) {
 					return new SudoFixedPasswordUser(fixedPassword.toCharArray());
 				} else if (OSCommand.hasCommand("sudo")) {
 					return new SudoAskPassGuiUser();
 				}
-			} else if (SystemUtils.IS_OS_WINDOWS) {
+			} else if (Platform.isWindows()) {
 				// http://mark.koli.ch/uac-prompt-from-java-createprocess-error740-the-requested-operation-requires-elevation
 				if (fixedPassword != null) {
 					return new RunAsUser(OS.getAdministratorUsername(), fixedPassword.toCharArray());

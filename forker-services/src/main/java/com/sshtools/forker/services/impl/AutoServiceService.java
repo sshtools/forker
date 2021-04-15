@@ -4,13 +4,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.lang3.SystemUtils;
-
 import com.sshtools.forker.client.OSCommand;
 import com.sshtools.forker.services.Service;
 import com.sshtools.forker.services.ServiceService;
 import com.sshtools.forker.services.ServicesContext;
 import com.sshtools.forker.services.ServicesListener;
+import com.sun.jna.Platform;
 
 public class AutoServiceService implements ServiceService {
 	private ServiceService services;
@@ -21,7 +20,7 @@ public class AutoServiceService implements ServiceService {
 
 	private void detect() throws IOException {
 		List<ServiceService> l = new ArrayList<ServiceService>();
-		if(SystemUtils.IS_OS_WINDOWS) {
+		if(Platform.isWindows()) {
 			l.add(new Win32ServiceService());
 		}
 		else {

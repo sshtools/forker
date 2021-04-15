@@ -71,9 +71,6 @@ import javax.management.remote.JMXConnectorServer;
 import javax.management.remote.JMXConnectorServerFactory;
 import javax.management.remote.JMXServiceURL;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.SystemUtils;
-
 import com.sshtools.forker.client.EffectiveUserFactory;
 import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.client.OSCommand;
@@ -86,6 +83,7 @@ import com.sshtools.forker.common.Util;
 import com.sshtools.forker.common.Util.TeeOutputStream;
 import com.sshtools.forker.wrapper.JVM.Version;
 import com.sun.jna.Native;
+import com.sun.jna.Platform;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Model.CommandSpec;
@@ -519,10 +517,10 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 		List<String> jvmArgs = configuration.getOptionValues("jvmarg");
 		List<String> systemProperties = configuration.getOptionValues("system");
-		if (nativeMain && StringUtils.isNotBlank(configuration.getOptionValue("classpath", null))) {
+		if (nativeMain && Util.isNotBlank(configuration.getOptionValue("classpath", null))) {
 			throw new IOException("Native main may not be used with classpath option.");
 		}
-		if (nativeMain && StringUtils.isNotBlank(configuration.getOptionValue("modulepath", null))) {
+		if (nativeMain && Util.isNotBlank(configuration.getOptionValue("modulepath", null))) {
 			throw new IOException("Native main may not be used with modulepath option.");
 		}
 		if (nativeMain && !jvmArgs.isEmpty()) {
@@ -745,7 +743,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	 */
 	protected int noFork(boolean useDaemon, String wrapperClasspath, String forkerClasspath, int times, int lastRetVal)
 			throws IOException {
-		if (StringUtils.isNotBlank(app.getModule()))
+		if (Util.isNotBlank(app.getModule()))
 			throw new IOException("no-fork does not currently work with modules.");
 
 //		String modulepath = null;
@@ -795,7 +793,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			throw new IOException("Remote debug helper may not be used with no-fork");
 		}
 
-		if (StringUtils.isBlank(app.getClassname()))
+		if (Util.isBlank(app.getClassname()))
 			throw new IllegalArgumentException(
 					"Must provide a 'main' property to specify the class that contains the main() method that is your applications entry point.");
 
@@ -839,7 +837,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			 */
 
 			// TODO how
-//			if (modulepath != null && StringUtils.isNotBlank(app.getModule())) {
+//			if (modulepath != null && Util.isNotBlank(app.getModule())) {
 //				command.add("--add-modules");
 //				command.add(app.getModule());
 //			}
@@ -853,7 +851,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				classname = WRAPPED_CLASS_NAME;
 				tail.add(app.getClassname());
 			} else {
-//				if (StringUtils.isNotBlank(app.getModule())) {
+//				if (Util.isNotBlank(app.getModule())) {
 //					headArgs.add("-m");
 //					tail.add(app.fullClassAndModule());
 //				} else
@@ -870,14 +868,14 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		usingWrapped = isUsingWrappedOnClasspath; // TODO || isUsingWrappedOnModulepath
 
 		/* Directory and IO */
-		if(SystemUtils.IS_OS_UNIX) {
+		if(OS.isUnix()) {
 			logger.info(String.format("chdir to %s", cwd));
 			if(CSystem.INSTANCE.chdir(cwd.getAbsolutePath()) != 0) {
 				throw new IllegalStateException(String.format("Failed to change directory to %s. %d", cwd, Native.getLastError()));
 			}
 			System.setProperty("user.dir", cwd.getAbsolutePath());
 		}
-		else if(SystemUtils.IS_OS_WINDOWS) {
+		else if(Platform.isWindows()) {
 			logger.info(String.format("SetCurrentDirectoryW to %s", cwd));
 			if(Kernel32.INSTANCE.SetCurrentDirectoryW(cwd.getAbsolutePath().toCharArray()) == 0) {
 				throw new IllegalStateException(String.format("Failed to change directory to %s. %d", cwd, Native.getLastError()));
@@ -1171,7 +1169,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	protected File resolveCwd() {
 		String cwdpath = configuration.getOptionValue("cwd", null);
 		File cwd = new File(System.getProperty("user.dir"));
-		if (StringUtils.isNotBlank(cwdpath)) {
+		if (Util.isNotBlank(cwdpath)) {
 			cwd = relativize(cwd, cwdpath);
 			if (!cwd.exists())
 				throw new IllegalArgumentException(String.format("No such directory %s", cwd));
@@ -1411,8 +1409,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	protected String getJVMPath() {
 		String javaExe = OS.getJavaPath();
 		String altJava = configuration.getOptionValue("java", null);
-		if (StringUtils.isNotBlank(altJava)) {
-			if (SystemUtils.IS_OS_WINDOWS) {
+		if (Util.isNotBlank(altJava)) {
+			if (Platform.isWindows()) {
 				if (altJava.toLowerCase().endsWith(".exe")) {
 					altJava = altJava.substring(0, altJava.length() - 4);
 				}
@@ -1425,10 +1423,10 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 		String minjava = configuration.getOptionValue("min-java", null);
 		String maxjava = configuration.getOptionValue("max-java", null);
-		if (StringUtils.isNotBlank(minjava) || StringUtils.isNotBlank(maxjava)) {
-			if (StringUtils.isBlank(minjava))
+		if (Util.isNotBlank(minjava) || Util.isNotBlank(maxjava)) {
+			if (Util.isBlank(minjava))
 				minjava = "0.0.0";
-			if (StringUtils.isBlank(maxjava))
+			if (Util.isBlank(maxjava))
 				maxjava = "9999.9999.9999";
 			Version minver = new Version(minjava);
 			Version maxver = new Version(maxjava);
@@ -1467,7 +1465,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	protected void event(String name, String... args) throws IOException {
 		String eventHandler = configuration.getOptionValue("on-" + name, null);
 		logger.info(String.format("Event " + name + ": %s", Arrays.asList(args)));
-		if (StringUtils.isNotBlank(eventHandler)) {
+		if (Util.isNotBlank(eventHandler)) {
 			// Parse the event handler script
 			List<String> handlerArgs = Util.parseQuotedString(eventHandler);
 			for (int i = 0; i < handlerArgs.size(); i++) {
@@ -1796,7 +1794,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			}
 		}
 		StringBuilder newClasspath = new StringBuilder();
-		if (StringUtils.isNotBlank(classpath)) {
+		if (Util.isNotBlank(classpath)) {
 			for (String el : splitCrossPlatformPath(classpath)) {
 				el = el.replace('/', File.separatorChar);
 				if (el.contains("*") || el.contains("?")) {
@@ -1835,7 +1833,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			}
 		}
 
-		if (StringUtils.isNotBlank(defaultClasspath)) {
+		if (Util.isNotBlank(defaultClasspath)) {
 			String cp = newClasspath.toString();
 			if (append) {
 				classpath = defaultClasspath + File.pathSeparator + cp;
@@ -1948,11 +1946,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				ForkerBuilder fb = new ForkerBuilder();
 				fb.directory(getLaunchDirectory());
 				fb.command().add(javaExe);
-				if (StringUtils.isNotBlank(forkerModulepath)) {
+				if (Util.isNotBlank(forkerModulepath)) {
 					fb.command().add("-p");
 					fb.command().add(forkerModulepath);
 				}
-				if (StringUtils.isNotBlank(forkerClasspath)) {
+				if (Util.isNotBlank(forkerClasspath)) {
 					fb.command().add("-classpath");
 					fb.command().add(forkerClasspath);
 				}
@@ -1969,7 +1967,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				// Doesnt seem to work
 				// fb.environment().put("FORKER_FDOUT", "1");
 				// fb.environment().put("FORKER_FDERR", "2");
-				if(StringUtils.isNotBlank(System.getProperty("jdk.module.main"))) {
+				if(Util.isNotBlank(System.getProperty("jdk.module.main"))) {
 					fb.command().add("-m");
 					fb.command().add(System.getProperty("jdk.module.main") + "/" + System.getProperty("jdk.module.main.class"));
 				}
@@ -2071,7 +2069,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 						} catch (IOException e1) {
 						}
 					} catch (InterruptedException e) {
-						if(SystemUtils.IS_OS_UNIX) {
+						if(OS.isUnix()) {
 							CSystem.INSTANCE.kill(p.pid(), 9);
 						}
 						else
@@ -2282,11 +2280,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			} else if (key.equals("user.home")) {
 				return System.getProperty(key).replace("\\", "/");
 			} else if (key.equals("os")) {
-				if(SystemUtils.IS_OS_WINDOWS)
+				if(Platform.isWindows())
 					return "win";
-				else if(SystemUtils.IS_OS_MAC_OSX)
+				else if(Platform.isMac())
 					return "osx";
-				else if(SystemUtils.IS_OS_LINUX)
+				else if(Platform.isLinux())
 					return "linux";
 				else
 					return "other";
@@ -2702,7 +2700,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		OutputStream outlog = null;
 		OutputStream errlog = null;
 		long logDelay = Long.parseLong(configuration.getOptionValue("log-write-delay", "50"));
-		if (StringUtils.isNotBlank(logpath)) {
+		if (Util.isNotBlank(logpath)) {
 			outlog = new LazyLogStream(logDelay, makeDirectoryForFile(relativize(cwd, logpath)), !logoverwrite);
 		}
 		if (errpath != null) {
@@ -2898,7 +2896,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				}
 			}
 
-			if (StringUtils.isBlank(app.getClassname()))
+			if (Util.isBlank(app.getClassname()))
 				throw new IllegalArgumentException(
 						"Must provide a 'main' property to specify the class that contains the main() method that is your applications entry point.");
 		} else {
@@ -2929,7 +2927,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		/*
 		 * We are just running the application directly or via Wrapped
 		 */
-		if (modulepath != null && StringUtils.isNotBlank(app.getModule())) {
+		if (modulepath != null && Util.isNotBlank(app.getModule())) {
 			command.add(new Argument("--add-modules"));
 			command.add(new Argument(app.getModule()));
 		}
@@ -2942,7 +2940,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			headArgs.add(new Argument(WRAPPED_CLASS_NAME));
 			tail.add(new Argument(app.getClassname()));
 		} else {
-			if (StringUtils.isNotBlank(app.getModule())) {
+			if (Util.isNotBlank(app.getModule())) {
 				headArgs.add(new Argument("-m"));
 				tail.add(new Argument(app.fullClassAndModule()));
 			} else

@@ -7,7 +7,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.jar.JarFile;
 
-import org.apache.commons.lang3.StringUtils;
+import com.sshtools.forker.common.Util;
 
 public class WrappedApplication {
 
@@ -88,7 +88,7 @@ public class WrappedApplication {
 	private String readMain(String jar) throws IOException {
 		try (JarFile jf = new JarFile(new File(jar))) {
 			String classname = jf.getManifest().getMainAttributes().getValue("Main-Class");
-			if (StringUtils.isBlank(classname)) {
+			if (Util.isBlank(classname)) {
 				throw new IOException(String.format(
 						"An executable jar (--jar %s) was provided, but it does not contain a Main-Class attribute in META-INF/MANIFEST.MF",
 						jar));
@@ -106,7 +106,7 @@ public class WrappedApplication {
 	}
 
 	public String fullClassAndModule() {
-		return StringUtils.isBlank(module) ? classname : module + "/" + classname;
+		return Util.isBlank(module) ? classname : module + "/" + classname;
 	}
 
 	public String[] getArguments() {

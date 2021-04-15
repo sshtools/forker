@@ -7,8 +7,9 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.SystemUtils;
+import com.sshtools.forker.common.OS;
+import com.sshtools.forker.common.Util;
+import com.sun.jna.Platform;
 
 /**
  * Extension to {@link ForkerBuilder} that with launch a shell appropriate for
@@ -150,7 +151,7 @@ public class ShellBuilder extends ForkerBuilder {
 	public <P extends ForkerProcess> P start(ForkerProcessListener listener) throws IOException {
 		String shLocation = null;
 		
-		if (StringUtils.isNotBlank(shell)) {
+		if (Util.isNotBlank(shell)) {
 			if (shell.contains("/") || shell.contains("\\")) {
 				/* Absolute path to shell */
 				if (new File(shell).exists())
@@ -163,7 +164,7 @@ public class ShellBuilder extends ForkerBuilder {
 			}
 		}
 		
-		if (SystemUtils.IS_OS_LINUX || SystemUtils.IS_OS_UNIX || SystemUtils.IS_OS_MAC_OSX) {
+		if (OS.isUnix()) {
 			// The shell, should be in /bin but just in case
 			
 			if (shLocation == null) {
@@ -200,7 +201,7 @@ public class ShellBuilder extends ForkerBuilder {
 				// Everything else
 				command().add(0, shLocation);
 			}
-		} else if (SystemUtils.IS_OS_WINDOWS) {
+		} else if (Platform.isWindows()) {
 			if(shLocation == null) {
 				command().add(0, "CMD.exe");
 				command().add(0, "/c");
@@ -213,7 +214,7 @@ public class ShellBuilder extends ForkerBuilder {
 	}
 
 	private String findCommand(String command) throws IOException {
-		if(SystemUtils.IS_OS_UNIX) {
+		if(OS.isUnix()) {
 			Collection<String> stdbuf = OSCommand.runCommandAndCaptureOutput("which", command);
 			if (!stdbuf.isEmpty()) {
 				return stdbuf.iterator().next();
@@ -222,10 +223,10 @@ public class ShellBuilder extends ForkerBuilder {
 		
 		/* What path extensions might be used? */
 		List<String> exts = new LinkedList<>();
-		if(SystemUtils.IS_OS_WINDOWS) {
+		if(Platform.isWindows()) {
 			/* Do we have a PATHEXT? */
 			String pathExt = System.getenv("PATHEXT");
-			if(StringUtils.isBlank(pathExt)) {
+			if(Util.isBlank(pathExt)) {
 				/* Assume a default set */
 				pathExt = ".COM;.EXT;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.PSC1";
 			}
@@ -237,14 +238,14 @@ public class ShellBuilder extends ForkerBuilder {
 
 		/* No path, add some defaults */
 		// TODO probably need more OS's 
-		if(StringUtils.isBlank(path)) {
-			if(SystemUtils.IS_OS_UNIX)
+		if(Util.isBlank(path)) {
+			if(OS.isUnix())
 				path = "/bin:/usr/bin";
-			else if(SystemUtils.IS_OS_WINDOWS)
+			else if(Platform.isWindows())
 				path = "C:\\Windows\\System32";
 		}
 		
-		if(StringUtils.isNotBlank(path)) {
+		if(Util.isNotBlank(path)) {
 			for(String p : path.split(File.pathSeparator)) {
 				/* With a discovered extension? */
 				for(String pe : exts) {

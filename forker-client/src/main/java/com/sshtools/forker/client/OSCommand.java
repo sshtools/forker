@@ -21,13 +21,11 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.SystemUtils;
-
 import com.sshtools.forker.client.EffectiveUserFactory.SudoFixedPasswordUser;
 import com.sshtools.forker.common.IO;
 import com.sshtools.forker.common.OS;
 import com.sshtools.forker.common.Util;
+import com.sun.jna.Platform;
 
 /**
  * Some helper methods for running commands and doing common things with minimal
@@ -109,11 +107,11 @@ public class OSCommand {
 		String forkerClasspath = System.getProperty("java.class.path");
 		String modulepath = System.getProperty("jdk.module.path");
 		aargs.add(OS.getJavaPath());
-		if (StringUtils.isNotBlank(forkerClasspath)) {
+		if (forkerClasspath != null && forkerClasspath.length() > 0) {
 			aargs.add("-classpath");
 			aargs.add(forkerClasspath);
 		}
-		if (StringUtils.isNotBlank(modulepath)) {
+		if (modulepath != null && modulepath.length() > 0) {
 			aargs.add("-p");
 			aargs.add(modulepath);
 		}
@@ -661,7 +659,7 @@ public class OSCommand {
 				List<String> vargs = new ArrayList<String>();
 				vargs.add(OS.getJavaPath());
 				String cp = System.getProperty("java.class.path");
-				if (StringUtils.isNotBlank(cp)) {
+				if (cp != null && cp.length() > 0) {
 					vargs.add("-classpath");
 					vargs.add(cp);
 				}
@@ -784,7 +782,7 @@ public class OSCommand {
 	}
 
 	protected static boolean doHasCommand(String command) {
-		if (SystemUtils.IS_OS_LINUX) {
+		if (Platform.isLinux()) {
 			boolean el = OSCommand.restrict();
 			try {
 				Collection<String> out = OSCommand.runCommandAndCaptureOutput("which", command);
@@ -803,7 +801,7 @@ public class OSCommand {
 					File f = new File(p);
 					if (f.isDirectory()) {
 						String cmd = command;
-						if (SystemUtils.IS_OS_WINDOWS) {
+						if (Platform.isWindows()) {
 							cmd += ".exe";
 						}
 						File e = new File(f, cmd);
@@ -991,7 +989,7 @@ public class OSCommand {
 	 * @throws IOException on any error
 	 */
 	public static int runCommand(File cwd, OutputStream out, String... args) throws IOException {
-		LOG.fine("Running command: " + StringUtils.join(args, " "));
+		LOG.fine("Running command: " + String.join("", args));
 		List<String> largs = new ArrayList<String>(Arrays.asList(args));
 		ForkerBuilder pb = new ForkerBuilder(largs);
 		if (io.get() != null)
@@ -1076,7 +1074,7 @@ public class OSCommand {
 	 */
 	public static Iterable<String> runCommandAndIterateOutput(File cwd, String... args) throws IOException {
 		final List<String> largs = new ArrayList<String>(Arrays.asList(args));
-		LOG.fine("Running command: " + StringUtils.join(largs, " "));
+		LOG.fine("Running command: " + String.join(" ", largs));
 		ForkerBuilder pb = new ForkerBuilder(largs);
 		if (io.get() != null)
 			pb.io(io.get());
@@ -1104,7 +1102,7 @@ public class OSCommand {
 									if (next == null) {
 										int ret = p.waitFor();
 										if (ret != 0) {
-											throw new IOException("Command '" + StringUtils.join(largs, " ")
+											throw new IOException("Command '" + String.join(" ", largs)
 													+ "' returned non-zero status. Returned " + ret + ". ");
 										}
 									}
@@ -1154,7 +1152,7 @@ public class OSCommand {
 		File askPass = null;
 		try {
 			List<String> largs = new ArrayList<String>(Arrays.asList(args));
-			LOG.fine("Running command: " + StringUtils.join(largs, " "));
+			LOG.fine("Running command: " + String.join(" ", largs));
 			ForkerBuilder pb = new ForkerBuilder(largs);
 			if (pb.io() == null)
 				pb.io(io.get() == null ? IO.NON_BLOCKING : io.get());
@@ -1169,8 +1167,8 @@ public class OSCommand {
 			try {
 				int ret = p.waitFor();
 				if (ret != 0) {
-					throw new IOException("Command '" + StringUtils.join(largs, " ")
-							+ "' returned non-zero status. Returned " + ret + ". " + StringUtils.join(lines, "\n"));
+					throw new IOException("Command '" + String.join(" ", largs)
+							+ "' returned non-zero status. Returned " + ret + ". " + String.join("\n", lines));
 				}
 			} catch (InterruptedException e) {
 				LOG.log(Level.SEVERE, "Command interrupted.", e);
@@ -1225,7 +1223,7 @@ public class OSCommand {
 	 * @throws IOException on any error
 	 */
 	public static int runCommandAndOutputToFile(File cwd, File file, String... args) throws IOException {
-		LOG.fine("Running command: " + StringUtils.join(args, " ") + " > " + file);
+		LOG.fine("Running command: " + String.join(" ", args) + " > " + file);
 		FileOutputStream fos = new FileOutputStream(file);
 		try {
 			ForkerBuilder pb = new ForkerBuilder(args);

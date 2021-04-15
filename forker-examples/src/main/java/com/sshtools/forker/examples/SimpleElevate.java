@@ -4,9 +4,8 @@ import static com.sshtools.forker.client.OSCommand.elevate;
 import static com.sshtools.forker.client.OSCommand.restrict;
 import static com.sshtools.forker.client.OSCommand.run;
 
-import org.apache.commons.lang3.SystemUtils;
-
 import com.sshtools.forker.client.OSCommand;
+import com.sshtools.forker.common.OS;
 
 /**
  * Show uses {@link OSCommand}, that uses {@link ThreadLocal} state to configure
@@ -16,7 +15,7 @@ public class SimpleElevate {
 	public static void main(String[] args) throws Exception {
 		elevate();
 		try {
-			if (SystemUtils.IS_OS_UNIX)
+			if (OS.isUnix())
 				run("cat", "/etc/passwd");
 			else {
 				String pf = System.getenv("PROGRAMFILES");

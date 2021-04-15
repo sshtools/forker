@@ -21,13 +21,12 @@ import java.util.ServiceLoader;
 import java.util.concurrent.Callable;
 import java.util.logging.Level;
 
-import org.apache.commons.lang3.SystemUtils;
-
 import com.sshtools.forker.common.OS;
 import com.sshtools.forker.common.Util;
 import com.sshtools.forker.updater.AppManifest.Section;
 import com.sshtools.forker.wrapper.ForkerWrapper;
 import com.sshtools.forker.wrapper.Replace;
+import com.sun.jna.Platform;
 
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Model.OptionSpec;
@@ -328,7 +327,7 @@ public class Updater extends ForkerWrapper {
 		}
 		Map<String, String> props = new HashMap<>();
 		if (OS.isAdministrator()) {
-			if (SystemUtils.IS_OS_WINDOWS) {
+			if (Platform.isWindows()) {
 				props.put("installer.home", "C:/Program Files");
 			} else {
 				props.put("installer.home", "/opt");

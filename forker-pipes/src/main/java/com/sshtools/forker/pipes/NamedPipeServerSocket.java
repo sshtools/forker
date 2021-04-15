@@ -1,19 +1,13 @@
 package com.sshtools.forker.pipes;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketAddress;
-import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.sshtools.forker.common.CSystem;
-import com.sshtools.forker.common.CSystem.SockAddr;
 import com.sshtools.forker.common.XKernel32;
 import com.sshtools.forker.pipes.PipeFactory.Flag;
-import com.sun.jna.LastErrorException;
 import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.platform.win32.WinBase;
 import com.sun.jna.platform.win32.WinError;

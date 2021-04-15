@@ -13,9 +13,9 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.logging.Logger;
 
-import org.apache.commons.lang3.StringUtils;
 import org.w3c.dom.Node;
 
+import com.sshtools.forker.common.Util;
 import com.sshtools.forker.updater.AppManifest.Section;
 import com.sshtools.forker.updater.AppManifest.Type;
 import com.sshtools.forker.wrapper.Replace;
@@ -84,7 +84,7 @@ public class Entry {
 			}
 		}
 		String targetStr = AppManifest.getAttribute(replace, file, "target");
-		if (StringUtils.isNotBlank(targetStr)) {
+		if (Util.isNotBlank(targetStr)) {
 			target = Paths.get(targetStr);
 		} else {
 			uri = new URI(AppManifest.getRequiredAttribute(replace, file, "uri"));

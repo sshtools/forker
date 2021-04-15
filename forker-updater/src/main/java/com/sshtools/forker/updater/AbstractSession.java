@@ -11,9 +11,8 @@ import java.net.URL;
 import java.util.Locale;
 import java.util.Map;
 
-import org.apache.commons.lang3.SystemUtils;
-
 import com.sshtools.forker.updater.DesktopShortcut.Type;
+import com.sun.jna.Platform;
 
 public abstract class AbstractSession implements Session {
 
@@ -39,7 +38,7 @@ public abstract class AbstractSession implements Session {
 	}
 
 	public void installShortcut(DesktopShortcut shortcut) throws IOException {
-		if (SystemUtils.IS_OS_LINUX) {
+		if (Platform.isLinux()) {
 			File file = getShortcutFile(shortcut.id() + ".desktop");
 			writeDesktopFile(file, shortcut);
 		} else
@@ -47,14 +46,14 @@ public abstract class AbstractSession implements Session {
 	}
 
 	public boolean shorcutInstalled(String id) {
-		if (SystemUtils.IS_OS_LINUX)
+		if (Platform.isLinux())
 			return getShortcutFile(id + ".desktop").exists();
 		else
 			throw new UnsupportedOperationException();
 	}
 
 	public void uninstallShortcut(String id) throws IOException {
-		if (SystemUtils.IS_OS_LINUX)
+		if (Platform.isLinux())
 			getShortcutFile(id + ".desktop").delete();
 		else
 			throw new UnsupportedOperationException();

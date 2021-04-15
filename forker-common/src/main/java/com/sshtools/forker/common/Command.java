@@ -9,7 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.lang3.SystemUtils;
+import com.sun.jna.Platform;
 
 /**
  * This class carries all of the detail for the command to launch and may be
@@ -33,7 +33,7 @@ public class Command {
 	private File directory;
 	private Map<String, String> environment;
 	private String runAs = "";
-	private IO io = SystemUtils.IS_OS_WINDOWS ? IO.DEFAULT : IO.NON_BLOCKING;
+	private IO io = Platform.isWindows() ? IO.DEFAULT : IO.NON_BLOCKING;
 	private Priority priority = null;
 	private List<Integer> affinity = new ArrayList<Integer>();
 	private boolean background;
@@ -277,7 +277,7 @@ public class Command {
 	public List<String> getAllArguments() {
 		List<String> a = new ArrayList<String>(arguments);
 		if (priority != null) {
-			if (SystemUtils.IS_OS_UNIX) {
+			if (OS.isUnix()) {
 				a.add(0, "nice");
 				a.add(1, "-n");
 				switch (priority) {
@@ -296,7 +296,7 @@ public class Command {
 				default:
 					break;
 				}
-			} else if (SystemUtils.IS_OS_WINDOWS) {
+			} else if (Platform.isWindows()) {
 				if (a.size() < 3 || !a.get(0).equals("CMD.EXE") || !a.get(1).equals("/C")
 						|| !a.get(2).equals("START")) {
 					a.add(0, "CMD.EXE");
@@ -327,7 +327,7 @@ public class Command {
 				throw new UnsupportedOperationException();
 		}
 		
-		if(SystemUtils.IS_OS_UNIX && background) {
+		if(OS.isUnix() && background) {
 			a.add(0, "nohup");
 		}
 
@@ -336,13 +336,11 @@ public class Command {
 			for (Integer cpu : affinity) {
 				mask = mask | 1 << (cpu - 1);
 			}
-			if (SystemUtils.IS_OS_UNIX) {
+			if (OS.isUnix()) {
 				a.add(0, "taskset");
 				a.add(1, String.format("0x%x", mask));
-			} else if (SystemUtils.IS_OS_WINDOWS && !(SystemUtils.IS_OS_WINDOWS_XP) && !SystemUtils.IS_OS_WINDOWS_95
-					&& !SystemUtils.IS_OS_WINDOWS_98 && !SystemUtils.IS_OS_WINDOWS_ME && !SystemUtils.IS_OS_WINDOWS_NT
-					&& !SystemUtils.IS_OS_WINDOWS_VISTA) {
-				// Windows 7 and above
+			} else if (Platform.isWindows()) {
+				// Windows 7 and above only, but by now that should not be a problem (is JDK even possible on those?)
 				if (a.size() < 3 || !a.get(0).equals("CMD.EXE") || !a.get(1).equals("/C")
 						|| !a.get(2).equals("START")) {
 					a.add(0, "CMD.EXE");

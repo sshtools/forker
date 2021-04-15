@@ -4,9 +4,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.lang3.SystemUtils;
-
 import com.sshtools.forker.client.OSCommand;
+import com.sun.jna.Platform;
 
 /**
  * Java Virtual Machine detection.
@@ -162,7 +161,7 @@ public class JVM {
 	 */
 	public static List<JVM> jvms() {
 		List<JVM> jvms = new ArrayList<JVM>();
-		if (SystemUtils.IS_OS_LINUX) {
+		if (Platform.isLinux()) {
 			try {
 				for (String j : OSCommand.runCommandAndCaptureOutput("update-alternatives", "--list", "java")) {
 					jvms.add(new JVM(j));

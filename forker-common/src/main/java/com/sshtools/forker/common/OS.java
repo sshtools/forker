@@ -3,11 +3,9 @@ package com.sshtools.forker.common;
 import java.io.File;
 import java.io.IOException;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.SystemUtils;
-
 import com.sshtools.forker.common.CSystem.Termios;
 import com.sun.jna.Memory;
+import com.sun.jna.Platform;
 import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.ptr.IntByReference;
@@ -98,7 +96,7 @@ public class OS {
 	 * @see #resetStdin()
 	 */
 	public static void resetStdin() {
-		if (SystemUtils.IS_OS_UNIX) {
+		if (isUnix()) {
 			if (unbufferedResetHook != null) {
 				try {
 					Runtime.getRuntime().removeShutdownHook(unbufferedResetHook);
@@ -108,7 +106,7 @@ public class OS {
 				oldTermios = null;
 				unbufferedResetHook = null;
 			}
-		} else if (SystemUtils.IS_OS_WINDOWS) {
+		} else if (Platform.isWindows()) {
 			if (oldMode != null) {
 				HANDLE hStdin = Kernel32.INSTANCE.GetStdHandle(Kernel32.STD_INPUT_HANDLE);
 				Kernel32.INSTANCE.SetConsoleMode(hStdin, oldMode);
@@ -125,7 +123,7 @@ public class OS {
 	 */
 	public static void unbufferedStdin() {
 		// http://forums.codeguru.com/showthread.php?466009-Reading-from-stdin-%28without-echo%29
-		if (SystemUtils.IS_OS_UNIX) {
+		if (isUnix()) {
 			if (oldTermios != null)
 				// Already configuration
 				return;
@@ -144,7 +142,7 @@ public class OS {
 					resetStdin();
 				}
 			});
-		} else if (SystemUtils.IS_OS_WINDOWS) {
+		} else if (Platform.isWindows()) {
 			HANDLE hStdin = Kernel32.INSTANCE.GetStdHandle(Kernel32.STD_INPUT_HANDLE);
 			IntByReference mode = new IntByReference();
 			Kernel32.INSTANCE.GetConsoleMode(hStdin, mode);
@@ -161,10 +159,10 @@ public class OS {
 	 * @return process ID
 	 */
 	public static int getPID() {
-		if (SystemUtils.IS_OS_WINDOWS) {
+		if (Platform.isWindows()) {
 			return Kernel32.INSTANCE.GetCurrentProcessId();
 		}
-		if (SystemUtils.IS_OS_UNIX) {
+		if (isUnix()) {
 			return CSystem.INSTANCE.getpid();
 		}
 		throw new UnsupportedOperationException();
@@ -176,11 +174,11 @@ public class OS {
 	 * @return administrator username
 	 */
 	public static String getAdministratorUsername() {
-		if (SystemUtils.IS_OS_WINDOWS) {
+		if (Platform.isWindows()) {
 			return System.getProperty("forker.administratorUsername",
 					System.getProperty("vm.rootUser", "Administrator"));
 		}
-		if (SystemUtils.IS_OS_UNIX) {
+		if (isUnix()) {
 			return System.getProperty("forker.administratorUsername", System.getProperty("vm.rootUser", "root"));
 		}
 		throw new UnsupportedOperationException();
@@ -192,7 +190,7 @@ public class OS {
 	 * @return administrator
 	 */
 	public static boolean isAdministrator() {
-		if (SystemUtils.IS_OS_WINDOWS) {
+		if (Platform.isWindows()) {
 			try {
 				String programFiles = System.getenv("ProgramFiles");
 				if (programFiles == null) {
@@ -210,7 +208,7 @@ public class OS {
 				return false;
 			}
 		}
-		if (SystemUtils.IS_OS_UNIX) {
+		if (isUnix()) {
 			return System.getProperty("forker.administratorUsername", System.getProperty("vm.rootUser", "root"))
 					.equals(System.getProperty("user.name"));
 		}
@@ -230,16 +228,13 @@ public class OS {
 
 		String desktopSession = System.getenv("XDG_CURRENT_DESKTOP");
 		String gdmSession = System.getenv("GDMSESSION");
-		if (SystemUtils.IS_OS_WINDOWS) {
+		if (Platform.isWindows()) {
 			return Desktop.WINDOWS;
 		}
-		if (SystemUtils.IS_OS_MAC_OSX) {
+		if (Platform.isMac()) {
 			return Desktop.MAC_OSX;
 		}
-		if (SystemUtils.IS_OS_MAC) {
-			return Desktop.MAC;
-		}
-		if (SystemUtils.IS_OS_LINUX && StringUtils.isBlank(System.getenv("DISPLAY"))) {
+		if (Platform.isLinux() && Util.isBlank(System.getenv("DISPLAY"))) {
 			return Desktop.CONSOLE;
 		}
 
@@ -253,7 +248,7 @@ public class OS {
 			return Desktop.XFCE;
 		}
 		if ("KDE".equalsIgnoreCase(desktopSession)
-				|| (StringUtils.isBlank(desktopSession) && "kde-plasma".equals(gdmSession))) {
+				|| (Util.isBlank(desktopSession) && "kde-plasma".equals(gdmSession))) {
 			return Desktop.KDE;
 		}
 		if ("UNITY".equalsIgnoreCase(desktopSession)) {
@@ -279,7 +274,7 @@ public class OS {
 	 */
 	public static String getJavaPath() {
 		String javaExe = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
-		if (SystemUtils.IS_OS_WINDOWS) {
+		if (Platform.isWindows()) {
 			if (!javaExe.toLowerCase().endsWith("w")) {
 				javaExe += "w";
 			}
@@ -296,7 +291,7 @@ public class OS {
 	 * @return success
 	 */
 	public static boolean setProcname(String procname) {
-		if (SystemUtils.IS_OS_UNIX && !SystemUtils.IS_OS_MAC_OSX) {
+		if (isUnix() && !Platform.isMac()) {
 			if(procname.length() > 15)
 				procname = procname.substring(0, 15);
 			Memory name = new Memory(procname.length() + 1);
@@ -306,5 +301,18 @@ public class OS {
 		}
 		return false;
 
+	}
+
+	/**
+	 * Gef if using a Unix like OS.
+	 * 
+	 * @return unix
+	 */
+	public static boolean isUnix() {
+		return Platform.isMac() || Platform.isAIX() || Platform.isLinux() || Platform.isFreeBSD() || Platform.isNetBSD() || Platform.isOpenBSD();
+	}
+
+	public static boolean isJava8() {
+		return System.getProperty("java.specification.version", "").startsWith("1.8");
 	}
 }
