@@ -419,7 +419,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 						.uri(new URI(resolveUrl(normalizeForUri(remoteBase), imagePath.relativize(splashPath).toString())))
 						.type(Type.OTHER));
 				if (repository) {
-					Path repositorySplashPath = imagePath.resolve("splash." + getExtension(splash));
+					Path repositorySplashPath = repositoryPath.resolve("splash." + getExtension(splash));
 					Files.copy(Paths.get(splash), repositorySplashPath);
 				}
 			}
