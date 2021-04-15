@@ -338,7 +338,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 					Path target = imagePath
 							.resolve(file.target.equals(".") ? imagePath : imagePath.resolve(file.target))
 							.resolve(path.getFileName());
-					copy(path, target, manifest.timestamp());
+					copy("Bootstrap File", path, target, manifest.timestamp());
 					if (updateableBootstrap) {
 						manifest.entries()
 								.add(new Entry(target, manifest).section(Section.BOOTSTRAP).path(imagePath.relativize(target))
@@ -347,7 +347,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 						target = repositoryPath
 								.resolve(file.target.equals(".") ? repositoryPath : repositoryPath.resolve(file.target))
 								.resolve(path.getFileName());
-						copy(path, target, manifest.timestamp());
+						copy("Updateable Bootstrap File", path, target, manifest.timestamp());
 					}
 				}
 			}
@@ -359,7 +359,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 							.resolve(file.target.equals(".") ? businessPathObj : businessPathObj.resolve(file.target))
 							.resolve(path.getFileName());
 					Path relTarget = imagePath.relativize(target);
-					copy(path, target, manifest.timestamp());
+					copy("App file", path, target, manifest.timestamp());
 					manifest.entries()
 							.add(new Entry(target, manifest).section(Section.APP).path(relTarget)
 									.uri(new URI(resolveUrl(normalizeForUri(remoteBase), relTarget.toString())))
@@ -387,7 +387,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 								if (!Files.isSymbolicLink(s)) {
 									Path t = checkFilesDir(repositoryPath.resolve(relPath));
 									try {
-										copy(s, t, manifest.timestamp());
+										copy("Non-app bootstrap file", s, t, manifest.timestamp());
 									} catch (IOException e) {
 										throw new IllegalStateException(
 												String.format("Failed to copy bootstrap file %s to %s.", s, t));
@@ -548,12 +548,10 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		if (isBootstrap) {
 			/* Bootstrap */
 			if (isModule) {
-				Path dir = checkDir(resolvePath(bootstrapPathObj, modulePath));
-				copy(aetherArtifact.getFile().toPath(), dir.resolve(getFileName(a)), manifest.timestamp());
+				Path dir = resolvePath(bootstrapPathObj, modulePath);
 				module(manifest, dir, false, a, resolutionResult, file, Section.BOOTSTRAP);
 			} else {
-				Path dir = checkDir(resolvePath(bootstrapPathObj, classPath));
-				copy(aetherArtifact.getFile().toPath(), dir.resolve(getFileName(a)), manifest.timestamp());
+				Path dir = resolvePath(bootstrapPathObj, classPath);
 				classpath(manifest, dir, false, a, resolutionResult, file, Section.BOOTSTRAP);
 			}
 		}
@@ -561,12 +559,10 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		if (isBusiness) {
 			/* App */
 			if (isModule) {
-				Path dir = checkDir(resolvePath(businessPathObj, modulePath));
-				copy(aetherArtifact.getFile().toPath(), dir.resolve(getFileName(a)), manifest.timestamp());
+				Path dir = resolvePath(businessPathObj, modulePath);
 				module(manifest, dir, true, a, resolutionResult, file, Section.APP);
 			} else {
-				Path dir = checkDir(resolvePath(businessPathObj, classPath));
-				copy(aetherArtifact.getFile().toPath(), dir.resolve(getFileName(a)), manifest.timestamp());
+				Path dir = resolvePath(businessPathObj, classPath);
 				classpath(manifest, dir, true, a, resolutionResult, file, Section.APP);
 			}
 		}
@@ -604,19 +600,22 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 
 			List<String> modulePaths = new ArrayList<>();
 			List<String> vmopts = new ArrayList<>();
+			Path localDir = resolvePath(imagePath.resolve(bootstrapPath), modulePath);
 			Path dir = resolvePath(bootstrapPath, modulePath);
-			if (Files.exists(dir)) {
-				for (File f : dir.toFile().listFiles()) {
+			if (Files.exists(localDir)) {
+				for (File f : localDir.toFile().listFiles()) {
 					modulePaths.add(dir + "/" + f.getName());
 					if (f.getName().startsWith("forker-updater")) {
 						useForkerModules = true;
 					}
 				}
 			}
+
+			localDir = resolvePath(imagePath.resolve(bootstrapPath), classPath);
 			dir = resolvePath(bootstrapPath, classPath);
 			List<String> classPaths = new ArrayList<>();
-			if (Files.exists(dir)) {
-				for (File f : dir.toFile().listFiles()) {
+			if (Files.exists(localDir)) {
+				for (File f : localDir.toFile().listFiles()) {
 					classPaths.add(dir + "/" + f.getName());
 				}
 			}
@@ -787,16 +786,16 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 	private void classpath(AppManifest manifest, Path path, boolean business, Artifact a,
 			ArtifactResult resolutionResult, File file, Section section) throws IOException, URISyntaxException {
 		String finalClassPath = path.resolve(getFileName(a)).toString();
-		getLog().info(String.format("Adding %s classpath jar %s to update4j config.", a.getFile(), finalClassPath));
+		getLog().info(String.format("Adding %s classpath jar %s to updater config.", a.getFile(), finalClassPath));
 		if (image)
-			copy(a.getFile().toPath(), imageDirectory.toPath().resolve(finalClassPath), manifest.timestamp());
+			copy("Image classpath jar", a.getFile().toPath(), imageDirectory.toPath().resolve(finalClassPath), manifest.timestamp());
 		String remoteUrl = mavenUrl(resolutionResult);
 		Entry entry;
 		Path entryPath = Paths.get(getFileName(a));
 		if (repository) {
 			if (remotesFromOriginalSource) {
 				if (!isRemote(remoteUrl) && !Files.isSymbolicLink(file.toPath())) {
-					copy(a.getFile().toPath(), repositoryDirectory.toPath().resolve(finalClassPath),
+					copy("Classpath jar from Maven", a.getFile().toPath(), repositoryDirectory.toPath().resolve(finalClassPath),
 							manifest.timestamp());
 				}
 				if (remoteUrl == null)
@@ -807,7 +806,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 				entry = new Entry(file.toPath(), manifest).section(section).name(entryPath)
 						.uri(new URI(repositoryUrl(resolutionResult, path))).type(Type.CLASSPATH);
 				if (!Files.isSymbolicLink(file.toPath()))
-					copy(file.toPath(), repositoryDirectory.toPath().resolve(finalClassPath), manifest.timestamp());
+					copy("Classpath jar from Local", file.toPath(), repositoryDirectory.toPath().resolve(finalClassPath), manifest.timestamp());
 			}
 		} else {
 			entry = new Entry(file.toPath(), manifest).section(section).name(entryPath).uri(new URI(remoteUrl))
@@ -823,14 +822,14 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		String finalModulePath = path.resolve(getFileName(a)).toString();
 		getLog().info(String.format("Adding %s module jar %s to updater config.", a.getFile(), finalModulePath));
 		if (image)
-			copy(file.toPath(), imageDirectory.toPath().resolve(finalModulePath), manifest.timestamp());
+			copy("Modulepath image jar", file.toPath(), imageDirectory.toPath().resolve(finalModulePath), manifest.timestamp());
 		String remoteUrl = mavenUrl(resolutionResult);
 		Entry entry;
 		Path entryPath =Paths.get(getFileName(a));
 		if (repository) {
 			if (remotesFromOriginalSource) {
 				if (!isRemote(remoteUrl)) {
-					copy(file.toPath(), repositoryDirectory.toPath().resolve(finalModulePath), manifest.timestamp());
+					copy("Modulepath jar from Maven", file.toPath(), repositoryDirectory.toPath().resolve(finalModulePath), manifest.timestamp());
 				}
 				if (remoteUrl == null)
 					remoteUrl = repositoryUrl(resolutionResult, path);
@@ -839,7 +838,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 			} else {
 				entry = new Entry(file.toPath(), manifest).section(section).name(entryPath)
 						.uri(new URI(repositoryUrl(resolutionResult, path))).type(Type.MODULEPATH);
-				copy(a.getFile().toPath(), repositoryDirectory.toPath().resolve(finalModulePath), manifest.timestamp());
+				copy("Modulepath jar from Local", a.getFile().toPath(), repositoryDirectory.toPath().resolve(finalModulePath), manifest.timestamp());
 			}
 		} else {
 			entry = new Entry(file.toPath(), manifest).section(section).name(entryPath).uri(new URI(remoteUrl))
@@ -1001,7 +1000,8 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		return tc;
 	}
 
-	private void copy(Path p1, Path p2, Instant mod) throws IOException {
+	private void copy(String reason, Path p1, Path p2, Instant mod) throws IOException {
+		getLog().info(String.format("Copy %s - %s to %s", reason, p1.toAbsolutePath(), p2.toAbsolutePath()));
 		Files.createDirectories(p2.getParent());
 		if (Files.isSymbolicLink(p1)) {
 			Files.createSymbolicLink(p2, Files.readSymbolicLink(p1));
