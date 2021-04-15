@@ -13,7 +13,7 @@ public class WrapperTest {
 		fw.getWrappedApplication().setModule(WrappedTest.class.getPackageName());
 		fw.getWrappedApplication().setClassname(WrappedTest.class.getName());
 		fw.getConfiguration().setRemaining("arg1");
-		fw.getConfiguration().setProperty("level", "FINE");
+		fw.getConfiguration().setProperty("level", "INFO");
 
 		// Start and wait for wrapper to exit
 		System.out.println("Wrapped process returned: " + fw.start());

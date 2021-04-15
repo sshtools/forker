@@ -1,8 +1,11 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 	<modelVersion>4.0.0</modelVersion>
-	<artifactId>forker-examples</artifactId>
-	<name>Forker Examples</name>
-	<description>Examples for the forker system.</description>
+	<artifactId>forker-pipes</artifactId>
+	<name>Forker Pipes</name>
+	<description>Abstracts operating system pipes, such as unix domain sockets on Unix and friends, and
+named pipes on Windows.</description>
 	<parent>
 		<groupId>com.sshtools</groupId>
 		<artifactId>forker</artifactId>
@@ -27,30 +30,28 @@
 				<directory>src/test/resources</directory>
 			</testResource>
 		</testResources>
-
 	</build>
 
 	<dependencies>
-		
 		<dependency>
-			<groupId>${project.groupId}</groupId>
-			<artifactId>forker-client</artifactId>
-			<version>${project.version}</version>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-lang3</artifactId>
+			<version>3.11</version>
 		</dependency>
 		<dependency>
 			<groupId>${project.groupId}</groupId>
-			<artifactId>forker-pty</artifactId>
+			<artifactId>forker-common</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>${project.groupId}</groupId>
-			<artifactId>forker-wrapper</artifactId>
-			<version>${project.version}</version>
+			<groupId>net.java.dev.jna</groupId>
+			<artifactId>jna</artifactId>
+			<version>5.6.0</version>
 		</dependency>
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>forker-wrapped</artifactId>
-            <version>${project.version}</version>
-        </dependency>
+		<dependency>
+			<groupId>net.java.dev.jna</groupId>
+			<artifactId>jna-platform</artifactId>
+			<version>5.6.0</version>
+		</dependency>
 	</dependencies>
 </project>

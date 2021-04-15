@@ -340,7 +340,8 @@ public class OSCommand {
 	 * iterator over all of the output as strings. An exception will be thrown if
 	 * the exit code is anything other than zero. This is more efficient that
 	 * {@link #adminCommandAndCaptureOutput(String...)} as the output is not built
-	 * up into memory first.
+	 * up into memory first. Be sure to iterate over all elements so the process
+	 * is ended correctly.
 	 * 
 	 * @param cwd  working directory
 	 * @param args command arguments
@@ -375,7 +376,8 @@ public class OSCommand {
 	 * strings. An exception will be thrown if the exit code is anything other than
 	 * zero. This is more efficient that
 	 * {@link #adminCommandAndCaptureOutput(String...)} as the output is not built
-	 * up into memory first.
+	 * up into memory first. Be sure to iterate over all elements so the process
+	 * is ended correctly.
 	 * 
 	 * @param args command arguments
 	 * @return output as iterator of strings
@@ -502,7 +504,7 @@ public class OSCommand {
 	 */
 	public static Process doCommand(File cwd, List<String> args, OutputStream out) throws IOException {
 		args = new ArrayList<String>(args);
-		LOG.fine("Running command: " + StringUtils.join(args, " "));
+		LOG.fine("Running command: " + String.join(" ", args));
 		ForkerBuilder builder = new ForkerBuilder(args);
 		if (io.get() != null)
 			builder.io(io.get());
@@ -1064,7 +1066,8 @@ public class OSCommand {
 	/**
 	 * Run a command with a particular working directory and iterate over all of the
 	 * output. An exception will be thrown if the exit code is anything other than
-	 * zero.
+	 * zero.  Be sure to iterate over all elements so the process
+	 * is ended correctly.
 	 * 
 	 * @param cwd  working directory
 	 * @param args command arguments
@@ -1184,7 +1187,8 @@ public class OSCommand {
 	/**
 	 * Run a command, iterating over it's output. This is more efficient that
 	 * {@link #runCommandAndCaptureOutput(String...)} as the output is not built up
-	 * into memory first.
+	 * into memory first. Be sure to iterate over all elements so the process
+	 * is ended correctly.
 	 * 
 	 * @param args command arguments
 	 * @return output as list of strings

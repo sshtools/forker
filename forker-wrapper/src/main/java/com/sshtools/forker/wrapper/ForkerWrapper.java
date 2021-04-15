@@ -1,5 +1,6 @@
 package com.sshtools.forker.wrapper;
 
+import java.awt.SplashScreen;
 import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.File;
@@ -14,7 +15,6 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
 import java.io.UnsupportedEncodingException;
-import java.lang.management.ManagementFactory;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -59,12 +59,16 @@ import java.util.logging.Logger;
 
 import javax.management.InstanceNotFoundException;
 import javax.management.MBeanException;
+import javax.management.MBeanServer;
 import javax.management.MBeanServerConnection;
+import javax.management.MBeanServerFactory;
 import javax.management.MXBean;
 import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
 import javax.management.ReflectionException;
 import javax.management.remote.JMXConnectorFactory;
+import javax.management.remote.JMXConnectorServer;
+import javax.management.remote.JMXConnectorServerFactory;
 import javax.management.remote.JMXServiceURL;
 
 import org.apache.commons.lang3.StringUtils;
@@ -82,14 +86,12 @@ import com.sshtools.forker.common.Util;
 import com.sshtools.forker.common.Util.TeeOutputStream;
 import com.sshtools.forker.wrapper.JVM.Version;
 import com.sun.jna.Native;
-import com.sun.tools.attach.AttachNotSupportedException;
-import com.sun.tools.attach.VirtualMachine;
-import com.sun.tools.attach.VirtualMachineDescriptor;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Model.OptionSpec;
 import picocli.CommandLine.Model.PositionalParamSpec;
+import picocli.CommandLine.ParameterException;
 import picocli.CommandLine.ParseResult;
 
 /**
@@ -240,6 +242,20 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	
 	/** The jmx object name. */
 	private ObjectName jmxObjectName;
+	
+	/**
+	 * JMX Address of wrapped application, only available once it has reported back that it
+	 * is launching via this applications JMX server
+	 */
+	private String wrappedJMXAddress;
+	
+	/**
+	 * Launch directory
+	 */
+	private File launchDirectory = new File(System.getProperty("user.dir"));
+
+	private static JMXConnectorServer server;
+	private static MBeanServer mbs;
 
 	{
 		reconfigureLogging();
@@ -369,6 +385,28 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	}
 
 	/**
+	 * Get the launch directory. Usually this is the working directory that
+	 * this runtime was started from, but may be changed by extensions such
+	 * as the installer.
+	 * 
+	 * @return launch directory.
+	 */
+	public File getLaunchDirectory() {
+		return launchDirectory;
+	}
+
+	/**
+	 * Set the launch directory. Usually this is the working directory that
+	 * this runtime was started from, but may be changed by extensions such
+	 * as the installer.
+	 * 
+	 * @param launchDirectory launch directory.
+	 */
+	public void setLaunchDirectory(File launchDirectory) {
+		this.launchDirectory = launchDirectory;
+	}
+
+	/**
 	 * Relativize.
 	 *
 	 * @param context the context
@@ -430,6 +468,25 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	}
 
 	/**
+	 * Wrapped application can call this to indicate it is full ready. This
+	 * could be used to close the splash screen and more.
+	 */
+	@Override
+	public void ready() {
+		closeSplash();
+	}
+
+	/**
+	 * Wrapped application is about to actually launch and has setup a JMX server
+	 * for communication with the wrapper.
+	 */
+	@Override
+	public void wrapped(String jmxUrl) {
+		logger.info(String.format("Wrapped application has JMX url of %s", jmxUrl));
+		wrappedJMXAddress = jmxUrl;
+	}
+
+	/**
 	 * Start.
 	 *
 	 * @return the int
@@ -454,7 +511,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		String wrapperClasspath = resolveWrapperClasspath();
 		String wrapperModulepath = resolveWrapperModulepath();
 		String forkerClasspath = System.getProperty("java.class.path");
-		String forkerModulepath = System.getProperty("java.module.path");
+		String forkerModulepath = System.getProperty("jdk.module.path");
 		String bootClasspath = configuration.getOptionValue("boot-classpath", null);
 		final boolean nativeMain = configuration.getSwitch("native", false);
 		if(configuration.getSwitch("no-forker-daemon", false)) {
@@ -485,11 +542,20 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			logger.finest(String.format("Failed to set process name to %s", app.getClassname()));
 		}
 		try {
-			ManagementFactory.getPlatformMBeanServer().registerMBean(this,
+			if(mbs == null) {
+		        mbs = MBeanServerFactory.newMBeanServer();
+				server = JMXConnectorServerFactory.newJMXConnectorServer(new JMXServiceURL("service:jmx:rmi://"), null, mbs);
+			    server.start();
+			    JMXServiceURL outputAddr = server.getAddress();
+			    logger.info(String.format("JMX started on %s", outputAddr));
+			    configuration.addProperty("setenv", "FORKER_JMX_URL=" + outputAddr.toString());
+			}
+		    mbs.registerMBean(this,
 					new ObjectName("com.sshtools.forker.wrapper:type=Wrapper"));
 		} catch (Exception e) {
-			logger.warning("Could not start MBean server, no JMX features will be available.");
+			logger.log(Level.WARNING, "Could not start MBean server, no JMX features will be available.", e);
 		}
+		
 		/*
 		 * Create a lock file if 'single instance' was specified
 		 */
@@ -581,6 +647,22 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			stopping = false;
 			preventRestart = false;
 			tempRestartOnExit = false;
+			try {
+				mbs.unregisterMBean(new ObjectName("com.sshtools.forker.wrapper:type=Wrapper"));
+			}
+			catch(Exception e) {
+			}
+		}
+	}
+
+	public void closeSplash() {
+		try {
+			final SplashScreen splash = SplashScreen.getSplashScreen();
+			if(splash != null)
+				splash.close();
+		}
+		catch(Exception e) {
+			logger.log(Level.FINE, "Ignoring splash error.", e);
 		}
 	}
 
@@ -636,7 +718,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 
 		monitorConfigurationFiles();
-		monitorWrappedApplication();
 		monitorWrappedJMXApplication();
 
 		event(STARTING_APPLICATION, String.valueOf(times), resolveCwd().getAbsolutePath(), app.fullClassAndModule(),
@@ -959,7 +1040,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	 * @param args the args
 	 * @return the object
 	 * @throws MalformedObjectNameException the malformed object name exception
-	 * @throws AttachNotSupportedException the attach not supported exception
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 * @throws MalformedURLException the malformed URL exception
 	 * @throws InstanceNotFoundException the instance not found exception
@@ -967,7 +1047,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	 * @throws ReflectionException the reflection exception
 	 */
 	protected Object executeJmxCommandInApp(String method, Object... args)
-			throws MalformedObjectNameException, AttachNotSupportedException, IOException, MalformedURLException,
+			throws MalformedObjectNameException, IOException, MalformedURLException,
 			InstanceNotFoundException, MBeanException, ReflectionException {
 		logger.log(Level.FINE,
 				String.format("Executing %s in remote app with arguments %s", method, Arrays.asList(args)));
@@ -985,36 +1065,18 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	 * Check JMX connection to wrapped.
 	 *
 	 * @throws MalformedObjectNameException the malformed object name exception
-	 * @throws AttachNotSupportedException the attach not supported exception
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 * @throws MalformedURLException the malformed URL exception
 	 */
 	protected void checkJMXConnectionToWrapped()
-			throws MalformedObjectNameException, AttachNotSupportedException, IOException, MalformedURLException {
-		if (jmxConnectionToWrapped == null) {
-			List<VirtualMachineDescriptor> vms = VirtualMachine.list();
-			for (VirtualMachineDescriptor desc : vms) {
-				List<String> dn = Arrays.asList(desc.displayName().split(" "));
-				if (dn.contains(WRAPPED_MODULE_NAME + "/" + WRAPPED_CLASS_NAME) || dn.contains(WRAPPED_CLASS_NAME)) {
-					jmxObjectName = new ObjectName(
-							String.format("%s:type=basic,name=%s", WRAPPED_MODULE_NAME, WRAPPED_MX_BEAN_NAME));
-					VirtualMachine vm = desc.provider().attachVirtualMachine(desc);
-					String connectorAddress = vm.getAgentProperties()
-							.getProperty("com.sun.management.jmxremote.localConnectorAddress", null);
-					if (connectorAddress == null) {
-						vm.startLocalManagementAgent();
-						connectorAddress = vm.getAgentProperties()
-								.getProperty("com.sun.management.jmxremote.localConnectorAddress", null);
-						if (connectorAddress == null) {
-							throw new IllegalStateException("Could not start local management agent.");
-						}
-					}
-					JMXServiceURL jmxUrl = new JMXServiceURL(connectorAddress);
-					jmxConnectionToWrapped = JMXConnectorFactory.connect(jmxUrl).getMBeanServerConnection();
-					break;
-
-				}
-			}
+			throws MalformedObjectNameException, IOException, MalformedURLException {
+		if (jmxConnectionToWrapped == null && wrappedJMXAddress != null) {
+			jmxObjectName = new ObjectName(
+					String.format("%s:type=basic,name=%s", WRAPPED_MODULE_NAME, WRAPPED_MX_BEAN_NAME));
+			JMXServiceURL jmxUrl = new JMXServiceURL(wrappedJMXAddress);
+		    logger.info(String.format("Connecting to wrapped applications JMX on  %s", jmxUrl));
+			jmxConnectionToWrapped = JMXConnectorFactory.connect(jmxUrl).getMBeanServerConnection();
+		    logger.info(String.format("Connected to wrapped applications JMX on  %s", jmxUrl));
 		}
 	}
 
@@ -1188,9 +1250,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	public static void wrapperMain(String[] args, ForkerWrapper wrapper, CommandSpec opts) {
 		CommandLine cl = new CommandLine(opts);
 		cl.setTrimQuotes(true);
-		cl.setUnmatchedArgumentsAllowed(true);
-		cl.setUnmatchedOptionsAllowedAsOptionParameters(true);
-		cl.setUnmatchedOptionsArePositionalParams(true);
+//		cl.setUnmatchedArgumentsAllowed(true);
+//		cl.setUnmatchedOptionsAllowedAsOptionParameters(true);
+//		cl.setUnmatchedOptionsArePositionalParams(true);
 		try {
 			ParseResult cmd = cl.parseArgs(args);
 			wrapper.init(cmd);
@@ -1209,7 +1271,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				System.setErr(new PrintStream(new FileOutputStream(fdErr), true));
 			}
 			if (CommandLine.printHelpIfRequested(cmd)) {
-				System.exit(0);
+				exit(0);
 			}
 			for (String cfg : wrapper.getConfiguration().getOptionValues("configuration")) {
 				wrapper.readConfigFile(new File(cfg));
@@ -1237,12 +1299,14 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				}
 			});
 			if (ret != Integer.MIN_VALUE)
-				System.exit(ret);
+				exit(ret);
 		} catch (Throwable e) {
-			e.printStackTrace();
 			System.err.println(String.format("%s: %s\n", wrapper.getClass().getName(), e.getMessage()));
-			cl.usage(new PrintWriter(System.err, true));
-			System.exit(1);
+			if(!(e instanceof ParameterException))
+				e.printStackTrace();
+			else
+				System.err.println(cl.getHelp().abbreviatedSynopsis()); 
+			exit(1);
 		}
 
 	}
@@ -1536,9 +1600,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 						+ "of times start via (forker.info.attempts) and more. This option prevents those being set.")
 				.build());
 		options.addOption(OptionSpec.builder("-nf", "--native-fork")
-				.description("Overwriite logfiles instead of appending.").build());
+				.description("Use an alternative method for forking as a daemon.").build());
 		options.addOption(OptionSpec.builder("-o", "--log-overwrite")
-				.description("Overwriite logfiles instead of appending.").build());
+				.description("Overwrite logfiles instead of appending.").build());
 		options.addOption(OptionSpec.builder("-l", "--log").paramLabel("file").type(File.class).description(
 				"Where to log stdout (and by default stderr) output. If not specified, will be output on stdout (or stderr) of this process.")
 				.build());
@@ -1691,6 +1755,17 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				.build());
 		
 		options.name(getAppName());
+	}
+	
+	protected static void exit(int val) {
+		if(server != null) {
+			try {
+				server.stop();
+			}
+			catch(Exception e) {
+			}
+		}
+		System.exit(val);
 	}
 
 	/**
@@ -1871,6 +1946,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				if (app.getOriginalArgs() == null)
 					throw new IllegalStateException("Original arguments must be set.");
 				ForkerBuilder fb = new ForkerBuilder();
+				fb.directory(getLaunchDirectory());
 				fb.command().add(javaExe);
 				if (StringUtils.isNotBlank(forkerModulepath)) {
 					fb.command().add("-p");
@@ -1884,18 +1960,27 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					if (System.getProperty(s) != null)
 						fb.command().add("-D" + s + "=" + System.getProperty(s));
 				}
-				fb.environment().put("FORKER_FALLBACK_ACTIVE", "true");
+				fb.command().add("-Dforkerwrapper.fallback.active=true");
+				fb.command().add("-Dforkerwrapper.quiet=true");
 				// Currently needs to be quiet :(
-				fb.environment().put("FORKER_QUIET", "true");
+//				fb.environment().put("FORKER_FALLBACK_ACTIVE", "true");
+//				fb.environment().put("FORKER_QUIET", "true");
+				
 				// Doesnt seem to work
 				// fb.environment().put("FORKER_FDOUT", "1");
 				// fb.environment().put("FORKER_FDERR", "2");
-				fb.command().add(ForkerWrapper.class.getName());
+				if(StringUtils.isNotBlank(System.getProperty("jdk.module.main"))) {
+					fb.command().add("-m");
+					fb.command().add(System.getProperty("jdk.module.main") + "/" + System.getProperty("jdk.module.main.class"));
+				}
+				else {
+					fb.command().add(ForkerWrapper.class.getName());
+				}
 				// fb.command().add("--fdout=1");
 				// fb.command().add("--fderr=2");
 				fb.command().addAll(Arrays.asList(app.getOriginalArgs()));
 				fb.background(true);
-				fb.io(IO.IO);
+				fb.io(IO.DEFAULT);
 				logger.info(String.format("Executing: %s", String.join(" ", fb.command())));
 				Process p = fb.start();
 				try {
@@ -2106,53 +2191,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 									}
 								}
 							}
-							Thread.sleep(1000);
-						}
-					} catch (InterruptedException ie) {
-					}
-				}
-			};
-			monitorThread.start();
-		} else if ((!isUseDaemon() || Integer.parseInt(configuration.getOptionValue("timeout", "60")) == 0)
-				&& monitorThread != null) {
-			monitorThread.interrupt();
-			monitorThread = null;
-			logger.info("Stopping forker monitor thread.");
-		}
-	}
-
-	/**
-	 * Monitor wrapped application.
-	 */
-	protected void monitorWrappedApplication() {
-		if (!usingWrapped && isUseDaemon() && Integer.parseInt(configuration.getOptionValue("timeout", "60")) > 0
-				&& monitorThread == null) {
-			monitorThread = new Thread() {
-				{
-					setName("ForkerWrapperMonitor");
-					setDaemon(true);
-				}
-
-				@Override
-				public void run() {
-					logger.info("Monitoring pings from wrapped application");
-					try {
-						while (!stopping) {
-//							if (process != null && daemon != null) {
-//								WrapperHandler wrapper = daemon.getHandler(WrapperHandler.class);
-//								int timeout = Integer.parseInt(configuration.getOptionValue("timeout", "60"));
-//								if (wrapper.getLastPing() > 0
-//										&& (wrapper.getLastPing() + timeout * 1000) <= System.currentTimeMillis()) {
-//									logger.warning(String.format(
-//											"Process has not sent a ping in %d seconds, attempting to terminate",
-//											timeout));
-//									tempRestartOnExit = true;
-//									/*
-//									 * TODO may need to be more forceful than this, e.g. OS kill
-//									 */
-//									process.destroy();
-//								}
-//							}
 							Thread.sleep(1000);
 						}
 					} catch (InterruptedException ie) {
@@ -2407,7 +2445,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 		if (onBeforeProcess(() -> {
 			continueProcessing();
-			System.exit(task.call());
+			exit(task.call());
 			return null;
 		})) {
 			continueProcessing();
@@ -2523,7 +2561,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 						}
 					} else {
 						logger.info(String.format("The configuration change will adjust the running service."));
-						monitorWrappedApplication();
 						monitorWrappedJMXApplication();
 						monitorConfigurationFiles();
 					}
@@ -2969,7 +3006,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		/* Environment variables */
 
 		for (String env : configuration.getOptionValues("setenv")) {
-			String[] nv = nameValue(env.substring(2));
+			String[] nv = nameValue(env);
 			appBuilder.environment().put(nv[0], nv[1]);
 		}
 

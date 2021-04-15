@@ -99,6 +99,9 @@ public abstract class AbstractOSProcess extends ForkerProcess {
 			if (bui.length() > 0) {
 				bui.append(";");
 			}
+			if (builder.background()) {
+				bui.append("nohup ");
+			}
 			for (String a : builder.getAllArguments()) {
 				bui.append(" '");
 				bui.append(Util.escapeSingleQuotes(a));
@@ -109,8 +112,6 @@ public abstract class AbstractOSProcess extends ForkerProcess {
 			}
 			if (builder.redirectErrorStream()) {
 				bui.insert(0, "(");
-			}
-			if (builder.redirectErrorStream()) {
 				bui.append(") 2>&1");
 			}
 			if (builder.background()) {

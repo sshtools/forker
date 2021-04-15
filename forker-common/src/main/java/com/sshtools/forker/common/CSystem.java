@@ -3,6 +3,7 @@ package com.sshtools.forker.common;
 import java.util.Arrays;
 import java.util.List;
 
+import com.sun.jna.LastErrorException;
 import com.sun.jna.Library;
 import com.sun.jna.Memory;
 import com.sun.jna.Native;
@@ -10,30 +11,64 @@ import com.sun.jna.Platform;
 import com.sun.jna.Pointer;
 import com.sun.jna.PointerType;
 import com.sun.jna.Structure;
+import com.sun.jna.Structure.FieldOrder;
 
 /**
  * Interface to the native C library.
  */
 public interface CSystem extends Library {
+
+	/**
+	 * The Class SockAddr.
+	 */
+	@FieldOrder({"sun_family", "sun_path"})
+	public static class SockAddr extends Structure {
+
+		/** The sun family. */
+		public short sun_family;
+		
+		/** The sun path. */
+		public byte[] sun_path;
+
+		/**
+		 * Instantiates a new sock addr.
+		 *
+		 * @param sunPath the sun path
+		 */
+		public SockAddr(String sunPath) {
+			sun_family = AF_UNIX;
+			byte[] arr = sunPath.getBytes();
+			sun_path = new byte[arr.length + 1];
+			System.arraycopy(arr, 0, sun_path, 0, Math.min(sun_path.length - 1, arr.length));
+			allocateMemory();
+		}
+	}
+	
 	/**
 	 * Instance of library.
 	 */
 	CSystem INSTANCE = (CSystem) Native.load((Platform.isWindows() ? "msvcrt" : "c"), CSystem.class);
+	
+	/** The Constant AF_UNIX. */
+	public static final int AF_UNIX = 1;
+	
+	/** The Constant SOCK_STREAM. */
+	public static final int SOCK_STREAM = Platform.isSolaris() ? 2 : 1;
+	
+	/** The Constant PROTOCOL. */
+	public static final int PROTOCOL = 0;
 
 	/**
 	 * The change occurs immediately.
 	 */
 	public final static int TCSANOW = 0;
-	/**
-	 * Stdin FD
-	 */
+	
+	/** Stdin FD. */
 	public final static int STDIN_FILENO = 0;
 
 	/* c_oflag bits */
 
-	/**
-	 * Post-process output
-	 */
+	/** Post-process output. */
 	public final static int OPOST = 0x00000001;
 
 	/* c_iflag bits */
@@ -56,6 +91,101 @@ public interface CSystem extends Library {
 	 * location pointed to by (char *) arg2.
 	 */
 	public final static int PR_SET_NAME = 15;
+
+	/**
+	 * Socket.
+	 *
+	 * @param domain the domain
+	 * @param type the type
+	 * @param protocol the protocol
+	 * @return the int
+	 * @throws LastErrorException the last error exception
+	 */
+	int socket(int domain, int type, int protocol) throws LastErrorException;
+
+	/**
+	 * Bind.
+	 *
+	 * @param fd the fd
+	 * @param sockaddr the sockaddr
+	 * @param addrlen the addrlen
+	 * @return the int
+	 * @throws LastErrorException the last error exception
+	 */
+	int bind(int fd, SockAddr sockaddr, int addrlen) throws LastErrorException;
+
+	/**
+	 * Accept.
+	 *
+	 * @param fd the fd
+	 * @param sockaddr the sockaddr
+	 * @param addrlen the addrlen
+	 * @return the int
+	 * @throws LastErrorException the last error exception
+	 */
+	int accept(int fd, SockAddr sockaddr, int addrlen) throws LastErrorException;
+
+	/**
+	 * Listen.
+	 *
+	 * @param fd the fd
+	 * @param backlog the backlog
+	 * @return the int
+	 * @throws LastErrorException the last error exception
+	 */
+	int listen(int fd, int backlog) throws LastErrorException;
+
+	/**
+	 * Connect.
+	 *
+	 * @param sockfd the sockfd
+	 * @param sockaddr the sockaddr
+	 * @param addrlen the addrlen
+	 * @return the int
+	 * @throws LastErrorException the last error exception
+	 */
+	int connect(int sockfd, SockAddr sockaddr, int addrlen) throws LastErrorException;
+
+	/**
+	 * Recv.
+	 *
+	 * @param fd the fd
+	 * @param buffer the buffer
+	 * @param count the count
+	 * @param flags the flags
+	 * @return the int
+	 * @throws LastErrorException the last error exception
+	 */
+	int recv(int fd, byte[] buffer, int count, int flags) throws LastErrorException;
+
+	/**
+	 * Send.
+	 *
+	 * @param fd the fd
+	 * @param buffer the buffer
+	 * @param count the count
+	 * @param flags the flags
+	 * @return the int
+	 * @throws LastErrorException the last error exception
+	 */
+	int send(int fd, byte[] buffer, int count, int flags) throws LastErrorException;
+
+	/**
+	 * Close.
+	 *
+	 * @param fd the fd
+	 * @return the int
+	 * @throws LastErrorException the last error exception
+	 */
+	int close(int fd) throws LastErrorException;
+
+	/**
+	 * Strerror.
+	 *
+	 * @param errno the errno
+	 * @return the string
+	 */
+	String strerror(int errno);
 
 	/**
 	 * passes the command name or program name specified by command to the host
@@ -225,40 +355,31 @@ public interface CSystem extends Library {
 	int kill(long pid, int sig);
 
 	/**
-	 * Operations on a process
-	 * 
-	 * @param option
-	 *            option
-	 * @param arg2
-	 *            arg2
-	 * @param arg3
-	 *            arg3
-	 * @param arg4
-	 *            arg4
-	 * @param arg5
-	 *            arg5
+	 * Operations on a process.
+	 *
+	 * @param option            option
+	 * @param arg2            arg2
+	 * @param arg3            arg3
+	 * @param arg4            arg4
+	 * @param arg5            arg5
 	 * @return status
 	 */
 	int prctl(int option, Pointer arg2, Pointer arg3, Pointer arg4, Pointer arg5);
 
 	/**
-	 * Get terminal attributes, line control, get baud rate
-	 * 
-	 * @param port
-	 *            port
-	 * @param termios
-	 *            IO structure
+	 * Get terminal attributes, line control, get baud rate.
+	 *
+	 * @param port            port
+	 * @param termios            IO structure
 	 * @return status
 	 */
 	int tcgetattr(int port, Termios termios);
 
 	/**
-	 * Set terminal attributes, line control, set baud rate
-	 * 
-	 * @param port
-	 *            port mode
-	 * @param mode
-	 *            IO structure
+	 * Set terminal attributes, line control, set baud rate.
+	 *
+	 * @param port            port mode
+	 * @param mode            IO structure
 	 * @param termios term IO structure
 	 * @return status
 	 */
@@ -284,54 +405,44 @@ public interface CSystem extends Library {
 	}
 
 	/**
-	 * Terminal IO structure
+	 * Terminal IO structure.
 	 */
 	public class Termios extends Structure {
 
-		/**
-		 * Input flags
-		 */
+		/** Input flags. */
 		public int c_iflag;
-		/**
-		 * Output flags
-		 */
+		
+		/** Output flags. */
 		public int c_oflag;
-		/**
-		 * Control modes
-		 */
+		
+		/** Control modes. */
 		public int c_cflag;
-		/**
-		 * Local modes
-		 */
+		
+		/** Local modes. */
 		public int c_lflag;
-		/**
-		 * Line discipline
-		 */
+		
+		/** Line discipline. */
 		public byte c_line;
-		/**
-		 * Special characters
-		 */
+		
+		/** Special characters. */
 		public byte[] c_cc = new byte[(32)];
-		/**
-		 * Input speed
-		 */
+		
+		/** Input speed. */
 		public int c_ispeed;
-		/**
-		 * Output speed
-		 */
+		
+		/** Output speed. */
 		public int c_ospeed;
 
 		/**
-		 * Constructor
+		 * Constructor.
 		 */
 		public Termios() {
 		}
 
 		/**
-		 * Construct a new terminal IO structure from another
-		 * 
-		 * @param termios
-		 *            structure to copy from
+		 * Construct a new terminal IO structure from another.
+		 *
+		 * @param termios            structure to copy from
 		 */
 		public Termios(Termios termios) {
 			this.c_iflag = termios.c_iflag;
@@ -349,6 +460,11 @@ public interface CSystem extends Library {
 			return Arrays.asList("c_iflag", "c_oflag", "c_cflag", "c_lflag", "c_line", "c_cc", "c_ispeed", "c_ospeed");
 		}
 
+		/**
+		 * To string.
+		 *
+		 * @return the string
+		 */
 		@Override
 		public String toString() {
 			return "Termios [c_iflag=" + c_iflag + ", c_oflag=" + c_oflag + ", c_cflag=" + c_cflag + ", c_lflag="

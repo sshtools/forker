@@ -36,6 +36,7 @@ public class Command {
 	private IO io = SystemUtils.IS_OS_WINDOWS ? IO.DEFAULT : IO.NON_BLOCKING;
 	private Priority priority = null;
 	private List<Integer> affinity = new ArrayList<Integer>();
+	private boolean background;
 
 	/**
 	 * Constructor
@@ -44,6 +45,23 @@ public class Command {
 		environment = new ProcessBuilder("dummy").environment();
 	}
 
+	/**
+	 * Get whether or not this process will be launched in the background.
+	 * 
+	 * @return background
+	 */
+	public boolean isBackground() {
+		return background;
+	}
+
+	/**
+	 * Set whether or not this process will be launched in the background.
+	 * 
+	 * @param background whether to run in background or not
+	 */
+	public void setBackground(boolean background) {
+		this.background = background;
+	}
 	/**
 	 * Construct a new command given the serialisation stream. The order of
 	 * attributes must be as per {@link Command#write(DataOutputStream)}.
@@ -307,6 +325,10 @@ public class Command {
 				a.add(6, "\"Forker\"");
 			} else
 				throw new UnsupportedOperationException();
+		}
+		
+		if(SystemUtils.IS_OS_UNIX && background) {
+			a.add(0, "nohup");
 		}
 
 		if (!affinity.isEmpty()) {

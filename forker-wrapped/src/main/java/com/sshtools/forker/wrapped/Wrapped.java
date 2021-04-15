@@ -1,13 +1,24 @@
 package com.sshtools.forker.wrapped;
 
-import java.lang.management.ManagementFactory;
+import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import javax.management.InstanceNotFoundException;
+import javax.management.MBeanException;
 import javax.management.MBeanServer;
+import javax.management.MBeanServerConnection;
+import javax.management.MBeanServerFactory;
+import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
+import javax.management.ReflectionException;
+import javax.management.remote.JMXConnectorFactory;
+import javax.management.remote.JMXConnectorServer;
+import javax.management.remote.JMXConnectorServerFactory;
+import javax.management.remote.JMXServiceURL;
 
 public class Wrapped implements WrappedMXBean {
 
@@ -29,6 +40,10 @@ public class Wrapped implements WrappedMXBean {
 	private boolean runMonitor = true;
 	private Object monitorLock = new Object();
 	private Method mainMethod;
+	private boolean ready;
+	private MBeanServerConnection wrapperJMXConnection;
+	private JMXServiceURL wrapperJMXUrlObject;
+	private JMXConnectorServer server;
 
 	public static Wrapped get() {
 		return instance;
@@ -60,14 +75,56 @@ public class Wrapped implements WrappedMXBean {
 	public void removeShutdownListener(ShutdownListener listener) {
 		shutdownListeners.remove(listener);
 	}
+	
+	public void ready() {
+		if(!ready) {
+			ready = true;
+			try {
+				wrapperJMXConnection.invoke(new ObjectName("com.sshtools.forker.wrapper:type=Wrapper"), "ready", new Object[] { }, new String[] { });
+			} catch (InstanceNotFoundException | MalformedObjectNameException | MBeanException | ReflectionException
+					| IOException e) {
+				System.getLogger(Wrapped.class.getName()).log(Level.ERROR, "Failed to notify application ready.", e);
+			}
+		}
+	}
+	
+	public void close() {
+		/* This should be called before System.exit() so that
+		 * RMI objects can be unexported (i.e. JMX shutdown). Without
+		 * it, non-daemon "RMI Reaper" thread may stay running.
+		 * 
+		 * https://blakboard.wordpress.com/2011/02/22/effects-of-java-rmi-on-jvm-shutdown/
+		 */
+		if(server != null) {
+			try {
+				server.stop();
+			} catch (IOException e) {
+			}
+			finally {
+				server = null;
+			}
+		}
+	}
 
 	void init(String[] args) throws Exception {
+
+		/* Get the JMX url for the wrappers JMX service */
+		String wrapperJMXUrl = System.getenv("FORKER_JMX_URL");
+		if(wrapperJMXUrl == null || wrapperJMXUrl.length() == 0)
+			throw new IllegalStateException("No wrapper JMX URL.");
+		
+		
+		/* Create a new JMX server for the wrapped application */
+		MBeanServer mbs = MBeanServerFactory.newMBeanServer();
+		server = JMXConnectorServerFactory.newJMXConnectorServer(new JMXServiceURL("service:jmx:rmi://"), null, mbs);
+		server.start();
+		JMXServiceURL outputAddr = server.getAddress();
+		
 		ObjectName objectName = new ObjectName(String.format("%s:type=basic,name=%s",
 				WrappedMXBean.class.getPackageName(), WrappedMXBean.class.getSimpleName()));
-		MBeanServer server = ManagementFactory.getPlatformMBeanServer();
 
 		/* Expose the wrapped application */
-		server.registerMBean(this, objectName);
+		mbs.registerMBean(this, objectName);
 		List<String> argList = new ArrayList<String>(Arrays.asList(args));
 		if (argList.isEmpty()) {
 			throw new IllegalArgumentException("First argument must be the class to actually run.");
@@ -77,6 +134,11 @@ public class Wrapped implements WrappedMXBean {
 		if (loader == null)
 			loader = Wrapped.class.getClassLoader();
 		Class<?> clazz = loader.loadClass(classname);
+		
+		/* Connect to the wrappers JMX service and tell it our own JMX url */
+		wrapperJMXUrlObject = new JMXServiceURL(wrapperJMXUrl);
+		wrapperJMXConnection = JMXConnectorFactory.connect(wrapperJMXUrlObject).getMBeanServerConnection();
+		wrapperJMXConnection.invoke(new ObjectName("com.sshtools.forker.wrapper:type=Wrapper"), "wrapped", new Object[] { outputAddr.toString() }, new String[] { String.class.getName() });
 
 		/* Launch */
 		mainMethod = clazz.getMethod("main", String[].class);
@@ -196,5 +258,4 @@ public class Wrapped implements WrappedMXBean {
 			lastPing = System.currentTimeMillis();
 		}
 	}
-
 }

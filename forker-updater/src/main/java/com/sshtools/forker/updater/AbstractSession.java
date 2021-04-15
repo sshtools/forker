@@ -19,7 +19,7 @@ public abstract class AbstractSession implements Session {
 
 	private Updater updater;
 	private AppManifest manifest;
-
+	
 	public Updater updater() {
 		return updater;
 	}

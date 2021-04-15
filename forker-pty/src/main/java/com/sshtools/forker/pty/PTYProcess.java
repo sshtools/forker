@@ -96,6 +96,14 @@ public class PTYProcess extends ForkerProcess {
 
 	}
 
+	public void setSize(int cols, int rows) {
+		nativeProcess.setWinSize(new WinSize(cols, rows));
+	}
+
+	public void setSize(int cols, int rows, int width, int height) {
+		nativeProcess.setWinSize(new WinSize(cols, rows, width, height));
+	}
+	
 	@Override
 	public ProcessHandle toHandle() {
 		return ProcessHandle.of(nativeProcess.getPid()).get();

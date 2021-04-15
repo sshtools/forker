@@ -1,6 +1,9 @@
 package com.sshtools.forker.wrapper;
 
 public interface ForkerWrapperMXBean {
+	void ready();
+	
+	void wrapped(String jmxUrl);
 
 	String getClassname();
 

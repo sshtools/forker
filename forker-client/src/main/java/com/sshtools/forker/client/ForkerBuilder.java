@@ -32,7 +32,6 @@ import com.sshtools.forker.common.Util;
  *
  */
 public class ForkerBuilder {
-	private boolean background;
 	private Command command = new Command();
 	private ForkerConfiguration configuration;
 	private EffectiveUser effectiveUser;
@@ -104,7 +103,7 @@ public class ForkerBuilder {
 	 * @return background
 	 */
 	public boolean background() {
-		return background;
+		return command.isBackground();
 	}
 
 	/**
@@ -114,7 +113,7 @@ public class ForkerBuilder {
 	 * @return this for chaining
 	 */
 	public ForkerBuilder background(boolean background) {
-		this.background = background;
+		command.setBackground(background);
 		return this;
 	}
 
@@ -462,7 +461,7 @@ public class ForkerBuilder {
 
 	@Override
 	public String toString() {
-		return "ForkerBuilder [command=" + command + ", background=" + background + ", effectiveUser=" + effectiveUser + "]";
+		return "ForkerBuilder [command=" + command + ", effectiveUser=" + effectiveUser + "]";
 	}
 
 	protected IOException handleIllegalArgumentException(String prog, String dir, IllegalArgumentException e) {

@@ -21,21 +21,22 @@ public class NonBlocking {
 		} else {
 			builder.command("DIR", "C:\\");
 		}
-		NonBlockingProcess process = new ForkerBuilder("ls","-al", "/").io(IO.NON_BLOCKING).redirectErrorStream(true).start(new DefaultNonBlockingProcessListener() {
-			@Override
-			public void onStdout(NonBlockingProcess process, ByteBuffer buffer, boolean closed) {
-				if (!closed) {
-					byte[] bytes = new byte[buffer.remaining()];
-					/* Consume bytes from buffer (so position is updated) */
-					buffer.get(bytes);
-					System.out.println(new String(bytes));
-				}
-			}
-		});
+		NonBlockingProcess process = new ForkerBuilder("ls", "-al", "/").io(IO.NON_BLOCKING).redirectErrorStream(true)
+				.start(new DefaultNonBlockingProcessListener() {
+					@Override
+					public void onStdout(NonBlockingProcess process, ByteBuffer buffer, boolean closed) {
+						if (!closed) {
+							byte[] bytes = new byte[buffer.remaining()];
+							/* Consume bytes from buffer (so position is updated) */
+							buffer.get(bytes);
+							System.out.println(new String(bytes));
+						}
+					}
+				});
 		/*
-		 * Not strictly required, this is just to hold up the example thread
-		 * until the command is finished, your use case may or may not need to
-		 * wait for the command to finish.
+		 * Not strictly required, this is just to hold up the example thread until the
+		 * command is finished, your use case may or may not need to wait for the
+		 * command to finish.
 		 */
 		System.out.println("Done: " + process.waitFor());
 	}

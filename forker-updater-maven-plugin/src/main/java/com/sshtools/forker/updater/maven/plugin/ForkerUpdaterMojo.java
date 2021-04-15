@@ -30,6 +30,7 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.execution.MavenSession;
@@ -45,7 +46,6 @@ import org.apache.maven.toolchain.Toolchain;
 import org.apache.maven.toolchain.ToolchainManager;
 import org.codehaus.plexus.languages.java.jpms.LocationManager;
 import org.codehaus.plexus.util.IOUtil;
-import org.codehaus.plexus.util.StringUtils;
 import org.codehaus.plexus.util.cli.CommandLineUtils;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
@@ -208,6 +208,9 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 
 	@Parameter(defaultValue = "true", property = "image")
 	private boolean image;
+
+	@Parameter(defaultValue = "", property = "splash")
+	private String splash;
 
 	@Parameter(defaultValue = "true", property = "link")
 	private boolean link;
@@ -407,6 +410,15 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 				launcherScriptName = project.getArtifactId();
 			}
 
+			if(StringUtils.isNotBlank(splash)) {
+				Path splashPath = imagePath.resolve("splash." + getExtension(splash));
+				Files.copy(Paths.get(splash), splashPath);
+				manifest.entries().add(new Entry(splashPath, manifest).section(Section.BOOTSTRAP)
+						.path(imagePath.relativize(splashPath))
+						.uri(new URI(resolveUrl(normalizeForUri(remoteBase), imagePath.relativize(splashPath).toString())))
+						.type(Type.OTHER));
+			}
+
 			Path appCfgPath = imagePath.resolve("app.cfg");
 			checkDir(imagePath.resolve("app.cfg.d"));
 			writeAppCfg(manifest, appCfgPath, imagePath);
@@ -603,6 +615,9 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 					classPaths.add(dir + "/" + f.getName());
 				}
 			}
+			if(org.apache.commons.lang3.StringUtils.isNotBlank(splash)) {
+				vmopts.add("-splash:splash." + getExtension(splash));
+			}
 			if (!modulePaths.isEmpty()) {
 				vmopts.add("-p");
 				vmopts.add(String.join(":", modulePaths));
@@ -700,6 +715,13 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 			}
 		}
 		scriptPath.toFile().setExecutable(true);
+	}
+
+	private String getExtension(String fileName) {
+		int idx = fileName.indexOf('.');
+		if(idx == -1)
+			throw new IllegalArgumentException(String.format("Filename %s must have extension.", fileName));
+		return fileName.substring(idx + 1);
 	}
 
 	private void writeAppCfg(AppManifest manifest, Path appCfgPath, Path imagePath) throws IOException {
