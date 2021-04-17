@@ -55,6 +55,7 @@ import org.eclipse.aether.resolution.ArtifactRequest;
 import org.eclipse.aether.resolution.ArtifactResolutionException;
 import org.eclipse.aether.resolution.ArtifactResult;
 
+import com.sshtools.forker.common.OS;
 import com.sshtools.forker.common.Util;
 import com.sshtools.forker.updater.AppManifest;
 import com.sshtools.forker.updater.AppManifest.Section;
@@ -435,13 +436,18 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 				Path repositoryAppCfgPath = repositoryPath.resolve("app.cfg");
 				writeAppCfg(manifest, repositoryAppCfgPath, imagePath);
 			}
+			
+			String fullScriptName = launcherScriptName; 
+			if(Platform.isWindows() && !fullScriptName.toLowerCase().endsWith(".bat")) {
+				fullScriptName += ".bat";
+			}
 
-			Path scriptPath = checkDir(imagePath.resolve("bin")).resolve(launcherScriptName);
+			Path scriptPath = checkDir(imagePath.resolve("bin")).resolve(fullScriptName);
 			Path argsPath = useArgfile ? checkDir(imagePath).resolve(launcherScriptName + ".args") : null;
 			writeScript(imagePath, scriptPath, argsPath, bootstrapPathObj, businessPathObj);
 			if (updateableBootstrap) {
 				argsPath = useArgfile ? checkDir(repositoryPath).resolve(launcherScriptName + ".args") : null;
-				scriptPath = checkDir(repositoryPath.resolve("bin")).resolve(launcherScriptName);
+				scriptPath = checkDir(repositoryPath.resolve("bin")).resolve(fullScriptName);
 				writeScript(imagePath, scriptPath, argsPath, bootstrapPathObj, businessPathObj);
 				manifest.entries()
 						.add(new Entry(scriptPath, manifest).section(Section.BOOTSTRAP)
@@ -477,9 +483,9 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 				|| (a.getArtifactId().startsWith("forker-updater-")
 						&& !a.getArtifactId().equals("forker-updater-example"))
 				|| a.getArtifactId().equals("forker-client") || a.getArtifactId().equals("forker-common")
-				|| a.getArtifactId().equals("forker-wrapper") || a.getArtifactId().equals("forker-daemon")
+				|| a.getArtifactId().equals("forker-wrapper")
 				|| a.getArtifactId().equals("jna-platform") || a.getArtifactId().equals("jna")
-				|| a.getArtifactId().equals("picocli") || a.getArtifactId().equals("commons-lang3");
+				|| a.getArtifactId().equals("picocli");
 	}
 
 	protected boolean isForkerUpdaterRuntime(org.eclipse.aether.artifact.Artifact a) {
@@ -487,7 +493,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 			return a.getArtifactId().equals("forker-updater") || a.getArtifactId().equals("forker-common")
 					|| a.getArtifactId().equals("forker-client") || a.getArtifactId().equals("forker-wrapped")
 					|| a.getArtifactId().equals("jna-platform") || a.getArtifactId().equals("jna")
-					|| a.getArtifactId().equals("picocli") || a.getArtifactId().equals("commons-lang3");
+					|| a.getArtifactId().equals("picocli");
 		} else {
 			return false;
 		}
@@ -591,134 +597,220 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 
 	private void writeScript(Path imagePath, Path scriptPath, Path argsPath, Path bootstrapPath, Path businessPath)
 			throws IOException {
-		boolean useForkerModules = false;
-		try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(scriptPath), true)) {
-			out.println("#!/bin/sh");
-			out.println("realpath=$(readlink \"$0\")");
-			out.println("if [ -z \"${realpath}\" ] ; then realpath=\"$0\" ; fi");
-			out.println("cd $(dirname ${realpath})/..");
-
-			List<String> modulePaths = new ArrayList<>();
-			List<String> vmopts = new ArrayList<>();
-			Path localDir = resolvePath(imagePath.resolve(bootstrapPath), modulePath);
-			Path dir = resolvePath(bootstrapPath, modulePath);
-			if (Files.exists(localDir)) {
-				for (File f : localDir.toFile().listFiles()) {
-					modulePaths.add(dir + "/" + f.getName());
-					if (f.getName().startsWith("forker-updater")) {
-						useForkerModules = true;
+		
+		List<String> modulePaths = new ArrayList<>();
+		List<String> vmopts = new ArrayList<>();
+		List<String> classPaths = new ArrayList<>();
+		StringBuilder updaterArgs = new StringBuilder();
+		
+		boolean useForkerModules = scriptArgs(imagePath, bootstrapPath, modulePaths, vmopts,
+				classPaths, updaterArgs);
+		
+		if(Platform.isWindows()) {
+			try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(scriptPath), true)) {
+				out.println("@ECHO OFF");
+				out.println("CD %~dp0\\..");
+				if (argsPath != null) {
+					try (PrintWriter pw = new PrintWriter(Files.newBufferedWriter(argsPath))) {
+						for (String vmopt : vmopts) {
+							pw.println(vmopt);
+						}
 					}
+					out.println(String.format("SET VM_OPTIONS=\"@%s\"", argsPath.getFileName().toString()));
+				} else
+					out.println(String.format("SET VM_OPTIONS=\"%s\"", String.join(" ", vmopts)));
+	
+				if (link) {
+					out.println("SET JAVA_EXE=bin\\java.exe");
+				} else {
+					out.println(String.format("IF \"%JAVA_HOME%\"==\"\" ( "));
+					out.println("    SET JAVA_EXE=${JAVA_HOME}\\bin\\java.exe");
+					out.println(") ELSE (");
+					out.println("    SET JAVA_EXE=java");
+					out.println(")");
 				}
-			}
-
-			localDir = resolvePath(imagePath.resolve(bootstrapPath), classPath);
-			dir = resolvePath(bootstrapPath, classPath);
-			List<String> classPaths = new ArrayList<>();
-			if (Files.exists(localDir)) {
-				for (File f : localDir.toFile().listFiles()) {
-					classPaths.add(dir + "/" + f.getName());
-				}
-			}
-			if(org.apache.commons.lang3.StringUtils.isNotBlank(splash)) {
-				vmopts.add("-splash:splash." + getExtension(splash));
-			}
-			if (!modulePaths.isEmpty()) {
-				vmopts.add("-p");
-				vmopts.add(String.join(":", modulePaths));
-			}
-			if (!classPaths.isEmpty()) {
-				vmopts.add("-cp");
-				vmopts.add(String.join(":", classPaths));
-			}
-
-			if (systemModules != null && systemModules.size() > 0) {
-				vmopts.add("--add-modules");
-				vmopts.add(String.join(",", systemModules));
-			}
-			vmopts.add("-Dforker.remoteManifest=" + normalizeForUri(remoteBase));
-			if (vmArgs != null) {
-				for (String vmArg : vmArgs) {
-					vmopts.add(vmArg);
-				}
-			}
-
-			if (argsPath != null) {
-				try (PrintWriter pw = new PrintWriter(Files.newBufferedWriter(argsPath))) {
-					for (String vmopt : vmopts) {
-						pw.println(vmopt);
-					}
-				}
-				out.println(String.format("VM_OPTIONS=\"@%s\"", argsPath.getFileName().toString()));
-			} else
-				out.println(String.format("VM_OPTIONS=\"%s\"", String.join(" ", vmopts)));
-
-			StringBuilder updaterArgs = new StringBuilder();
-			updaterArgs.append("--configuration ");
-			updaterArgs.append("app.cfg");
-			if (this.updaterArgs != null) {
-				for (String arg : this.updaterArgs) {
-					updaterArgs.append(" ");
-					updaterArgs.append(escapeSpaces(arg));
-				}
-			}
-
-			if (link) {
-				out.println("JAVA_EXE=bin/java");
-			} else {
-				out.println(String.format("if [ -n \"${JAVA_HOME}\" ] ; then "));
-				out.println("    JAVA_EXE=${JAVA_HOME}/bin/java");
-				out.println("else");
-				out.println("    JAVA_EXE=java");
-				out.println("fi");
-			}
-
-			out.println(String.format("APP_ARGS=\"%s\"", updaterArgs.toString()));
-			if (updateableBootstrap) {
-				out.println("while : ; do");
-				if (useForkerModules)
-					out.println(
-							"    ${JAVA_EXE} ${VM_OPTIONS} -m com.sshtools.forker.updater/com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
-				else
-					out.println("    ${JAVA_EXE} ${VM_OPTIONS} com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
-				out.println("    ret=$?");
-				out.println("    if [ \"${ret}\" != 9 -o ! -d .updates ]; then");
-				out.println("        exit $ret");
-				out.println("    else");
-				out.println("        echo Updating bootstrap ....");
-				out.println("        cd .updates");
-				out.println("        if ! find . -type d -exec mkdir -p ../\\{} \\; ; then");
-				out.println("            echo \"$0: Failed to recreate directory structure.\" >&2");
-				out.println("            exit 2");
-				out.println("        fi");
-				out.println("        if ! find . -type f -exec mv -f \\{} ../\\{} \\; ; then");
-				out.println("            echo \"$0: Failed to move update files.\" >&2");
-				out.println("            exit 2");
-				out.println("        fi");
-				out.println("        if ! find . -type l -exec mv -f \\{} ../\\{} \\; ; then");
-				out.println("            echo \"$0: Failed to move link files.\" >&2");
-				out.println("            exit 2");
-				out.println("        fi");
-				out.println("        cd ..");
-				out.println("        rm -fr .updates");
-				out.println("    fi");
-				out.println("done");
-			} else {
-				if(updateable) {
+	
+				out.println(String.format("SET APP_ARGS=\"%s\"", updaterArgs.toString()));
+				if (updateableBootstrap) {
+					//out.println("while : ; do");
 					if (useForkerModules)
 						out.println(
-								"${JAVA_EXE} ${VM_OPTIONS} -m com.sshtools.forker.updater/com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
+								"    %JAVA_EXE% %VM_OPTIONS% -m com.sshtools.forker.updater/com.sshtools.forker.updater.Updater %APP_ARGS% %*");
 					else
-						out.println("${JAVA_EXE} ${VM_OPTIONS} com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
-				}
-				else {
-					if (useForkerModules)
-						out.println("${JAVA_EXE} ${VM_OPTIONS} -m com.sshtools.forker.wrapper/com.sshtools.forker.wrapper.ForkerWrapper ${APP_ARGS} $@");
-					else
-						out.println("${JAVA_EXE} ${VM_OPTIONS} com.sshtools.forker.wrapper.ForkerWrapper ${APP_ARGS} $@");
+						out.println("    %JAVA_EXE% %VM_OPTIONS% com.sshtools.forker.updater.Updater %APP_ARGS% %*");
+//					out.println("    ret=$?");
+//					out.println("    if [ \"${ret}\" != 9 -o ! -d .updates ]; then");
+//					out.println("        exit $ret");
+//					out.println("    else");
+//					out.println("        echo Updating bootstrap ....");
+//					out.println("        cd .updates");
+//					out.println("        if ! find . -type d -exec mkdir -p ../\\{} \\; ; then");
+//					out.println("            echo \"$0: Failed to recreate directory structure.\" >&2");
+//					out.println("            exit 2");
+//					out.println("        fi");
+//					out.println("        if ! find . -type f -exec mv -f \\{} ../\\{} \\; ; then");
+//					out.println("            echo \"$0: Failed to move update files.\" >&2");
+//					out.println("            exit 2");
+//					out.println("        fi");
+//					out.println("        if ! find . -type l -exec mv -f \\{} ../\\{} \\; ; then");
+//					out.println("            echo \"$0: Failed to move link files.\" >&2");
+//					out.println("            exit 2");
+//					out.println("        fi");
+//					out.println("        cd ..");
+//					out.println("        rm -fr .updates");
+//					out.println("    fi");
+//					out.println("done");
+				} else {
+					if(updateable) {
+						if (useForkerModules)
+							out.println(
+									"%JAVA_EXE% %VM_OPTIONS% -m com.sshtools.forker.updater/com.sshtools.forker.updater.Updater %APP_ARGS% %*");
+						else
+							out.println("%JAVA_EXE% %VM_OPTIONS% com.sshtools.forker.updater.Updater %APP_ARGS% %*");
+					}
+					else {
+						if (useForkerModules)
+							out.println("%JAVA_EXE% %VM_OPTIONS% -m com.sshtools.forker.wrapper/com.sshtools.forker.wrapper.ForkerWrapper %APP_ARGS% %*");
+						else
+							out.println("%JAVA_EXE% %VM_OPTIONS% com.sshtools.forker.wrapper.ForkerWrapper %APP_ARGS% %*");
+					}
 				}
 			}
 		}
+		else if(OS.isUnix()) {
+			try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(scriptPath), true)) {
+				out.println("#!/bin/sh");
+				out.println("realpath=$(readlink \"$0\")");
+				out.println("if [ -z \"${realpath}\" ] ; then realpath=\"$0\" ; fi");
+				out.println("cd $(dirname ${realpath})/..");
+	
+				if (argsPath != null) {
+					try (PrintWriter pw = new PrintWriter(Files.newBufferedWriter(argsPath))) {
+						for (String vmopt : vmopts) {
+							pw.println(vmopt);
+						}
+					}
+					out.println(String.format("VM_OPTIONS=\"@%s\"", argsPath.getFileName().toString()));
+				} else
+					out.println(String.format("VM_OPTIONS=\"%s\"", String.join(" ", vmopts)));
+	
+				if (link) {
+					out.println("JAVA_EXE=bin/java");
+				} else {
+					out.println(String.format("if [ -n \"${JAVA_HOME}\" ] ; then "));
+					out.println("    JAVA_EXE=${JAVA_HOME}/bin/java");
+					out.println("else");
+					out.println("    JAVA_EXE=java");
+					out.println("fi");
+				}
+	
+				out.println(String.format("APP_ARGS=\"%s\"", updaterArgs.toString()));
+				if (updateableBootstrap) {
+					out.println("while : ; do");
+					if (useForkerModules)
+						out.println(
+								"    ${JAVA_EXE} ${VM_OPTIONS} -m com.sshtools.forker.updater/com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
+					else
+						out.println("    ${JAVA_EXE} ${VM_OPTIONS} com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
+					out.println("    ret=$?");
+					out.println("    if [ \"${ret}\" != 9 -o ! -d .updates ]; then");
+					out.println("        exit $ret");
+					out.println("    else");
+					out.println("        echo Updating bootstrap ....");
+					out.println("        cd .updates");
+					out.println("        if ! find . -type d -exec mkdir -p ../\\{} \\; ; then");
+					out.println("            echo \"$0: Failed to recreate directory structure.\" >&2");
+					out.println("            exit 2");
+					out.println("        fi");
+					out.println("        if ! find . -type f -exec mv -f \\{} ../\\{} \\; ; then");
+					out.println("            echo \"$0: Failed to move update files.\" >&2");
+					out.println("            exit 2");
+					out.println("        fi");
+					out.println("        if ! find . -type l -exec mv -f \\{} ../\\{} \\; ; then");
+					out.println("            echo \"$0: Failed to move link files.\" >&2");
+					out.println("            exit 2");
+					out.println("        fi");
+					out.println("        cd ..");
+					out.println("        rm -fr .updates");
+					out.println("    fi");
+					out.println("done");
+				} else {
+					if(updateable) {
+						if (useForkerModules)
+							out.println(
+									"${JAVA_EXE} ${VM_OPTIONS} -m com.sshtools.forker.updater/com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
+						else
+							out.println("${JAVA_EXE} ${VM_OPTIONS} com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
+					}
+					else {
+						if (useForkerModules)
+							out.println("${JAVA_EXE} ${VM_OPTIONS} -m com.sshtools.forker.wrapper/com.sshtools.forker.wrapper.ForkerWrapper ${APP_ARGS} $@");
+						else
+							out.println("${JAVA_EXE} ${VM_OPTIONS} com.sshtools.forker.wrapper.ForkerWrapper ${APP_ARGS} $@");
+					}
+				}
+			}
+		}
+		else
+			throw new UnsupportedOperationException("Cannot create launch script for this platform.");
 		scriptPath.toFile().setExecutable(true);
+	}
+
+	protected boolean scriptArgs(Path imagePath, Path bootstrapPath, List<String> modulePaths,
+			List<String> vmopts, List<String> classPaths, StringBuilder updaterArgs) {
+
+		boolean useForkerModules = false;
+		Path localDir = resolvePath(imagePath.resolve(bootstrapPath), modulePath);
+		Path dir = resolvePath(bootstrapPath, modulePath);
+		if (Files.exists(localDir)) {
+			for (File f : localDir.toFile().listFiles()) {
+				modulePaths.add(dir + File.separator + f.getName());
+				if (f.getName().startsWith("forker-updater")) {
+					useForkerModules = true;
+				}
+			}
+		}
+
+		localDir = resolvePath(imagePath.resolve(bootstrapPath), classPath);
+		dir = resolvePath(bootstrapPath, classPath);
+		if (Files.exists(localDir)) {
+			for (File f : localDir.toFile().listFiles()) {
+				classPaths.add(dir + File.separator + f.getName());
+			}
+		}
+		if(org.apache.commons.lang3.StringUtils.isNotBlank(splash)) {
+			vmopts.add("-splash:splash." + getExtension(splash));
+		}
+		if (!modulePaths.isEmpty()) {
+			vmopts.add("-p");
+			vmopts.add(String.join(File.pathSeparator, modulePaths));
+		}
+		if (!classPaths.isEmpty()) {
+			vmopts.add("-cp");
+			vmopts.add(String.join(File.pathSeparator, classPaths));
+		}
+
+		if (systemModules != null && systemModules.size() > 0) {
+			vmopts.add("--add-modules");
+			vmopts.add(String.join(",", systemModules));
+		}
+		vmopts.add("-Dforker.remoteManifest=" + normalizeForUri(remoteBase));
+		if (vmArgs != null) {
+			for (String vmArg : vmArgs) {
+				vmopts.add(vmArg);
+			}
+		}
+		
+		updaterArgs.append("--configuration=");
+		updaterArgs.append("app.cfg");
+		if (this.updaterArgs != null) {
+			for (String arg : this.updaterArgs) {
+				updaterArgs.append(" ");
+				updaterArgs.append(escapeSpaces(arg));
+			}
+		}
+		
+		return useForkerModules;
 	}
 
 	private String getExtension(String fileName) {

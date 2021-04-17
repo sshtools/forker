@@ -41,9 +41,9 @@ public class DefaultPipeFactory implements PipeFactory {
 		throw new UnsupportedOperationException();
 	}
 
-	protected String validateName(String name) {
+	protected String validateName(String name, Flag[] flags) {
 		for (char c : name.toCharArray()) {
-			if (!Character.isAlphabetic(c) && !Character.isDigit(c) && c != '_' && c != '.' && c != '-')
+			if (!Character.isAlphabetic(c) && !Character.isDigit(c) && c != '_' && c != '.' && c != '-' && (!Platform.isWindows() || c != '\\'))
 				throw new IllegalArgumentException("Invalidate pipe name.");
 		}
 		return name;
@@ -52,9 +52,9 @@ public class DefaultPipeFactory implements PipeFactory {
 	protected String toUnixName(String name, Flag... flags) {
 		List<Flag> flagsList = Arrays.asList(flags);
 		if (flagsList.contains(Flag.CONCRETE))
-			return "/tmp/" + validateName(name);
+			return "/tmp/" + validateName(name, flags);
 		else
-			return "\0/tmp/" + validateName(name);
+			return "\0/tmp/" + validateName(name, flags);
 	}
 
 	protected String toWindowsName(String name, Flag... flags) {
@@ -66,9 +66,9 @@ public class DefaultPipeFactory implements PipeFactory {
 			String[] parts = name.split(":");
 			if (parts.length != 2)
 				throw new IllegalArgumentException("For a remote pipe, the name must be in the format host:name");
-			return "\\\\" + parts[0] + "\\pipe\\" + validateName(parts[1]);
+			return "\\\\" + parts[0] + "\\pipe\\" + validateName(parts[1], flags);
 		} else {
-			return "\\\\.\\pipe\\" + validateName(name);
+			return "\\\\.\\pipe\\" + validateName(name, flags);
 		}
 	}
 }

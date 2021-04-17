@@ -245,7 +245,7 @@ public class Updater extends ForkerWrapper {
 			 * Load the local manifest well to get the current version first.
 			 */
 			URL url = localManifestPath.toUri().toURL();
-			logger.log(Level.FINE, String.format("Look for local manifest from %s.", localManifestPath));
+			logger.log(Level.FINE, String.format("Look for local manifest from %s.", url));
 			AppManifest localManifest = null;
 			handler.startingManifestLoad(url);
 			try (Reader localIn = Files.newBufferedReader(localManifestPath)) {
@@ -261,11 +261,15 @@ public class Updater extends ForkerWrapper {
 			}
 			handler.completedManifestLoad(url);
 
+			
+			if(remoteManifestLocation.startsWith("file://")) {
+				remoteManifestLocation = "file:/" + remoteManifestLocation.substring(7);
+			}
 			url = new URL(remoteManifestLocation);
 			logger.log(Level.FINE, String.format("Get remote manifest from %s.", remoteManifestLocation));
 			handler.startingManifestLoad(url);
 			boolean haveRemote = false;
-			if (getConfiguration().getSwitch("offline", false)) {
+			if ((url.getProtocol().equals("file") && url.toURI().equals(localManifestPath.toUri())) || getConfiguration().getSwitch("offline", false)) {
 				url = localManifestPath.toUri().toURL();
 				try (Reader in = Files.newBufferedReader(localManifestPath)) {
 					continueProcessing = manifest(task, localManifest, handler, session, url, in);

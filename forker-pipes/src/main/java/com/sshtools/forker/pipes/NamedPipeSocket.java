@@ -7,6 +7,8 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.net.Socket;
 import java.net.SocketAddress;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import com.sshtools.forker.pipes.PipeFactory.Flag;
@@ -55,8 +57,10 @@ public class NamedPipeSocket extends Socket {
 	private InputStream in;
 	private OutputStream out;
 	private final String path;
+	private final List<Flag> flags;
 
 	NamedPipeSocket(String path, Flag... flags) {
+		this.flags = Arrays.asList(flags);
 		this.path = path;
 	}
 
@@ -104,22 +108,26 @@ public class NamedPipeSocket extends Socket {
 				file = new RandomAccessFile(path, "rw");
 				break;
 			} catch (FileNotFoundException fnfe) {
-				try {
-					Kernel32.INSTANCE.WaitNamedPipe(path, timeout);
-					file = new RandomAccessFile(path, "rw");
-				} catch (Throwable cle) {
-					if (System.currentTimeMillis() - now > TimeUnit.MILLISECONDS.toNanos(usedTimeout)) {
-						if (timeout == 0) {
-							throw new FileNotFoundException("Timeout may be needed.");
-						}
-						throw fnfe;
-					}
+				if(flags.contains(Flag.WAIT)) {
 					try {
-						TimeUnit.MILLISECONDS.sleep(5);
-					} catch (InterruptedException ie) {
-						throw new IOException("Interrupted.", ie);
+						Kernel32.INSTANCE.WaitNamedPipe(path, timeout);
+						file = new RandomAccessFile(path, "rw");
+					} catch (Throwable cle) {
+						if (System.currentTimeMillis() - now > TimeUnit.MILLISECONDS.toNanos(usedTimeout)) {
+							if (timeout == 0) {
+								throw new FileNotFoundException("Timeout may be needed.");
+							}
+							throw fnfe;
+						}
+						try {
+							TimeUnit.MILLISECONDS.sleep(5);
+						} catch (InterruptedException ie) {
+							throw new IOException("Interrupted.", ie);
+						}
 					}
 				}
+				else
+					throw fnfe;
 			}
 		} while (true);
 		in = new DelegateInputStream();

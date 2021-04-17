@@ -365,10 +365,22 @@ public class Util {
 
 	}
 
+	/**
+	 * Get if a string is null or empty.
+	 * 
+	 * @param str string
+	 * @return blank
+	 */
 	public static boolean isBlank(String str) {
 		return str == null || str.length() == 0;
 	}
 
+	/**
+	 * Get if a string is neither null nor empty.
+	 * 
+	 * @param str string
+	 * @return not blank
+	 */
 	public static boolean isNotBlank(String str) {
 		return !isBlank(str);
 	}

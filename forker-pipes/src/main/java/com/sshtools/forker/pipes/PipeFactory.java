@@ -37,6 +37,12 @@ public interface PipeFactory {
 		 * {@link Flag#ABSTRACT} is specified and that is supported.
 		 */
 		public final static Flag REMOTE = new Flag();
+		
+		/**
+		 * Wait for a pipe to becoming available before opening it. When this flag
+		 * is not present, an exception will be thrown when the pipe is created.
+		 */
+		public final static Flag WAIT = new Flag();
 	}
 
 	/**

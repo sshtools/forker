@@ -1292,7 +1292,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				} catch (Throwable e) {
 					e.printStackTrace();
 					System.err.println(String.format("%s: %s\n", wrapper.getClass().getName(), e.getMessage()));
-					cl.usage(new PrintWriter(System.err, true));
 					return 1;
 				}
 			});

@@ -39,7 +39,7 @@
 		</testResources>
 
 		<plugins>
-			<!-- <plugin>
+			<plugin>
 				<groupId>com.sshtools</groupId>
 				<artifactId>forker-updater-maven-plugin</artifactId>
 				<version>1.7-SNAPSHOT</version>
@@ -52,8 +52,8 @@
 						</goals>
 						<configuration>
 							
-							Only use file:// URL for testing, usually you'd
-							want a http:// or https:// URL.
+							<!-- Only use file:// URL for testing, usually you'd
+							want a http:// or https:// URL.  -->
 							<remoteBase>file://${build.directory}/image</remoteBase>
 							
 							<mainClass>hello.world/hello.world.HelloWorld</mainClass>
@@ -101,7 +101,7 @@
 						</configuration>
 					</execution>
 				</executions>
-			</plugin> -->
+			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-deploy-plugin</artifactId>
