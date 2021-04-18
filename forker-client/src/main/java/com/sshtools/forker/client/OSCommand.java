@@ -1154,8 +1154,8 @@ public class OSCommand {
 			List<String> largs = new ArrayList<String>(Arrays.asList(args));
 			LOG.fine("Running command: " + String.join(" ", largs));
 			ForkerBuilder pb = new ForkerBuilder(largs);
-			if (pb.io() == null)
-				pb.io(io.get() == null ? IO.NON_BLOCKING : io.get());
+			if (io.get() != null)
+				pb.io(io.get());
 			checkElevationAndEnvironment(pb);
 			if (cwd != null) {
 				pb.directory(cwd);
@@ -1227,7 +1227,8 @@ public class OSCommand {
 		FileOutputStream fos = new FileOutputStream(file);
 		try {
 			ForkerBuilder pb = new ForkerBuilder(args);
-			pb.io(io.get() == null ? IO.NON_BLOCKING : io.get());
+			if(io.get() != null)
+				pb.io(io.get());
 			if (cwd != null) {
 				pb.directory(cwd);
 			}

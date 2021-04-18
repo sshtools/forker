@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.sshtools.forker.common.IO.DefaultIO;
 import com.sun.jna.Platform;
 
 /**
@@ -33,7 +34,8 @@ public class Command {
 	private File directory;
 	private Map<String, String> environment;
 	private String runAs = "";
-	private IO io = Platform.isWindows() ? IO.DEFAULT : IO.NON_BLOCKING;
+	private IO io = getDefaultIO();
+	
 	private Priority priority = null;
 	private List<Integer> affinity = new ArrayList<Integer>();
 	private boolean background;
@@ -353,5 +355,9 @@ public class Command {
 				throw new UnsupportedOperationException();
 		}
 		return a;
+	}
+
+	protected static IO getDefaultIO() {
+		return DefaultIO.valueOf( System.getProperty("forker.defaultIo", Platform.isWindows() ? IO.DEFAULT.name() : IO.NON_BLOCKING.name() ) );
 	}
 }

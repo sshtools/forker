@@ -4,12 +4,14 @@ import java.io.IOException;
 import java.nio.file.Path;
 
 import org.apache.commons.lang3.SystemUtils;
+import org.apache.maven.plugin.logging.Log;
 
 public class SelfExtractingExecutableBuilder {
 
 	private Path output;
 	private Path script;
 	private Path image;
+	private Log log;
 
 	public Path output() {
 		return output;
@@ -43,5 +45,14 @@ public class SelfExtractingExecutableBuilder {
 
 		}
 		throw new UnsupportedOperationException();
+	}
+	
+	public Log log() {
+		return log;
+	}
+
+	public SelfExtractingExecutableBuilder log(Log log) {
+		this.log = log;
+		return this;		
 	}
 }

@@ -66,6 +66,11 @@ import com.sun.jna.Platform;
 @Mojo(threadSafe = true, name = "updates", defaultPhase = LifecyclePhase.PACKAGE, requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME, requiresProject = true)
 public class ForkerUpdaterMojo extends AbstractMojo {
 	private static final String MAVEN_BASE = "https://repo1.maven.org/maven2";
+	
+	public enum PackageMode {
+		NONE, JPACKAGE, SELF_EXTRACTING
+	}
+	
 
 	/**
 	 * Location of the file.
@@ -237,6 +242,12 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 
 	@Parameter(defaultValue = "true", property = "modules")
 	private boolean modules = true;
+
+	@Parameter(defaultValue = "SELF_EXTRACTING", property = "packageMode")
+	private PackageMode packageMode = PackageMode.SELF_EXTRACTING;
+
+	@Parameter(defaultValue = "${project.build.directory}/packages", property = "packagePath")
+	private String packagePath;
 
 	/**
 	 * The maven project.
@@ -472,6 +483,20 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 				try (Writer out = Files.newBufferedWriter(checkDir(repositoryPath).resolve("manifest.xml"))) {
 					manifest.save(out);
 				}
+			}
+			
+			switch(packageMode) {
+			case SELF_EXTRACTING:
+				SelfExtractingExecutableBuilder builder = new SelfExtractingExecutableBuilder();
+				builder.image(imagePath);
+				builder.output(Paths.get(packagePath));
+				builder.log(getLog());
+				builder.make();
+				break;
+			case NONE:
+				break;
+			default:
+				throw new UnsupportedOperationException("Not yet implemented.");
 			}
 		} catch (IOException | URISyntaxException e) {
 			throw new MojoExecutionException("Failed to write configuration.", e);
