@@ -193,6 +193,7 @@ public interface IO {
 				ios.put(DEFAULT.name(), DEFAULT);
 				ios.put(INPUT.name(), INPUT);
 				ios.put(OUTPUT.name(), OUTPUT);
+				ios.put(NON_BLOCKING.name(), NON_BLOCKING);
 				ios.put(IO.name(), IO);
 				ios.put(SINK.name(), SINK);
 				ios.put(DAEMON.name(), DAEMON);
