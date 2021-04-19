@@ -243,8 +243,8 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 	@Parameter(defaultValue = "true", property = "modules")
 	private boolean modules = true;
 
-	@Parameter(defaultValue = "SELF_EXTRACTING", property = "packageMode")
-	private PackageMode packageMode = PackageMode.SELF_EXTRACTING;
+	@Parameter(defaultValue = "NONE", property = "packageMode")
+	private PackageMode packageMode = PackageMode.NONE;
 
 	@Parameter(defaultValue = "${project.build.directory}/packages", property = "packagePath")
 	private String packagePath;
