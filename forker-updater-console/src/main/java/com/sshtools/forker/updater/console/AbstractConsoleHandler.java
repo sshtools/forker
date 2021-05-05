@@ -11,15 +11,34 @@ import org.fusesource.jansi.Ansi.Erase;
 import com.sshtools.forker.updater.AbstractHandler;
 import com.sshtools.forker.updater.AbstractSession;
 
-public class AbstractConsoleHandler<S extends AbstractSession> extends AbstractHandler {
+public class AbstractConsoleHandler<S extends AbstractSession> extends AbstractHandler<S> {
 	protected int currentIndex;
 	protected String currentDest;
 	protected float currentFrac;
 	protected S session;
 
+	@Override
 	public void init(S session) {
 		this.session = session;
 		ConsoleSystem.get().activate();
+
+		printDetails(session);
+	}
+
+	protected void printDetails(S session) {
+		Ansi ansi = Ansi.ansi();
+		String title = session.properties().getProperty("title", "");
+		if(title != null && title.length() > 0) {
+			println(ansi.bold() + title + ansi.boldOff()) ;
+		}
+		String description = session.properties().getProperty("description", "");
+		if(description != null && description.length() > 0) {
+			println(description) ;
+		}
+		String version = session.properties().getProperty("version", "");
+		if(version != null && version.length() > 0) {
+			println(ansi.fgBlue() + version + ansi.fgDefault()) ;
+		}
 	}
 	
 	protected String prompt(String text, Object... args) {
@@ -46,12 +65,14 @@ public class AbstractConsoleHandler<S extends AbstractSession> extends AbstractH
 
 	protected void updateRow() {
 		Ansi ansi = Ansi.ansi();
-		int progressCells = Math.max(1, (int) (40f * currentFrac));
+		int progressWidth = 20;
+		int nameWidth = 20;
+		int progressCells = Math.max(1, (int) (progressWidth * currentFrac));
 		String sizeReceived = toHumanSize((long)((double)session.size() * currentFrac));
 		String totalSize = toHumanSize(session.size());
 		print(ansi.cursorToColumn(0)
-				.a(String.format("%4d/%4d [%-40s] - %-20s (%02d:%02d:%02d) [%10s / %10s]", currentIndex + 1, session.updates(),
-						repeat("▒", progressCells), trim(currentDest, 20), 0, 0, 0, sizeReceived, totalSize))
+				.a(String.format("%4d/%4d [%-" + progressWidth + "s] - %-" + nameWidth + "s (%02d:%02d:%02d) [%10s / %10s]", currentIndex + 1, session.updates(),
+						repeat("▒", progressCells), trim(currentDest, nameWidth), 0, 0, 0, sizeReceived, totalSize))
 				.eraseLine(Erase.FORWARD).cursorToColumn(progressCells + 11).toString());
 		out.flush();
 	}

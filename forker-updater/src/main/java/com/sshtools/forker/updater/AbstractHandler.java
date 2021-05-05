@@ -3,7 +3,7 @@ package com.sshtools.forker.updater;
 import java.io.Console;
 import java.io.PrintWriter;
 
-public abstract class AbstractHandler implements Handler {
+public abstract class AbstractHandler<S extends Session> implements Handler<S> {
 
 	protected Console console;
 	protected PrintWriter out;

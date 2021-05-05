@@ -23,14 +23,14 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 
-public class DefaultConsoleInstallHandler extends AbstractHandler implements InstallHandler {
+public class DefaultConsoleInstallHandler extends AbstractHandler<InstallSession> implements InstallHandler {
 
 	private InstallSession session;
 	private Path dest;
 
 	@Override
 	public void init(InstallSession context) {
-		this.session = context;
+		this.session = context; 
 	}
 
 	@Override

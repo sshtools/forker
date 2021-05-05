@@ -35,13 +35,16 @@ public class Util {
 	 * @return deleted OK
 	 */
 	public static boolean deleteRecursiveIfExists(File item) {
-		if (!item.exists())
-			return true;
+//		if (!item.exists()) {
+//			System.out.println("   no existy");
+//			return true;
+//		}
 		if (!Files.isSymbolicLink(item.toPath()) && item.isDirectory()) {
 			File[] subitems = item.listFiles();
-			for (File subitem : subitems)
+			for (File subitem : subitems) {
 				if (!deleteRecursiveIfExists(subitem))
 					return false;
+			}
 		}
 		return item.delete();
 	}

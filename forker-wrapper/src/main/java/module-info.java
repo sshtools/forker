@@ -6,6 +6,7 @@ module com.sshtools.forker.wrapper {
 	requires transitive com.sshtools.forker.client;
 	requires transitive java.logging;
 	requires java.management;
+	requires java.management.rmi;
 	requires transitive info.picocli;
 	requires static java.desktop;
 

@@ -12,8 +12,8 @@ module com.sshtools.forker.client {
 	exports com.sshtools.forker.client.impl.jna.osx;
 	exports com.sshtools.forker.client.ui;
 
-	requires static transitive com.sshtools.forker.common;
-	requires java.desktop;
+	requires transitive com.sshtools.forker.common;
+	requires static java.desktop;
 	requires java.logging;
 
 	uses com.sshtools.forker.client.ForkerProcessFactory;

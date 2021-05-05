@@ -10,6 +10,7 @@ import java.io.PrintWriter;
 import java.net.URL;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 
 import com.sshtools.forker.updater.DesktopShortcut.Type;
 import com.sun.jna.Platform;
@@ -18,6 +19,12 @@ public abstract class AbstractSession implements Session {
 
 	private Updater updater;
 	private AppManifest manifest;
+	private Properties properties = new Properties();
+	
+	@Override
+	public Properties properties() {
+		return properties;
+	}
 	
 	public Updater updater() {
 		return updater;

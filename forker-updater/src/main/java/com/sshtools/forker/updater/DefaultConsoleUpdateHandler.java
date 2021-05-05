@@ -1,12 +1,12 @@
 
 package com.sshtools.forker.updater;
 
-public class DefaultConsoleUpdateHandler extends AbstractHandler implements UpdateHandler {
+public class DefaultConsoleUpdateHandler extends AbstractHandler<UpdateSession> implements UpdateHandler {
 
 	private UpdateSession context;
 
 	@Override
-	public void init(UpdateSession context) {
+	public void init(UpdateSession context) { 
 		this.context = context;
 	}
 

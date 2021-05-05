@@ -5,7 +5,7 @@ import com.sshtools.forker.updater.Entry;
 import com.sshtools.forker.updater.UpdateHandler;
 import com.sshtools.forker.updater.UpdateSession;
 
-public class SWTUpdateHandler extends AbstractHandler implements UpdateHandler {
+public class SWTUpdateHandler extends AbstractHandler<UpdateSession> implements UpdateHandler {
 
 	@Override
 	public void init(UpdateSession updater) {

@@ -183,8 +183,9 @@ public class Updater extends ForkerWrapper {
 			if (isInstaller()) {
 				return install(task);
 			}
+		} catch(RuntimeException re) {
+			throw re;
 		} catch (Exception e) {
-			e.printStackTrace();
 			throw new IllegalStateException("Failed to install. Cannot continue.", e);
 		}
 
@@ -236,7 +237,15 @@ public class Updater extends ForkerWrapper {
 			UpdateSession session = new UpdateSession(this);
 			if (userCwd != null)
 				session.systemWideBootstrapInstall(true);
-
+			Path updaterProperties = cwd().resolve("updater.properties");
+			if(Files.exists(updaterProperties)) {
+				try(Reader r = Files.newBufferedReader(updaterProperties)) {
+					session.properties().load(r);
+					logger.log(Level.FINE, String.format("Loaded %d updater properties from %s.", session.properties().size(), updaterProperties));
+				}
+			}
+			else
+				logger.log(Level.FINE, String.format("No updater properties %s.", updaterProperties));
 			session.localDir(cwd());
 			session.appArgs(getConfiguration().getRemaining());
 			handler.init(session);
@@ -321,6 +330,15 @@ public class Updater extends ForkerWrapper {
 	protected boolean install(Callable<Void> task) throws Exception {
 		InstallHandler handler = getInstallHandler();
 		InstallSession session = new InstallSession();
+		Path installerProperties = cwd().resolve("installer.properties");
+		if(Files.exists(installerProperties)) {
+			try(Reader r = Files.newBufferedReader(installerProperties)) {
+				session.properties().load(r);
+				logger.log(Level.FINE, String.format("Loaded %d installer properties from %s.", session.properties().size(), installerProperties));
+			}
+		}
+		else
+			logger.log(Level.FINE, String.format("No installer properties %s.", installerProperties));
 		Files.walk(cwd()).forEach(s -> {
 			if (Files.isRegularFile(s))
 				session.addFile(s);
@@ -343,6 +361,8 @@ public class Updater extends ForkerWrapper {
 		session.manifest(new AppManifest(cwd().resolve("manifest.xml")));
 		session.base(Paths.get(installLocation));
 		handler.init(session);
+		
+		
 		Path destination = handler.chooseDestination(new Callable<Void>() {
 			@Override
 			public Void call() throws Exception {

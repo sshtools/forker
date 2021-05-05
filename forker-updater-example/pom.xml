@@ -18,6 +18,11 @@
 			<version>${project.version}</version>
 			<artifactId>forker-updater-swt</artifactId>
 		</dependency>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<version>${project.version}</version>
+			<artifactId>forker-updater-console</artifactId>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -51,17 +56,19 @@
 							<goal>updates</goal>
 						</goals>
 						<configuration>
-							
-							<!-- Only use file:// URL for testing, usually you'd
-							want a http:// or https:// URL.  -->
+
+							<!-- Only use file:// URL for testing, usually you'd want a http:// 
+								or https:// URL. -->
 							<remoteBase>file://${build.directory}/image</remoteBase>
-							
+							<packageMode>SELF_EXTRACTING</packageMode>
 							<mainClass>hello.world/hello.world.HelloWorld</mainClass>
 							<systemModules>
-								<systemModule>java.desktop</systemModule>
 								<systemModule>java.management</systemModule>
 								<systemModule>java.logging</systemModule>
+								<systemModule>java.xml</systemModule>
 								<systemModule>jdk.attach</systemModule>
+								<systemModule>java.management.rmi</systemModule>
+								<systemModule>java.desktop</systemModule>
 							</systemModules>
 							<artifactArch>
 								<linux>org.eclipse.swt.gtk.linux.x86_64</linux>
@@ -70,11 +77,12 @@
 								<amd64>org.eclipse.swt.gtk.linux.x86_64</amd64>
 							</artifactOS>
 							<bootstrapArtifacts>
-								<bootstrapOnlyModule>forker-updater-console</bootstrapOnlyModule>
-								<bootstrapOnlyModule>jansi</bootstrapOnlyModule>
+								<bootstrapArtifact>forker-updater-console</bootstrapArtifact>
+								<bootstrapArtifact>jansi</bootstrapArtifact>
 								<bootstrapArtifact>forker-updater-swt</bootstrapArtifact>
 								<bootstrapArtifact>org.eclipse.swt</bootstrapArtifact>
 								<bootstrapArtifact>org.eclipse.swt.gtk.linux.x86_64</bootstrapArtifact>
+								-->
 							</bootstrapArtifacts>
 						</configuration>
 					</execution>
@@ -107,7 +115,7 @@
 				<artifactId>maven-deploy-plugin</artifactId>
 				<configuration>
 					<skip>true</skip>
-				</configuration>			
+				</configuration>
 			</plugin>
 		</plugins>
 	</build>

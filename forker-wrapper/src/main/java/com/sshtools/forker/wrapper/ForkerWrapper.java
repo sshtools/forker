@@ -1290,7 +1290,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				try {
 					return wrapper.start();
 				} catch (Throwable e) {
-					e.printStackTrace();
 					System.err.println(String.format("%s: %s\n", wrapper.getClass().getName(), e.getMessage()));
 					return 1;
 				}
@@ -1299,7 +1298,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				exit(ret);
 		} catch (Throwable e) {
 			System.err.println(String.format("%s: %s\n", wrapper.getClass().getName(), e.getMessage()));
-			if(!(e instanceof ParameterException))
+			if(!(e instanceof ParameterException) && ( wrapper.getLogger().getLevel().equals(Level.FINE) || wrapper.getLogger().getLevel().equals(Level.FINER) || wrapper.getLogger().getLevel().equals(Level.FINEST)))
 				e.printStackTrace();
 			else
 				System.err.println(cl.getHelp().abbreviatedSynopsis()); 

@@ -277,8 +277,14 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 	@Parameter
 	protected Map<String, String> jdkToolchain;
 
+	@Parameter
+	private Properties installerProperties = new Properties();
+
 	@Parameter(defaultValue = "${session}", readonly = true, required = true)
 	protected MavenSession session;
+
+	@Parameter(defaultValue = "true", property = "stripDebug")
+	private boolean stripDebug;
 
 	@Component
 	protected LocationManager locationManager;
@@ -322,6 +328,9 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 				if (noManPages)
 					pb.command().add("--no-man-pages");
 				pb.command().add("--compress=" + compress);
+				if(stripDebug) {
+					pb.command().add("--strip-debug");
+				}
 				getLog().info("Running jlink '" + String.join(" ", pb.command()) + "'");
 				Process p = pb.start();
 				try (InputStream in = p.getInputStream()) {
@@ -475,6 +484,22 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 									.type(Type.OTHER));
 				}
 			}
+			
+			Properties allProperties = new Properties();
+			allProperties.put("title", project.getName());
+			allProperties.put("description", project.getDescription());
+			allProperties.put("version", project.getVersion());
+			if(installerProperties != null) {
+				allProperties.putAll(installerProperties);
+			}
+			Path installerPropertiesPath = checkDir(imagePath).resolve("installer.properties");
+			try (Writer out = Files.newBufferedWriter(installerPropertiesPath)) {
+				allProperties.store(out, "Installer Properties");
+			}
+			manifest.entries().add(new Entry(installerPropertiesPath, manifest).section(Section.BOOTSTRAP)
+					.path(imagePath.relativize(installerPropertiesPath))
+					.uri(new URI(resolveUrl(normalizeForUri(remoteBase), imagePath.relativize(installerPropertiesPath).toString())))
+					.type(Type.OTHER));
 
 			try (Writer out = Files.newBufferedWriter(checkDir(imagePath).resolve("manifest.xml"))) {
 				manifest.save(out);
@@ -489,7 +514,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 			case SELF_EXTRACTING:
 				SelfExtractingExecutableBuilder builder = new SelfExtractingExecutableBuilder();
 				builder.image(imagePath);
-				builder.output(Paths.get(packagePath));
+				builder.output(Paths.get(packagePath).resolve(project.getBuild().getFinalName()));
 				builder.log(getLog());
 				builder.make();
 				break;

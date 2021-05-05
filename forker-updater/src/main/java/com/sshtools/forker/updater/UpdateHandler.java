@@ -3,19 +3,13 @@ package com.sshtools.forker.updater;
 import java.net.URL;
 import java.util.concurrent.Callable;
 
-public interface UpdateHandler {
-
-	void init(UpdateSession updater);
+public interface UpdateHandler extends Handler<UpdateSession> {
 
 	default void startingManifestLoad(URL location) {
 	}
 
 	default void completedManifestLoad(URL location) {
 	}
-
-	void failed(Throwable error);
-
-	void complete();
 
 	void doneDownloadFile(Entry file) throws Exception;
 

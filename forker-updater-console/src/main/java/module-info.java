@@ -1,5 +1,4 @@
 module com.sshtools.forker.updater.console {
-	requires java.prefs;
 	requires transitive com.sshtools.forker.updater;
 	requires transitive org.fusesource.jansi;
     exports com.sshtools.forker.updater.console; 
