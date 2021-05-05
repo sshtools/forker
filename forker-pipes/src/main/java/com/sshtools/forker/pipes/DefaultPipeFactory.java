@@ -44,7 +44,7 @@ public class DefaultPipeFactory implements PipeFactory {
 	protected String validateName(String name, Flag[] flags) {
 		for (char c : name.toCharArray()) {
 			if (!Character.isAlphabetic(c) && !Character.isDigit(c) && c != '_' && c != '.' && c != '-' && (!Platform.isWindows() || c != '\\'))
-				throw new IllegalArgumentException("Invalidate pipe name.");
+				throw new IllegalArgumentException(String.format("Invalid pipe name. %s", name));
 		}
 		return name;
 	}
