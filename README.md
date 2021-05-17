@@ -53,7 +53,7 @@ See [forker-services/README.md](forker-services/README.md).
 
 ## Forker Pipes
 
-Cross platform API to pipe-like OS specific pipes (i.e. Unix Sockets on Linux, Named Pipes on
+Cross platform API to pipe-like OS specific streams (i.e. Unix Sockets on Linux, Named Pipes on
 Windows).
 
 See [forker-pipes/README.md](forker-pipes/README.md).
