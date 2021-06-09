@@ -180,23 +180,19 @@ public class Configuration {
 				if (val == null) {
 					val = System.getenv("FORKER_" + key.replace("-", "_").toUpperCase());
 					if (val == null) {
-						val = getProperty(os + "-" + key);
-						if (val == null) {
-							val = getProperty(key);
+						val = cmd == null || cmd.matchedOption(key) == null ? null : cmd.matchedOption(key).getValue().toString();
+						if(val == null) {
+							val = getProperty(os + "-" + key);
+							if (val == null) {
+								val = getProperty(key);
+								if (val == null)
+									val = defaultValue;
+							}
 						}
 					}
 				}
 			}
 		}
-
-//		if (val == null) {
-//			val = cmd == null ? null : cmd.(os + "-" + key);
-		if (val == null)
-			val = cmd == null || cmd.matchedOption(key) == null ? null : cmd.matchedOption(key).getValue().toString();
-//		}
-
-		if (val == null)
-			val = defaultValue;
 
 		return val;
 	}
