@@ -59,12 +59,12 @@
 
 	<repositories>
 		<repository>
-			<id>bintray-jetbrains</id>
+			<id>spring-lib-release</id>
 			<releases />
 			<snapshots>
 				<enabled>false</enabled>
 			</snapshots>
-			<url>https://dl.bintray.com/jetbrains/pty4j//</url>
+			<url>https://repo.spring.io/libs-release/</url>
 		</repository>
 	</repositories>
 </project>
