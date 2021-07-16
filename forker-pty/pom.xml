@@ -59,12 +59,12 @@
 
 	<repositories>
 		<repository>
-			<id>spring-lib-release</id>
+			<id>ext-releases-local</id>
 			<releases />
 			<snapshots>
 				<enabled>false</enabled>
 			</snapshots>
-			<url>https://repo.spring.io/libs-release/</url>
+			<url>http://artifactory.javassh.com/ext-releases-local</url>
 		</repository>
 	</repositories>
 </project>
