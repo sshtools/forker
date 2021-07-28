@@ -50,7 +50,7 @@
 		<repository>
 			<id>ext-snapshots-local</id>
 			<name>ext-snapshots-local</name>
-			<url>http://artifactory.javassh.com/ext-snapshots-local</url>
+			<url>https://artifactory.jadaptive.com/ext-snapshots-local</url>
 			<releases>
 				<enabled>false</enabled>
 			</releases>

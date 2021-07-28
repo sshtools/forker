@@ -64,7 +64,7 @@
 			<snapshots>
 				<enabled>false</enabled>
 			</snapshots>
-			<url>http://artifactory.javassh.com/ext-releases-local</url>
+			<url>https://artifactory.jadaptive.com/ext-releases-local</url>
 		</repository>
 	</repositories>
 </project>

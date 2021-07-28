@@ -54,14 +54,14 @@
 			<uniqueVersion>true</uniqueVersion>
 			<id>opensource-snapshots</id>
 			<name>SSHTOOLS Opensource Snapshots</name>
-			<url>http://artifactory.javassh.com/opensource-snapshots</url>
+			<url>https://artifactory.jadaptive.com/opensource-snapshots</url>
 			<layout>default</layout>
 		</snapshotRepository>
 		<repository>
 			<uniqueVersion>true</uniqueVersion>
 			<id>opensource-releases</id>
 			<name>SSHTOOLS Opensource Releases</name>
-			<url>http://artifactory.javassh.com/opensource-releases</url>
+			<url>https://artifactory.jadaptive.com/opensource-releases</url>
 			<layout>default</layout>
 		</repository>
 	</distributionManagement>
