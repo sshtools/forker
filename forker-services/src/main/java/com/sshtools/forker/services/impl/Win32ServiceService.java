@@ -119,7 +119,7 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 			        if (!Advapi32.INSTANCE.StartService(srv.getHandle(), 0, null)) {
 			            throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
 			        }
-			        timedWaitForNonPendingState(srv, 10000);
+			        timedWaitForNonPendingState(srv, 20000);
 			        if (srv.queryStatus().dwCurrentState != Winsvc.SERVICE_RUNNING) {
 			            throw new RuntimeException("Unable to start the service");
 			        }
