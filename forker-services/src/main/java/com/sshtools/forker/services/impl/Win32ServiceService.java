@@ -33,6 +33,10 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 	private W32ServiceManager smgr;
 	private ScheduledFuture<?> task;
 	final static Logger LOG = Logger.getLogger(Win32ServiceService.class.getName());
+	
+	private static final int MAX_WAIT_TIME = Integer.parseInt(System.getProperty("forker.win32.maxServiceWaitTime", "60000"));
+	private static final long START_WAIT_TIME = Integer.parseInt(System.getProperty("forker.win32.startWaitTime", "15000"));
+	private static final long STOP_WAIT_TIME = Integer.parseInt(System.getProperty("forker.win32.stopWaitTime", "30000"));
 
 	@Override
 	public List<Service> getServices() throws IOException {
@@ -119,7 +123,7 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 			        if (!Advapi32.INSTANCE.StartService(srv.getHandle(), 0, null)) {
 			            throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
 			        }
-			        timedWaitForNonPendingState(srv, 20000);
+			        timedWaitForNonPendingState(srv, START_WAIT_TIME);
 			        if (srv.queryStatus().dwCurrentState != Winsvc.SERVICE_RUNNING) {
 			            throw new RuntimeException("Unable to start the service");
 			        }
@@ -180,15 +184,15 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
     
     /**
      * do not wait longer than the wait hint. A good interval is one-tenth the
-     * wait hint, but no less than 1 second and no more than 10 seconds.
+     * wait hint, but no less than 1 second and no more than MAX_WAIT_TIME seconds.
      */
     int sanitizeWaitTime(int dwWaitHint) {
         int dwWaitTime = dwWaitHint / 10;
 
         if (dwWaitTime < 1000) {
             dwWaitTime = 1000;
-        } else if (dwWaitTime > 10000) {
-            dwWaitTime = 10000;
+        } else if (dwWaitTime > MAX_WAIT_TIME) {
+            dwWaitTime =  MAX_WAIT_TIME;
         }
         return dwWaitTime;
     }
@@ -203,7 +207,7 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 						Winsvc.SERVICE_QUERY_STATUS | 
 						Winsvc.SERVICE_ENUMERATE_DEPENDENTS);
 				try {
-					srv.stopService();
+					srv.stopService(STOP_WAIT_TIME);
 				} finally {
 					srv.close();
 				}
