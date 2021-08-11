@@ -147,14 +147,20 @@ public abstract class EffectiveUserFactory {
 				}
 			}
 			
-			String mp = null;
+			List<String> mp = new ArrayList<>();
 			String fullMp = System.getProperty("jdk.module.path", "");
 			for (String p : fullMp.split(File.pathSeparator)) {
 				if (p.contains("forker-client")) {
-					mp = p;
+					mp.add(p);
+				}
+				else if (p.contains("forker-common")) {
+					mp.add(p);
+				}
+				else if (p.contains("jna")) {
+					mp.add(p);
 				}
 			}
-			if (mp == null && cp == null) {
+			if (mp.isEmpty() && cp == null) {
 				// Couldn't find just forker-common for some reason, just
 				// add everything
 				cp = fullCp;
@@ -170,7 +176,7 @@ public abstract class EffectiveUserFactory {
 			}
 			if(mp != null) {
 				b.append(" -p \"");
-				b.append(mp);
+				b.append(String.join(File.pathSeparator, mp));
 				b.append("\"");
 			}
 			b.append(" ");

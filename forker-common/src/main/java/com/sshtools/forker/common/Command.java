@@ -358,6 +358,6 @@ public class Command {
 	}
 
 	protected static IO getDefaultIO() {
-		return DefaultIO.valueOf( System.getProperty("forker.defaultIo", Platform.isWindows() ? IO.DEFAULT.name() : IO.NON_BLOCKING.name() ) );
+		return DefaultIO.valueOf( System.getProperty("forker.defaultIo", Platform.isWindows() || Platform.isMac() ? IO.DEFAULT.name() : IO.NON_BLOCKING.name() ) );
 	}
 }
