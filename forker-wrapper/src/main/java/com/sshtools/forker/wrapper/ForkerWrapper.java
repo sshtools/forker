@@ -919,7 +919,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		try {
 			mainClass = urlClassLoader.loadClass(classname);
 		} catch (ClassNotFoundException e) {
-			throw new IOException("Could not find application class.", e);
+			throw new IOException(String.format("Could not find application class '%s'.", classname));
 		}
 		logger.info(String.format("Created isolated classloader %s", urlClassLoader.hashCode()));
 		Method main;
@@ -1215,11 +1215,13 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		wrapper.getWrappedApplication().setOriginalArgs(args); 
 
 		CommandSpec opts = CommandSpec.create();
-//		opts.parser().stopAtUnmatched(true);
-//		opts.parser().unmatchedOptionsArePositionalParams(true);
+		opts.parser().stopAtUnmatched(false);
+		opts.parser().unmatchedOptionsArePositionalParams(true);
+//		opts.parser().stopAtPositional(true);
 		opts.mixinStandardHelpOptions(true);
 		// Add the options always available
 
+		opts.usageMessage().showEndOfOptionsDelimiterInUsageHelp(true);
 		opts.usageMessage().header("Forker Wrapper", "Provided by JAdpative.");
 		opts.usageMessage().description("Forker Wrapper is used to launch Java applications, optionally changing "
 				+ "the user they are run as, providing automatic restarting, signal handling and "
@@ -1250,7 +1252,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		cl.setTrimQuotes(true);
 //		cl.setUnmatchedArgumentsAllowed(true);
 //		cl.setUnmatchedOptionsAllowedAsOptionParameters(true);
-//		cl.setUnmatchedOptionsArePositionalParams(true);
+		cl.setUnmatchedOptionsArePositionalParams(true);
 		try {
 			ParseResult cmd = cl.parseArgs(args);
 			wrapper.init(cmd);
@@ -1740,15 +1742,13 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		options.addOption(OptionSpec.builder("-FE", "--fderr").description("File descriptor for stderr")
 				.paramLabel("fd").type(int.class).build());
 
-		options.addPositional(PositionalParamSpec.builder().paramLabel("classNameOrExecutable").type(String.class)
-				.description("The classname or executable name or path of the application to run.").build());
-		options.addPositional(PositionalParamSpec.builder().paramLabel("arguments").type(String.class).arity("1..*")
-				.description("All other arguments to pass on to the wrapped application.").build());
-
 		/* TODO: remove this */
 		options.addOption(OptionSpec.builder("-n", "--no-forker-daemon").description(
 				"DEPRECATED: This option is no longer used and will be removed entirely in version 1.8.")
 				.build());
+
+		options.addPositional(PositionalParamSpec.builder().paramLabel("arguments").type(String[].class)
+				.arity("0..*").description("If the class name or native executable has not been passed with the '--main' option, then the first argument will be that class name. All subsequent arguments to pass on to the wrapped application as entry point parameters.").build());
 		
 		options.name(getAppName());
 	}
