@@ -174,13 +174,13 @@ public abstract class EffectiveUserFactory {
 				b.append(cp);
 				b.append("\"");
 			}
-			if(mp != null) {
+			if(!mp.isEmpty()) {
 				b.append(" -p \"");
 				b.append(String.join(File.pathSeparator, mp));
 				b.append("\"");
 			}
 			b.append(" ");
-			if(mp != null)
+			if(!mp.isEmpty())
 				b.append("-m com.sshtools.forker.client/");
 			b.append(clazz.getName());
 			return b.toString();
