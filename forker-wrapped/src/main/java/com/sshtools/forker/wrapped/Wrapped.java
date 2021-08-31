@@ -147,8 +147,8 @@ public class Wrapped implements WrappedMXBean {
 
 	protected void startMonitor() {
 		/*
-		 * Start a thread. If no ping has been received in the last 5 seconds, then the
-		 * wrapper has died and we should shutdown as well.
+		 * Start a thread. If no ping has been received in the last 15 seconds, 
+		 * (3 cycles of 5 seconds) then the wrapper has died and we should shutdown as well.
 		 * 
 		 * This is a workaround for the fact that if the wrapper is killed without it's
 		 * shutdown hooks getting run (e.g. kill -9, or even just running from Eclipse),
@@ -156,16 +156,21 @@ public class Wrapped implements WrappedMXBean {
 		 */
 		monitor = new Thread("PingMonitorThread") {
 			long previousPing = 0;
+			int missedPings = 0;
 
 			public void run() {
 				try {
 					while (runMonitor) {
 						Thread.sleep(5000);
 						if (previousPing != 0 && lastPing == previousPing) {
-							shutdown();
-							break;
+							missedPings++;
+							if(missedPings > 2) {
+								shutdown();
+								break;
+							}
 						}
 						previousPing = lastPing;
+						missedPings = 0;
 					}
 				} catch (InterruptedException ie) {
 					// Stopped monitoring

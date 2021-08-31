@@ -610,13 +610,18 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 					plugin.beforeLaunch();
 				}
 
-				if (isNoFork()) {
-					retval = noFork(daemonize, wrapperClasspath, forkerClasspath, times, lastRetVal);
-				} else {
-					retval = forked(javaExe, wrapperClasspath, wrapperModulepath, forkerClasspath, forkerModulepath,
-							bootClasspath, nativeMain, daemonize, times, lastRetVal, quietStdErr, quietStdOut,
-							logoverwrite);
-
+				try {
+					if (isNoFork()) {
+						retval = noFork(daemonize, wrapperClasspath, forkerClasspath, times, lastRetVal);
+					} else {
+						retval = forked(javaExe, wrapperClasspath, wrapperModulepath, forkerClasspath, forkerModulepath,
+								bootClasspath, nativeMain, daemonize, times, lastRetVal, quietStdErr, quietStdOut,
+								logoverwrite);
+	
+					}
+				}
+				finally {
+					stopMonitoringOverJMX();
 				}
 
 				/* Decide whether to restart the process */
@@ -2196,6 +2201,12 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			monitorThread.start();
 		} else if ((!isUseDaemon() || Integer.parseInt(configuration.getOptionValue("timeout", "60")) == 0)
 				&& monitorThread != null) {
+			stopMonitoringOverJMX();
+		}
+	}
+	
+	protected synchronized void stopMonitoringOverJMX() {
+		if(monitorThread != null) {
 			monitorThread.interrupt();
 			monitorThread = null;
 			logger.info("Stopping forker monitor thread.");
