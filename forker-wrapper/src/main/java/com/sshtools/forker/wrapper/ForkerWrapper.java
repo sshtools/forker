@@ -506,8 +506,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		 * CWD
 		 */
 		String javaExe = getJVMPath();
-		String wrapperClasspath = resolveWrapperClasspath();
-		String wrapperModulepath = resolveWrapperModulepath();
 		String forkerClasspath = System.getProperty("java.class.path");
 		String forkerModulepath = System.getProperty("jdk.module.path");
 		String bootClasspath = configuration.getOptionValue("boot-classpath", null);
@@ -612,9 +610,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 
 				try {
 					if (isNoFork()) {
-						retval = noFork(daemonize, wrapperClasspath, forkerClasspath, times, lastRetVal);
+						retval = noFork(daemonize, forkerClasspath, times, lastRetVal);
 					} else {
-						retval = forked(javaExe, wrapperClasspath, wrapperModulepath, forkerClasspath, forkerModulepath,
+						retval = forked(javaExe, forkerClasspath, forkerModulepath,
 								bootClasspath, nativeMain, daemonize, times, lastRetVal, quietStdErr, quietStdOut,
 								logoverwrite);
 	
@@ -691,8 +689,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	 * Forked.
 	 *
 	 * @param javaExe the java exe
-	 * @param wrapperClasspath the wrapper classpath
-	 * @param wrapperModulepath the wrapper modulepath
 	 * @param forkerClasspath the forker classpath
 	 * @param forkerModulepath the forker modulepath
 	 * @param bootClasspath the boot classpath
@@ -708,9 +704,13 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	 * @throws UnsupportedEncodingException the unsupported encoding exception
 	 * @throws InterruptedException the interrupted exception
 	 */
-	protected int forked(String javaExe, String wrapperClasspath, String wrapperModulepath, String forkerClasspath,
+	protected int forked(String javaExe, String forkerClasspath,
 			String forkerModulepath, String bootClasspath, final boolean nativeMain, boolean daemonize,
 			int times, int lastRetVal, boolean quietStdErr, boolean quietStdOut, boolean logoverwrite) throws IOException, UnsupportedEncodingException, InterruptedException {
+
+		String wrapperClasspath = resolveWrapperClasspath();
+		String wrapperModulepath = resolveWrapperModulepath();
+		
 		int retval;
 		/* Build the command to launch the application itself */
 		ForkerBuilder appBuilder = buildCommand(javaExe, forkerClasspath, forkerModulepath, wrapperClasspath,
@@ -739,15 +739,16 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	 * No fork.
 	 *
 	 * @param useDaemon the use daemon
-	 * @param wrapperClasspath the wrapper classpath
 	 * @param forkerClasspath the forker classpath
 	 * @param times the times
 	 * @param lastRetVal the last ret val
 	 * @return the int
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
-	protected int noFork(boolean useDaemon, String wrapperClasspath, String forkerClasspath, int times, int lastRetVal)
+	protected int noFork(boolean useDaemon, String forkerClasspath, int times, int lastRetVal)
 			throws IOException {
+		String wrapperClasspath = resolveWrapperClasspath();
+		
 		if (Util.isNotBlank(app.getModule()))
 			throw new IOException("no-fork does not currently work with modules.");
 
