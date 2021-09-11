@@ -2,6 +2,7 @@ package com.sshtools.forker.client;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.ProcessBuilder.Redirect;
 import java.security.AccessControlException;
 import java.util.Arrays;
 import java.util.List;
@@ -86,6 +87,60 @@ public class ForkerBuilder {
 		this(ForkerConfiguration.getDefault(), command);
 	}
 
+    public ForkerBuilder redirectInput(Redirect source) {
+        if (source.type() == Redirect.Type.WRITE ||
+            source.type() == Redirect.Type.APPEND)
+            throw new IllegalArgumentException( 
+                    String.format("Invalid redirect for reading: %s", source));
+        command.getRedirects()[0] = source;
+        return this;
+    }
+
+    public ForkerBuilder redirectOutput(Redirect destination) {
+        if (destination.type() == Redirect.Type.READ)
+            throw new IllegalArgumentException(
+                    String.format("Invalid redirect for writing: %s", destination));
+        command.getRedirects()[1] = destination;
+        return this;
+    }
+
+    public ForkerBuilder redirectError(Redirect destination) {
+        if (destination.type() == Redirect.Type.READ)
+            throw new IllegalArgumentException(
+                String.format("Invalid redirect for writing: %s", destination));
+        command.getRedirects()[2] = destination;
+        return this;
+    }
+
+    public ForkerBuilder redirectInput(File file) {
+        return redirectInput(Redirect.from(file));
+    }
+
+    public ForkerBuilder redirectOutput(File file) {
+        return redirectOutput(Redirect.to(file));
+    }
+
+    public ForkerBuilder redirectError(File file) {
+        return redirectError(Redirect.to(file));
+    }
+
+    public Redirect redirectInput() {
+        return command.isDefaultRedirects() ? Redirect.PIPE : command.getRedirects()[0];
+    }
+
+    public Redirect redirectOutput() {
+        return command.isDefaultRedirects() ? Redirect.PIPE : command.getRedirects()[1];
+    }
+
+    public Redirect redirectError() {
+        return command.isDefaultRedirects() ? Redirect.PIPE : command.getRedirects()[2];
+    }
+
+    public ForkerBuilder inheritIO() {
+        Arrays.fill(command.getRedirects(), Redirect.INHERIT);
+        return this;
+    }
+    
 	/**
 	 * Get the process affinity list. To bind to particular CPUs, their numbers
 	 * should be added to this list. If this list is empty, the process will be

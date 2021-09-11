@@ -731,7 +731,13 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		event(STARTED_APPLICATION, app.fullClassAndModule());
 
 		/* The process is now started, capture the streams and log or sink them */
-		retval = captureStreams(resolveCwd(), daemonize, quietStdErr, quietStdOut, logoverwrite);
+		if(configuration.isBool("inherit-io")) {
+			logger.info("Inheriting IO, so not capturing any streams");
+			retval = process.waitFor();
+		}
+		else {
+			retval = captureStreams(resolveCwd(), daemonize, quietStdErr, quietStdOut, logoverwrite);
+		}
 		return retval;
 	}
 
@@ -1747,6 +1753,8 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				.paramLabel("fd").type(int.class).build());
 		options.addOption(OptionSpec.builder("-FE", "--fderr").description("File descriptor for stderr")
 				.paramLabel("fd").type(int.class).build());
+		options.addOption(OptionSpec.builder("-IO", "--inherit-io").description("Pass all streams to wrapped process.")
+				.build());
 
 		/* TODO: remove this */
 		options.addOption(OptionSpec.builder("-n", "--no-forker-daemon").description(
@@ -1948,6 +1956,9 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				if (app.getOriginalArgs() == null)
 					throw new IllegalStateException("Original arguments must be set.");
 				ForkerBuilder fb = new ForkerBuilder();
+				if(configuration.isBool("inherit-io")) {
+					fb.inheritIO();
+				}
 				fb.directory(getLaunchDirectory());
 				fb.command().add(javaExe);
 				if (Util.isNotBlank(forkerModulepath)) {
@@ -3037,6 +3048,11 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 				appBuilder.effectiveUser(EffectiveUserFactory.getDefault().getUserForUsername(runas));
 			}
 		}
+
+		if(configuration.isBool("inherit-io")) {
+			appBuilder.inheritIO();
+		}
+		
 		return appBuilder;
 	}
 

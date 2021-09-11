@@ -3,6 +3,7 @@ package com.sshtools.forker.client.impl;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.ProcessBuilder.Redirect;
 import java.util.List;
 
 import com.sshtools.forker.client.EffectiveUser;
@@ -36,8 +37,25 @@ public class LocalProcess extends ForkerProcess {
 		try {
 			List<String> allArguments = builder.getCommand().getAllArguments();
 			ProcessBuilder pb = new ProcessBuilder(allArguments);
-			if (builder.getCommand().isRedirectError()) {
-				pb.redirectErrorStream(true);
+			if(builder.getCommand().isDefaultRedirects()) {
+				if (builder.getCommand().isRedirectError()) {
+					pb.redirectErrorStream(true);
+				}	
+			}
+			else {
+				Redirect[] cmd = builder.getCommand().getRedirects();
+				pb.redirectInput(cmd[0]);
+				pb.redirectOutput(cmd[1]);
+				pb.redirectError(cmd[2]);
+				if(cmd[0].type() == Redirect.Type.READ || cmd[0].type() == Redirect.Type.WRITE || cmd[0].type() == Redirect.Type.APPEND) {
+					pb.redirectInput(cmd[0].file());
+				}
+				if(cmd[1].type() == Redirect.Type.READ || cmd[1].type() == Redirect.Type.WRITE || cmd[1].type() == Redirect.Type.APPEND) {
+					pb.redirectOutput(cmd[1].file());
+				}
+				if(cmd[2].type() == Redirect.Type.READ || cmd[2].type() == Redirect.Type.WRITE || cmd[2].type() == Redirect.Type.APPEND) {
+					pb.redirectError(cmd[2].file());
+				}
 			}
 			if (builder.getCommand().getDirectory() != null) {
 				pb.directory(builder.getCommand().getDirectory());
