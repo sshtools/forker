@@ -12,6 +12,7 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
@@ -434,14 +435,14 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 
 			if(StringUtils.isNotBlank(splash)) {
 				Path splashPath = imagePath.resolve("splash." + getExtension(splash));
-				Files.copy(Paths.get(splash), splashPath);
+				Files.copy(Paths.get(splash), splashPath, StandardCopyOption.REPLACE_EXISTING);
 				manifest.entries().add(new Entry(splashPath, manifest).section(Section.BOOTSTRAP)
 						.path(imagePath.relativize(splashPath))
 						.uri(new URI(resolveUrl(normalizeForUri(remoteBase), imagePath.relativize(splashPath).toString())))
 						.type(Type.OTHER));
 				if (repository) {
 					Path repositorySplashPath = repositoryPath.resolve("splash." + getExtension(splash));
-					Files.copy(Paths.get(splash), repositorySplashPath);
+					Files.copy(Paths.get(splash), repositorySplashPath, StandardCopyOption.REPLACE_EXISTING);
 				}
 			}
 
