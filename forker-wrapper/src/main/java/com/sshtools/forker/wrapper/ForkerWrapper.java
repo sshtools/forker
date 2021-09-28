@@ -540,7 +540,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		try {
 			if(mbs == null) {
 		        mbs = MBeanServerFactory.newMBeanServer();
-				server = JMXConnectorServerFactory.newJMXConnectorServer(new JMXServiceURL("service:jmx:rmi://"), null, mbs);
+				server = JMXConnectorServerFactory.newJMXConnectorServer(new JMXServiceURL("service:jmx:rmi://127.0.0.1"), null, mbs);
 			    server.start();
 			    JMXServiceURL outputAddr = server.getAddress();
 			    logger.info(String.format("JMX started on %s", outputAddr));
