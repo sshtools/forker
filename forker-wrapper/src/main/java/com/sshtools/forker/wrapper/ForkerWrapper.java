@@ -1,6 +1,5 @@
 package com.sshtools.forker.wrapper;
 
-import java.awt.SplashScreen;
 import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.File;

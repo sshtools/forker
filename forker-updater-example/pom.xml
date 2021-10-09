@@ -60,7 +60,7 @@
 							<!-- Only use file:// URL for testing, usually you'd want a http:// 
 								or https:// URL. -->
 							<remoteBase>file://${build.directory}/image</remoteBase>
-							<packageMode>SELF_EXTRACTING</packageMode>
+							<packageMode>NONE</packageMode>
 							<mainClass>hello.world/hello.world.HelloWorld</mainClass>
 							<installerProperties>
 								<bannerImage>left-banner.png</bannerImage>
