@@ -53,9 +53,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Handler;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.management.InstanceNotFoundException;
 import javax.management.MBeanException;
@@ -120,7 +118,7 @@ import picocli.CommandLine.ParseResult;
  *
  */
 @MXBean
-public class ForkerWrapper implements ForkerWrapperMXBean {
+public class ForkerWrapper extends AbstractWrapper implements ForkerWrapperMXBean {
 
 	/** The Constant CONTINUE_UPGRADE. */
 	public final static int CONTINUE_UPGRADE = Integer.MIN_VALUE;
@@ -228,9 +226,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	
 	/** The system properties. */
 	private Properties systemProperties = new Properties();
-
-	/** The logger. */
-	protected Logger logger = Logger.getGlobal();
 	
 	/** The using wrapped. */
 	private boolean usingWrapped;
@@ -653,17 +648,6 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 			}
 			catch(Exception e) {
 			}
-		}
-	}
-
-	public void closeSplash() {
-		try {
-			final SplashScreen splash = SplashScreen.getSplashScreen();
-			if(splash != null)
-				splash.close();
-		}
-		catch(Exception e) {
-			logger.log(Level.FINE, "Ignoring splash error.", e);
 		}
 	}
 
@@ -1351,47 +1335,10 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	}
 
 	/**
-	 * Sets the log level.
-	 *
-	 * @param lvl the new log level
-	 */
-	@Override
-	public void setLogLevel(String lvl) {
-		setLogLevel(Level.parse(lvl));
-	}
-
-	/**
-	 * Gets the logger.
-	 *
-	 * @return the logger
-	 */
-	public Logger getLogger() {
-		return logger;
-	}
-
-	/**
-	 * Sets the log level.
-	 *
-	 * @param lvl the new log level
-	 */
-	public void setLogLevel(Level lvl) {
-		Logger logger = this.logger;
-		do {
-			logger.setLevel(lvl);
-			for (Handler h : logger.getHandlers()) {
-				h.setLevel(lvl);
-			}
-			logger = logger.getParent();
-		} while (logger != null);
-	}
-
-	/**
 	 * Reconfigure logging.
 	 */
 	private void reconfigureLogging() {
-		String levelName = configuration.getOptionValue("level", "WARNING");
-		Level lvl = Level.parse(levelName);
-		setLogLevel(lvl);
+		reconfigureLogging(configuration.getOptionValue("level", "WARNING"));
 	}
 
 	/**
@@ -2463,13 +2410,22 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 		}
 
 		if (onBeforeProcess(() -> {
+			logger.info("Continuing via callback.");
 			continueProcessing();
-			exit(task.call());
+			logger.info("Callback calling task.");
+			Integer result = task.call();
+			logger.info("Callback task result is " + result);
+			exit(result);
 			return null;
 		})) {
+			logger.info("Continuing directly.");
 			continueProcessing();
-			return task.call();
+			logger.info("Directly calling task.");
+			Integer result  =task.call();
+			logger.info("Direct task result is " + result);
+			return result;
 		} else {
+			logger.info("Signalling that no exit be done.");
 			return Integer.MIN_VALUE;
 		}
 	}
@@ -2480,6 +2436,7 @@ public class ForkerWrapper implements ForkerWrapperMXBean {
 	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
 	protected void continueProcessing() throws IOException {
+		logger.info("Continue processing.");
 		app.set(configuration.getOptionValue("main", null), configuration.getOptionValue("jar", null),
 				configuration.getRemaining(), configuration.getOptionValues("apparg"), getArgMode());
 	}

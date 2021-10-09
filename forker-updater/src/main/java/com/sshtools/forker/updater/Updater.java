@@ -8,18 +8,24 @@ import java.io.OutputStream;
 import java.io.Reader;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.sshtools.forker.common.OS;
 import com.sshtools.forker.common.Util;
@@ -32,6 +38,195 @@ import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Model.OptionSpec;
 
 public class Updater extends ForkerWrapper {
+	public static class SetEntryPermissions implements UndoableOp {
+		private Path file;
+		private Boolean wasRead;
+		private Boolean wasWrite;
+		private Boolean wasExecute;
+
+		public SetEntryPermissions(Path d, boolean read, boolean write, boolean execute) throws IOException {
+			this.file = d;
+
+			Boolean ok = Files.isWritable(d);
+			if (write != ok) {
+				wasWrite = ok;
+				Logger.getGlobal().log(Level.INFO, String.format("Setting read-only on %s to %s", d, write));
+				d.toFile().setWritable(write, write);
+			}
+			ok = Files.isReadable(d);
+			if (read != ok) {
+				wasRead = ok;
+				Logger.getGlobal().log(Level.INFO, String.format("Setting no-read on %s to %s", d, read));
+				d.toFile().setReadable(read);
+			}
+			ok = Files.isExecutable(d);
+			if (execute != ok) {
+				wasExecute = ok;
+				Logger.getGlobal().log(Level.INFO, String.format("Setting execute on %s to %s", d, execute));
+				d.toFile().setExecutable(execute);
+			}
+		}
+
+		@Override
+		public void undo() throws IOException {
+			if (wasWrite != null) {
+				file.toFile().setWritable(wasWrite, wasWrite);
+			}
+			if (wasRead != null) {
+				file.toFile().setReadable(wasRead);
+			}
+			if (wasExecute != null) {
+				file.toFile().setExecutable(wasExecute);
+			}
+		}
+	}
+
+	public static class PermissionsOp implements UndoableOp {
+		private Path file;
+		private Set<PosixFilePermission> origPerms;
+
+		public PermissionsOp(Path d, Set<PosixFilePermission> perms) throws IOException {
+			this.file = d;
+			origPerms = Files.getPosixFilePermissions(d);
+			Files.setPosixFilePermissions(d, perms);
+		}
+
+		@Override
+		public void undo() throws IOException {
+			Files.setPosixFilePermissions(file, origPerms);
+		}
+	}
+
+	public static class MkdirOp implements UndoableOp {
+		private Path created;
+
+		public MkdirOp(Path dir) throws IOException {
+			if (!Files.exists(dir)) {
+				Logger.getGlobal().log(Level.INFO, String.format("Creating folder %s.", dir));
+				Files.createDirectories(dir);
+				created = dir;
+			}
+		}
+
+		@Override
+		public void undo() throws IOException {
+			if (created != null) {
+				Files.delete(created);
+			}
+		}
+	}
+
+	public static class LinkOp implements UndoableOp {
+		private Path link;
+
+		public LinkOp(Path link, Path target) throws IOException {
+			if (Files.exists(link))
+				throw new IllegalStateException("Link should not already exist.");
+			this.link = link;
+			Logger.getGlobal().log(Level.FINE, String.format("Creating link %s.", target));
+			Files.createSymbolicLink(link, Files.readSymbolicLink(target));
+		}
+
+		@Override
+		public void undo() throws IOException {
+			Files.delete(link);
+		}
+	}
+
+	public static class DeleteOnUndoOp implements UndoableOp {
+
+		private Path path;
+
+		public DeleteOnUndoOp(Path path) {
+			this.path = path;
+		}
+
+		@Override
+		public void undo() throws IOException {
+			Files.delete(path);
+		}
+	}
+
+	public static class DeleteOp implements UndoableOp {
+		private Path tmp;
+		private Path file;
+
+		public DeleteOp(Path file) throws IOException {
+			this.file = file;
+			if (Files.isDirectory(file, LinkOption.NOFOLLOW_LINKS)) {
+				/* We just need the path, not actual file */
+				tmp = Files.createTempDirectory(Paths.get(System.getProperty("java.io.tmpdir")), "fu");
+				Files.delete(tmp);
+				move(file, tmp);
+			} else {
+				if (Files.exists(file)) {
+					/* We just need the path, not actual file */
+					tmp = Files.createTempFile("fu", "undo");
+					Files.delete(tmp);
+					move(file, tmp);
+				}
+			}
+		}
+
+		@Override
+		public void undo() throws IOException {
+			if (tmp != null) {
+				move(tmp, file);
+			}
+		}
+
+		@Override
+		public void cleanUp() {
+			if(tmp != null) {
+				Util.deleteRecursiveIfExists(tmp.toFile());
+			}
+		}
+	}
+
+	public static class MoveOp implements UndoableOp {
+		private Path tmp;
+		private Path source;
+		private Path dest;
+
+		public MoveOp(Path source, Path dest) throws IOException {
+			this.source = source;
+			if (Files.isDirectory(source, LinkOption.NOFOLLOW_LINKS))
+				throw new IllegalArgumentException("Cannot be a directory.");
+			if (Files.exists(dest)) {
+				/* We just need the path, not actual file */
+				tmp = Files.createTempFile("fu", "undo");
+				Files.delete(tmp);
+				move(dest, tmp);
+			}
+
+			move(source, dest);
+		}
+
+		@Override
+		public void undo() throws IOException {
+			if (tmp != null) {
+				move(tmp, dest);
+			}
+			move(dest, source);
+		}
+
+		@Override
+		public void cleanUp() {
+			try {
+				Files.delete(tmp);
+			} catch (IOException e) {
+			}
+		}
+	}
+
+	static void move(Path source, Path dest) throws IOException {
+		try {
+			Files.move(source, dest, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+		} catch (AtomicMoveNotSupportedException amnse) {
+			Files.copy(source, dest, StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
+			Files.delete(source);
+		}
+	}
 
 	public static void main(String[] args) {
 		Updater wrapper = new Updater();
@@ -181,14 +376,16 @@ public class Updater extends ForkerWrapper {
 	protected boolean onBeforeProcess(Callable<Void> task) {
 		try {
 			if (isInstaller()) {
+				logger.info("This is an installer, installing.");
 				return install(task);
 			}
-		} catch(RuntimeException re) {
+		} catch (RuntimeException re) {
 			throw re;
 		} catch (Exception e) {
 			throw new IllegalStateException("Failed to install. Cannot continue.", e);
 		}
 
+		logger.info("This is an update, updating.");
 		return update(task);
 	}
 
@@ -231,21 +428,13 @@ public class Updater extends ForkerWrapper {
 
 		/* Try get the remote manifest first */
 		boolean continueProcessing = true;
+		UpdateSession session = null;
 		try {
 			AppManifest manifest = new AppManifest();
 			UpdateHandler handler = getUpdateHandler();
-			UpdateSession session = new UpdateSession(this);
+			session = new UpdateSession(cwd().resolve("updater.properties"), this);
 			if (userCwd != null)
 				session.systemWideBootstrapInstall(true);
-			Path updaterProperties = cwd().resolve("updater.properties");
-			if(Files.exists(updaterProperties)) {
-				try(Reader r = Files.newBufferedReader(updaterProperties)) {
-					session.properties().load(r);
-					logger.log(Level.FINE, String.format("Loaded %d updater properties from %s.", session.properties().size(), updaterProperties));
-				}
-			}
-			else
-				logger.log(Level.FINE, String.format("No updater properties %s.", updaterProperties));
 			session.localDir(cwd());
 			session.appArgs(getConfiguration().getRemaining());
 			handler.init(session);
@@ -270,15 +459,15 @@ public class Updater extends ForkerWrapper {
 			}
 			handler.completedManifestLoad(url);
 
-			
-			if(remoteManifestLocation.startsWith("file://")) {
+			if (remoteManifestLocation.startsWith("file://")) {
 				remoteManifestLocation = "file:/" + remoteManifestLocation.substring(7);
 			}
 			url = new URL(remoteManifestLocation);
 			logger.log(Level.FINE, String.format("Get remote manifest from %s.", remoteManifestLocation));
 			handler.startingManifestLoad(url);
 			boolean haveRemote = false;
-			if ((url.getProtocol().equals("file") && url.toURI().equals(localManifestPath.toUri())) || getConfiguration().getSwitch("offline", false)) {
+			if ((url.getProtocol().equals("file") && url.toURI().equals(localManifestPath.toUri()))
+					|| getConfiguration().getSwitch("offline", false)) {
 				url = localManifestPath.toUri().toURL();
 				try (Reader in = Files.newBufferedReader(localManifestPath)) {
 					continueProcessing = manifest(task, localManifest, handler, session, url, in);
@@ -300,6 +489,7 @@ public class Updater extends ForkerWrapper {
 							"Failed to get remote manifest, falling back to local from %s.", localManifestPath), e);
 
 					url = localManifestPath.toUri().toURL();
+					continueProcessing = false;
 					try (Reader in = Files.newBufferedReader(localManifestPath)) {
 						continueProcessing = manifest(task, localManifest, handler, session, url, in);
 					}
@@ -319,26 +509,40 @@ public class Updater extends ForkerWrapper {
 			getUpdateHandler().complete();
 
 		} catch (Exception e) {
-			e.printStackTrace();
+			getUpdateHandler().startUpdateRollback();
+			if (session != null) {
+				float progress = 0;
+				try {
+					for (int i = session.undos().size() - 1; i >= 0; i--) {
+						progress = (((float) i / (float) session.undos().size()));
+						getUpdateHandler().updateRollbackProgress(progress);
+						session.undos().get(i).undo();
+					}
+				} catch (Exception e2) {
+					logger.log(Level.SEVERE, "Failed to rollback.", e2);
+				}
+				if (progress != 1)
+					getUpdateHandler().updateRollbackProgress(1);
+			}
+			logger.info("Sending error to handler.");
 			getUpdateHandler().failed(e);
 			continueProcessing = false;
 		} finally {
+			if (session != null) {
+				for (UndoableOp op : session.undos()) {
+					op.cleanUp();
+				}
+			}
 		}
+
+		logger.info("Comntinue process is " + continueProcessing);
+
 		return continueProcessing;
 	}
 
 	protected boolean install(Callable<Void> task) throws Exception {
 		InstallHandler handler = getInstallHandler();
-		InstallSession session = new InstallSession();
-		Path installerProperties = cwd().resolve("installer.properties");
-		if(Files.exists(installerProperties)) {
-			try(Reader r = Files.newBufferedReader(installerProperties)) {
-				session.properties().load(r);
-				logger.log(Level.FINE, String.format("Loaded %d installer properties from %s.", session.properties().size(), installerProperties));
-			}
-		}
-		else
-			logger.log(Level.FINE, String.format("No installer properties %s.", installerProperties));
+		InstallSession session = new InstallSession(cwd().resolve("installer.properties"));
 		Files.walk(cwd()).forEach(s -> {
 			if (Files.isRegularFile(s))
 				session.addFile(s);
@@ -347,26 +551,27 @@ public class Updater extends ForkerWrapper {
 		if (installLocation == null || installLocation.equals("")) {
 			throw new IllegalStateException("install-location must be provided.");
 		}
-		Map<String, String> props = new HashMap<>();
+
+		Map<String, String> variables = new HashMap<>();
 		if (OS.isAdministrator()) {
 			if (Platform.isWindows()) {
-				props.put("installer.home", "C:/Program Files");
+				variables.put("installer.home", "C:/Program Files");
 			} else {
-				props.put("installer.home", "/opt");
+				variables.put("installer.home", "/opt");
 			}
 		} else
-			props.put("installer.home", System.getProperty("user.home"));
-		installLocation = Replace.replaceProperties(installLocation, props, true);
-		session.updater(this);
+			variables.put("installer.home", System.getProperty("user.home"));
+		installLocation = Replace.replaceProperties(installLocation, variables, true);
+
+		session.tool(this);
 		session.manifest(new AppManifest(cwd().resolve("manifest.xml")));
 		session.base(Paths.get(installLocation));
 		handler.init(session);
-		
-		
-		Path destination = handler.chooseDestination(new Callable<Void>() {
+
+		Path destination = handler.prep(new Callable<Void>() {
 			@Override
 			public Void call() throws Exception {
-				installTo(session, handler.chosenDestination());
+				installTo(session, handler.value());
 
 				/* Continue starting up the next bootphase, the updater */
 				if (update(task)) {
@@ -404,19 +609,20 @@ public class Updater extends ForkerWrapper {
 		try {
 			long readTotal = 0;
 			int file = 0;
-			for (Path s : session.files()) {
-				Path d = checkFilesDir(dest.resolve(cwd().relativize(s)));
-				logger.log(Level.FINE, String.format("Installing %s to %s.", s, d));
-				handler.installFile(s, d, file);
-				Files.deleteIfExists(d);
-				if (Files.isSymbolicLink(s)) {
-					logger.log(Level.FINE, String.format("Creating link %s.", s));
-					Files.createSymbolicLink(d, Files.readSymbolicLink(s));
+			for (Path source : session.files()) {
+				Path destination = checkFilesDir(dest.resolve(cwd().relativize(source)), session.undos());
+				logger.log(Level.FINE, String.format("Installing %s to %s.", source, destination));
+				handler.installFile(source, destination, file);
+				session.undos().add(new DeleteOp(destination));
+				Files.deleteIfExists(destination);
+				if (Files.isSymbolicLink(source)) {
+					session.undos().add(new LinkOp(destination, source));
 				} else {
-					long fileSize = Files.size(s);
-					logger.log(Level.FINE, String.format("Creating %s.", s));
-					try (InputStream in = throttleStream(Files.newInputStream(s))) {
-						try (OutputStream out = throttleStream(Files.newOutputStream(d))) {
+					long fileSize = Files.size(source);
+					logger.log(Level.FINE, String.format("Creating %s.", source));
+					session.undos().add(new DeleteOnUndoOp(destination));
+					try (InputStream in = throttleStream(Files.newInputStream(source))) {
+						try (OutputStream out = throttleStream(Files.newOutputStream(destination))) {
 							byte[] buf = new byte[65536];
 							int r;
 							long total = 0;
@@ -424,14 +630,14 @@ public class Updater extends ForkerWrapper {
 								out.write(buf, 0, r);
 								total += r;
 								readTotal += r;
-								handler.installFileProgress(s, (float) ((double) total / (double) fileSize));
+								handler.installFileProgress(source, (float) ((double) total / (double) fileSize));
 								handler.installProgress((float) ((double) readTotal / (double) grandTotal));
 							}
 						}
 					}
-					Files.setPosixFilePermissions(d, Files.getPosixFilePermissions(s));
+					session.undos().add(new PermissionsOp(destination, Files.getPosixFilePermissions(source)));
 				}
-				handler.installFileDone(s);
+				handler.installFileDone(source);
 				file++;
 			}
 			handler.installDone();
@@ -443,8 +649,21 @@ public class Updater extends ForkerWrapper {
 			getConfiguration().addProperty("jvmarg", "-Dforker.installedVersion=" + session.manifest().version());
 			getConfiguration().setProperty("cwd", dest.toString());
 		} catch (Exception e) {
+			handler.startInstallRollback();
+			float progress = 0;
+			for (int i = session.undos().size() - 1; i >= 0; i--) {
+				progress = (((float) i / (float) session.undos().size()));
+				handler.installRollbackProgress(progress);
+				session.undos().get(i).undo();
+			}
+			if (progress != 1)
+				handler.installRollbackProgress(1);
 			handler.failed(e);
 			throw e;
+		} finally {
+			for (UndoableOp op : session.undos()) {
+				op.cleanUp();
+			}
 		}
 	}
 
@@ -490,26 +709,30 @@ public class Updater extends ForkerWrapper {
 		int idx = 0;
 		for (Entry entry : updates) {
 			handler.startDownloadFile(entry, idx++);
-			Path resolvedPath = entry.resolve(session.localDir()); /*.relativize(Paths.get("/"));*/
+			Path resolvedPath = entry.resolve(session.localDir()); /* .relativize(Paths.get("/")); */
 			logger.log(Level.INFO, String.format("Installing %s to %s", entry.path(), resolvedPath));
 			Path path;
-			Path outPath = null;
+			Path destination = null;
 			if (entry.section() == Section.APP) {
 				path = resolvedPath;
 				if (entry.isLink())
-					outPath = path;
+					destination = path;
 				else
-					outPath = checkFilesDir(path.getParent().resolve("." + path.getFileName().toString() + ".tmp"));
+					destination = checkFilesDir(path.getParent().resolve("." + path.getFileName().toString() + ".tmp"),
+							session.undos());
 			} else {
 				if (tempBootstrapPath == null) {
-					tempBootstrapPath = checkDir(session.localDir().resolve(".updates"));
+					tempBootstrapPath = checkDir(session.localDir().resolve(".updates"), session.undos());
 				}
 				path = entry.resolve(tempBootstrapPath);
-				outPath = path;
+				destination = path;
 			}
 			checkPathBounds(path);
-			checkPathBounds(outPath);
+			checkPathBounds(destination);
 			try {
+
+				session.undos().add(new DeleteOp(destination));
+				destination = checkFilesDir(destination, session.undos());
 				if (entry.uri() == null) {
 					Path target = entry.target();
 					if (target == null)
@@ -522,23 +745,23 @@ public class Updater extends ForkerWrapper {
 						 */
 					}
 
-					Files.deleteIfExists(outPath);
-
 					logger.log(Level.INFO, String.format("Creating link file %s targeting  %s from %s in %s section.",
-							outPath, target, entry.path(), entry.section()));
-					Files.createSymbolicLink(checkFilesDir(outPath), target);
+							destination, target, entry.path(), entry.section()));
+
+					session.undos().add(new LinkOp(destination, target));
 
 				} else {
 					URL url = AppManifest.concat(session.manifest().baseUri(), entry.uri()).toURL();
 					logger.log(Level.INFO, String.format("Updating file %s from %s in %s section.", entry.path(), url,
 							entry.section()));
-					
-					if(logger.isLoggable(Level.FINE)) {
-						logger.log(Level.FINE, String.format("Writing to temporary file %s", outPath));
+
+					if (logger.isLoggable(Level.FINE)) {
+						logger.log(Level.FINE, String.format("Writing to temporary file %s", destination));
 					}
 
+					session.undos().add(new DeleteOnUndoOp(destination));
 					try (InputStream in = throttleStream(url.openStream())) {
-						try (OutputStream out = throttleStream(Files.newOutputStream(checkFilesDir(outPath)))) {
+						try (OutputStream out = throttleStream(Files.newOutputStream(destination))) {
 							byte[] buf = new byte[65536];
 							int r;
 							long total = 0;
@@ -553,37 +776,23 @@ public class Updater extends ForkerWrapper {
 						}
 					}
 
-					if (!outPath.equals(path)) {
+					if (!destination.equals(path)) {
 						if (Files.exists(path))
 							logger.log(Level.INFO, String.format("Removing existing file %s", path));
-						Files.deleteIfExists(path);
-						Files.move(outPath, path, StandardCopyOption.ATOMIC_MOVE);
+
+						session.undos().add(new DeleteOp(path));
+						session.undos().add(new MoveOp(destination, path));
 					}
 
 					if (entry.permissions() != null) {
-						if(logger.isLoggable(Level.FINE)) {
-							logger.log(Level.FINE, String.format("Setting permissions %s on %s", entry.permissions(), path));
+						if (logger.isLoggable(Level.FINE)) {
+							logger.log(Level.FINE,
+									String.format("Setting permissions %s on %s", entry.permissions(), path));
 						}
-						Files.setPosixFilePermissions(path, entry.permissions());
+						session.undos().add(new PermissionsOp(path, entry.permissions()));
 					} else {
-						if (!entry.write()) {
-							if(logger.isLoggable(Level.FINE)) {
-								logger.log(Level.FINE, String.format("Setting read-only on %s", path));
-							}
-							path.toFile().setWritable(false, false);
-						}
-						if(!entry.read()) {
-							if(logger.isLoggable(Level.FINE)) {
-								logger.log(Level.FINE, String.format("Setting no-read on %s", path));
-							}
-							path.toFile().setReadable(false);
-						}
-						if(entry.execute()) {
-							if(logger.isLoggable(Level.FINE)) {
-								logger.log(Level.FINE, String.format("Setting execute on %s", path));
-							}
-							path.toFile().setExecutable(true);
-						}
+						session.undos()
+								.add(new SetEntryPermissions(path, entry.write(), entry.read(), entry.execute()));
 					}
 
 					entry.checksum(AppManifest.checksum(path));
@@ -614,22 +823,20 @@ public class Updater extends ForkerWrapper {
 		 * Now check everything else in the base path (i.e. where app jars are) for
 		 * anything that shouldn't be there.
 		 */
-		for(Path appBase : session.manifest().sectionPaths().values())  {
+		for (Path appBase : session.manifest().sectionPaths().values()) {
 			try (DirectoryStream<Path> stream = Files.newDirectoryStream(appBase)) {
 				for (Path path : stream) {
 					if (Files.isDirectory(path) && !appBase.equals(session.localDir())) {
 						/*
 						 * Unless it's the root of the install, the appBase should have no folders in it
 						 */
-						logger.log(Level.INFO,
-								String.format("Removing directory with no manifest entry %s from app base path %s.", path,
-										appBase));
-						Util.deleteRecursiveIfExists(path.toFile());
+						logger.log(Level.INFO, String.format(
+								"Removing directory with no manifest entry %s from app base path %s.", path, appBase));
+						session.undos().add(new DeleteOp(path));
 					} else if (!Files.isDirectory(path) && !session.manifest().hasPath(path.getFileName())) {
-						logger.log(Level.INFO,
-								String.format("Removing file with no manifiest entry %s from app base path %s.", path,
-										appBase));
-						Files.delete(path);
+						logger.log(Level.INFO, String.format(
+								"Removing file with no manifiest entry %s from app base path %s.", path, appBase));
+						session.undos().add(new DeleteOp(path));
 					}
 				}
 			}
@@ -651,16 +858,13 @@ public class Updater extends ForkerWrapper {
 					String.format("Attempt to install file %s out of bounds of %s.", path, cwd()));
 	}
 
-	private Path checkFilesDir(Path file) throws IOException {
-		checkDir(file.getParent());
+	private Path checkFilesDir(Path file, List<UndoableOp> opts) throws IOException {
+		checkDir(file.getParent(), opts);
 		return file;
 	}
 
-	private Path checkDir(Path dir) throws IOException {
-		if (!Files.exists(dir)) {
-			logger.log(Level.INFO, String.format("Creating folder %s.", dir));
-			Files.createDirectories(dir);
-		}
+	private Path checkDir(Path dir, List<UndoableOp> opts) throws IOException {
+		opts.add(new MkdirOp(dir));
 		return dir;
 	}
 }

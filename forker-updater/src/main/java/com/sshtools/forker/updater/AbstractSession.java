@@ -7,40 +7,68 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
+import java.io.Reader;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.sshtools.forker.updater.DesktopShortcut.Type;
 import com.sun.jna.Platform;
 
-public abstract class AbstractSession implements Session {
+public abstract class AbstractSession<T> implements Session {
+	/** The logger. */
+	protected Logger logger = Logger.getGlobal();
 
-	private Updater updater;
+	private T tool;
 	private AppManifest manifest;
 	private Properties properties = new Properties();
+	private List<UndoableOp> undos = new ArrayList<>();
+	
+	protected AbstractSession() {
+	}
+	
+	protected AbstractSession(Path propertiesFile) throws IOException {
+		if (Files.exists(propertiesFile)) {
+			try (Reader r = Files.newBufferedReader(propertiesFile)) {
+				properties().load(r);
+				logger.log(Level.FINE, String.format("Loaded %d properties from %s.",
+						properties().size(), propertiesFile));
+			}
+		} else
+			logger.log(Level.FINE, String.format("No properties %s.", propertiesFile));
+	}
 	
 	@Override
 	public Properties properties() {
 		return properties;
 	}
 	
-	public Updater updater() {
-		return updater;
+	public List<UndoableOp> undos() {
+		return undos;
+	}
+	
+	public T tool() {
+		return tool;
 	}
 
 	public AppManifest manifest() {
 		return manifest;
 	}
 
-	public AbstractSession manifest(AppManifest manifest) {
+	public AbstractSession<T> manifest(AppManifest manifest) {
 		this.manifest = manifest;
 		return this;
 	}
 
-	public AbstractSession updater(Updater updater) {
-		this.updater = updater;
+	public AbstractSession<T> tool(T tool) {
+		this.tool = tool;
 		return this;
 	}
 

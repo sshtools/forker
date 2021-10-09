@@ -62,6 +62,19 @@
 							<remoteBase>file://${build.directory}/image</remoteBase>
 							<packageMode>SELF_EXTRACTING</packageMode>
 							<mainClass>hello.world/hello.world.HelloWorld</mainClass>
+							<installerProperties>
+								<bannerImage>left-banner.png</bannerImage>
+								<bannerPosition>left</bannerPosition>
+							</installerProperties>
+                            <uninstallerProperties>
+                                <bannerImage>left-banner.png</bannerImage>
+                                <bannerPosition>left</bannerPosition>
+                            </uninstallerProperties>
+							<bootstrapFiles>
+								<bootstrapFile>
+									<source>left-banner.png</source>
+								</bootstrapFile>
+							</bootstrapFiles>
 							<systemModules>
 								<systemModule>java.management</systemModule>
 								<systemModule>java.logging</systemModule>
@@ -82,7 +95,6 @@
 								<bootstrapArtifact>forker-updater-swt</bootstrapArtifact>
 								<bootstrapArtifact>org.eclipse.swt</bootstrapArtifact>
 								<bootstrapArtifact>org.eclipse.swt.gtk.linux.x86_64</bootstrapArtifact>
-								-->
 							</bootstrapArtifacts>
 						</configuration>
 					</execution>

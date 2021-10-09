@@ -3,7 +3,7 @@ package com.sshtools.forker.updater;
 import java.net.URL;
 import java.util.concurrent.Callable;
 
-public interface UpdateHandler extends Handler<UpdateSession> {
+public interface UpdateHandler extends Handler<UpdateSession, Void> {
 
 	default void startingManifestLoad(URL location) {
 	}
@@ -30,4 +30,8 @@ public interface UpdateHandler extends Handler<UpdateSession> {
 	}
 
 	void updateDone(boolean upgradeError);
+
+	void startUpdateRollback();
+
+	void updateRollbackProgress(float progress);
 }

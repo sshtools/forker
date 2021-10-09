@@ -10,22 +10,26 @@ import java.util.List;
 
 import com.sshtools.forker.updater.AppManifest.Section;
 
-public class UpdateSession extends AbstractSession {
+public class UpdateSession extends AbstractSession<Updater> {
 
 	private Path localDir = Paths.get(System.getProperty("user.dir"));
 	private List<String> appArgs;
 	private boolean systemWideBootstrapInstall;
 	private long sz = 0;
 	private int updates = 0;
-
-	UpdateSession(Updater updater) {
+	
+	public UpdateSession() {
 		super();
-		updater(updater);
+	}
+
+	public UpdateSession(Path propertiesFile, Updater updater) throws IOException {
+		super(propertiesFile);
+		tool(updater);
 	}
 
 	@Override
-	public AbstractSession manifest(AppManifest manifest) {
-		AbstractSession m = super.manifest(manifest);
+	public AbstractSession<Updater> manifest(AppManifest manifest) {
+		AbstractSession<Updater> m = super.manifest(manifest);
 		sz = 0;
 		try {
 			Collection<? extends Entry> l = getUpdates();

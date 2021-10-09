@@ -241,6 +241,12 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 	@Parameter(defaultValue = "true", property = "useArgfile")
 	private boolean useArgfile = true;
 
+	@Parameter(defaultValue = "true", property = "uninstaller")
+	private boolean uninstaller = true;
+
+	@Parameter(property = "uninstaller", defaultValue = "uninstaller", required = true)
+	private String uninstallerName = "uninstaller";
+
 	@Parameter(defaultValue = "true", property = "modules")
 	private boolean modules = true;
 
@@ -280,6 +286,9 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 
 	@Parameter
 	private Properties installerProperties = new Properties();
+
+	@Parameter
+	private Properties uninstallerProperties = new Properties();
 
 	@Parameter(defaultValue = "${session}", readonly = true, required = true)
 	protected MavenSession session;
@@ -355,8 +364,9 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 				doArtifact(manifest, bootstrapPathObj, businessPathObj, project.getArtifact());
 
 			if (bootstrapFiles != null) {
+				Path installFileSrc = Paths.get(project.getFile().getParentFile().getAbsolutePath()).resolve("src/main/installer");
 				for (BootstrapFile file : bootstrapFiles) {
-					Path path = Paths.get(file.source);
+					Path path = installFileSrc.resolve(file.source);
 					Path target = imagePath
 							.resolve(file.target.equals(".") ? imagePath : imagePath.resolve(file.target))
 							.resolve(path.getFileName());
@@ -462,20 +472,43 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 			if(Platform.isWindows() && !fullScriptName.toLowerCase().endsWith(".bat")) {
 				fullScriptName += ".bat";
 			}
+			String fullUninstallerName = uninstallerName; 
+			if(Platform.isWindows() && !fullUninstallerName.toLowerCase().endsWith(".bat")) {
+				fullUninstallerName += ".bat";
+			}
 
 			Path scriptPath = checkDir(imagePath.resolve("bin")).resolve(fullScriptName);
 			Path argsPath = useArgfile ? checkDir(imagePath).resolve(launcherScriptName + ".args") : null;
-			writeScript(imagePath, scriptPath, argsPath, bootstrapPathObj, businessPathObj);
+			Path uninstallerPath = null;
+			writeLauncherScript(imagePath, scriptPath, argsPath, bootstrapPathObj, businessPathObj);
+			if(uninstaller) {
+				argsPath = useArgfile ? checkDir(imagePath).resolve(uninstallerName + ".args") : null;
+				uninstallerPath = checkDir(imagePath.resolve("bin")).resolve(fullUninstallerName);
+				writeUninstallerScript(imagePath, uninstallerPath, argsPath, bootstrapPathObj, businessPathObj);
+			}
 			if (updateableBootstrap) {
 				argsPath = useArgfile ? checkDir(repositoryPath).resolve(launcherScriptName + ".args") : null;
 				scriptPath = checkDir(repositoryPath.resolve("bin")).resolve(fullScriptName);
-				writeScript(imagePath, scriptPath, argsPath, bootstrapPathObj, businessPathObj);
+				writeLauncherScript(imagePath, scriptPath, argsPath, bootstrapPathObj, businessPathObj);
+				if(uninstaller) {
+					argsPath = useArgfile ? checkDir(repositoryPath).resolve(uninstallerName + ".args") : null;
+					uninstallerPath = checkDir(repositoryPath.resolve("bin")).resolve(fullUninstallerName);
+					writeUninstallerScript(imagePath, uninstallerPath, argsPath, bootstrapPathObj, businessPathObj);
+					manifest.entries()
+							.add(new Entry(uninstallerPath, manifest).section(Section.BOOTSTRAP)
+									.path(repositoryPath.relativize(uninstallerPath))
+									.uri(new URI(resolveUrl(normalizeForUri(remoteBase),
+											normalizeForUri(repositoryPath.relativize(uninstallerPath).toString()))))
+									.type(Type.OTHER));
+				}
+				
 				manifest.entries()
 						.add(new Entry(scriptPath, manifest).section(Section.BOOTSTRAP)
 								.path(repositoryPath.relativize(scriptPath))
 								.uri(new URI(resolveUrl(normalizeForUri(remoteBase),
 										normalizeForUri(repositoryPath.relativize(scriptPath).toString()))))
 								.type(Type.OTHER));
+				
 				if (useArgfile) {
 					manifest.entries()
 							.add(new Entry(argsPath, manifest).section(Section.BOOTSTRAP)
@@ -486,21 +519,10 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 				}
 			}
 			
-			Properties allProperties = new Properties();
-			allProperties.put("title", project.getName());
-			allProperties.put("description", project.getDescription());
-			allProperties.put("version", project.getVersion());
-			if(installerProperties != null) {
-				allProperties.putAll(installerProperties);
+			writeProperties("installer.properties", "Installer Properties", installerProperties, manifest, imagePath);
+			if(uninstaller) {
+				writeProperties("uninstaller.properties", "Uninstaller Properties", uninstallerProperties, manifest, imagePath);
 			}
-			Path installerPropertiesPath = checkDir(imagePath).resolve("installer.properties");
-			try (Writer out = Files.newBufferedWriter(installerPropertiesPath)) {
-				allProperties.store(out, "Installer Properties");
-			}
-			manifest.entries().add(new Entry(installerPropertiesPath, manifest).section(Section.BOOTSTRAP)
-					.path(imagePath.relativize(installerPropertiesPath))
-					.uri(new URI(resolveUrl(normalizeForUri(remoteBase), imagePath.relativize(installerPropertiesPath).toString())))
-					.type(Type.OTHER));
 
 			try (Writer out = Files.newBufferedWriter(checkDir(imagePath).resolve("manifest.xml"))) {
 				manifest.save(out);
@@ -527,6 +549,28 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		} catch (IOException | URISyntaxException e) {
 			throw new MojoExecutionException("Failed to write configuration.", e);
 		}
+	}
+
+	protected void writeProperties(String name, String description, Properties properties, AppManifest manifest, Path imagePath) throws IOException, URISyntaxException {
+		Properties allProperties = new Properties();
+		addDefaultProperties(allProperties);
+		if(properties != null) {
+			allProperties.putAll(properties);
+		}
+		Path propertiesPath = checkDir(imagePath).resolve(name);
+		try (Writer out = Files.newBufferedWriter(propertiesPath)) {
+			allProperties.store(out, description);
+		}
+		manifest.entries().add(new Entry(propertiesPath, manifest).section(Section.BOOTSTRAP)
+				.path(imagePath.relativize(propertiesPath))
+				.uri(new URI(resolveUrl(normalizeForUri(remoteBase), imagePath.relativize(propertiesPath).toString())))
+				.type(Type.OTHER));
+	}
+
+	protected void addDefaultProperties(Properties allProperties) {
+		allProperties.put("title", project.getName());
+		allProperties.put("description", project.getDescription() == null ? "" : project.getDescription());
+		allProperties.put("version", project.getVersion());
 	}
 
 	protected boolean isForkerUpdaterBootstrap(org.eclipse.aether.artifact.Artifact a) {
@@ -645,8 +689,140 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 			return true;
 		return false;
 	}
+	
+	private void writeUninstallerScript(Path imagePath, Path uninstallerPath, Path argsPath, Path bootstrapPath, Path businessPath)
+			throws IOException {
+		
+		List<String> modulePaths = new ArrayList<>();
+		List<String> vmopts = new ArrayList<>();
+		List<String> classPaths = new ArrayList<>();
+		StringBuilder updaterArgs = new StringBuilder();
+		
+		boolean useForkerModules = scriptArgs(imagePath, bootstrapPath, modulePaths, vmopts,
+				classPaths, updaterArgs);
+		
+		if(Platform.isWindows()) {
+			try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(uninstallerPath), true)) {
+				out.println("@ECHO OFF");
+				out.println("CD %~dp0\\..");
+				if (argsPath != null) {
+					try (PrintWriter pw = new PrintWriter(Files.newBufferedWriter(argsPath))) {
+						for (String vmopt : vmopts) {
+							pw.println(vmopt);
+						}
+					}
+					out.println(String.format("SET VM_OPTIONS=\"@%s\"", argsPath.getFileName().toString()));
+				} else
+					out.println(String.format("SET VM_OPTIONS=\"%s\"", String.join(" ", vmopts)));
+	
+				if (link) {
+					out.println("SET JAVA_EXE=bin\\java.exe");
+				} else {
+					out.println(String.format("IF \"%JAVA_HOME%\"==\"\" ( "));
+					out.println("    SET JAVA_EXE=${JAVA_HOME}\\bin\\java.exe");
+					out.println(") ELSE (");
+					out.println("    SET JAVA_EXE=java");
+					out.println(")");
+				}
+	
+				if (updateableBootstrap) {
+					//out.println("while : ; do");
+					if (useForkerModules)
+						out.println(
+								"    %JAVA_EXE% %VM_OPTIONS% -m com.sshtools.forker.updater/com.sshtools.forker.updater.Uninstaller %APP_ARGS% %*");
+					else
+						out.println("    %JAVA_EXE% %VM_OPTIONS% com.sshtools.forker.updater.Uninstaller %APP_ARGS% %*");
+//					out.println("    ret=$?");
+//					out.println("    if [ \"${ret}\" != 9 -o ! -d .updates ]; then");
+//					out.println("        exit $ret");
+//					out.println("    else");
+//					out.println("        echo Updating bootstrap ....");
+//					out.println("        cd .updates");
+//					out.println("        if ! find . -type d -exec mkdir -p ../\\{} \\; ; then");
+//					out.println("            echo \"$0: Failed to recreate directory structure.\" >&2");
+//					out.println("            exit 2");
+//					out.println("        fi");
+//					out.println("        if ! find . -type f -exec mv -f \\{} ../\\{} \\; ; then");
+//					out.println("            echo \"$0: Failed to move update files.\" >&2");
+//					out.println("            exit 2");
+//					out.println("        fi");
+//					out.println("        if ! find . -type l -exec mv -f \\{} ../\\{} \\; ; then");
+//					out.println("            echo \"$0: Failed to move link files.\" >&2");
+//					out.println("            exit 2");
+//					out.println("        fi");
+//					out.println("        cd ..");
+//					out.println("        rm -fr .updates");
+//					out.println("    fi");
+//					out.println("done");
+				} else {
+					if (useForkerModules)
+						out.println(
+								"%JAVA_EXE% %VM_OPTIONS% -m com.sshtools.forker.updater/com.sshtools.forker.updater.Uninstaller %APP_ARGS% %*");
+					else
+						out.println("%JAVA_EXE% %VM_OPTIONS% com.sshtools.forker.updater.Uninstaller %APP_ARGS% %*");
+				}
+			}
+		}
+		else if(OS.isUnix()) {
+			try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(uninstallerPath), true)) {
+				out.println("#!/bin/sh");
+				out.println("realpath=$(readlink \"$0\")");
+				out.println("if [ -z \"${realpath}\" ] ; then realpath=\"$0\" ; fi");
+				out.println("cd $(dirname ${realpath})/..");
+	
+				if (argsPath != null) {
+					try (PrintWriter pw = new PrintWriter(Files.newBufferedWriter(argsPath))) {
+						for (String vmopt : vmopts) {
+							pw.println(vmopt);
+						}
+					}
+					out.println(String.format("VM_OPTIONS=\"@%s\"", argsPath.getFileName().toString()));
+				} else
+					out.println(String.format("VM_OPTIONS=\"%s\"", String.join(" ", vmopts)));
+	
+				if (link) {
+					out.println("JAVA_EXE=bin/java");
+				} else {
+					out.println(String.format("if [ -n \"${JAVA_HOME}\" ] ; then "));
+					out.println("    JAVA_EXE=${JAVA_HOME}/bin/java");
+					out.println("else");
+					out.println("    JAVA_EXE=java");
+					out.println("fi");
+				}
+	
+				if (updateableBootstrap) {
+					out.println("while : ; do");
+					if (useForkerModules)
+						out.println(
+								"    ${JAVA_EXE} ${VM_OPTIONS} -m com.sshtools.forker.updater/com.sshtools.forker.updater.Uninstaller ${APP_ARGS} $@");
+					else
+						out.println("    ${JAVA_EXE} ${VM_OPTIONS} com.sshtools.forker.updater.Uninstaller ${APP_ARGS} $@");
+					out.println("    ret=$?");
+					out.println("    exit $ret");
+					out.println("done");
+				} else {
+					if(updateable) {
+						if (useForkerModules)
+							out.println(
+									"${JAVA_EXE} ${VM_OPTIONS} -m com.sshtools.forker.updater/com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
+						else
+							out.println("${JAVA_EXE} ${VM_OPTIONS} com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
+					}
+					else {
+						if (useForkerModules)
+							out.println("${JAVA_EXE} ${VM_OPTIONS} -m com.sshtools.forker.wrapper/com.sshtools.forker.wrapper.ForkerWrapper ${APP_ARGS} $@");
+						else
+							out.println("${JAVA_EXE} ${VM_OPTIONS} com.sshtools.forker.wrapper.ForkerWrapper ${APP_ARGS} $@");
+					}
+				}
+			}
+		}
+		else
+			throw new UnsupportedOperationException("Cannot create launch script for this platform.");
+		uninstallerPath.toFile().setExecutable(true);
+	}
 
-	private void writeScript(Path imagePath, Path scriptPath, Path argsPath, Path bootstrapPath, Path businessPath)
+	private void writeLauncherScript(Path imagePath, Path scriptPath, Path argsPath, Path bootstrapPath, Path businessPath)
 			throws IOException {
 		
 		List<String> modulePaths = new ArrayList<>();
@@ -765,6 +941,7 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 						out.println("    ${JAVA_EXE} ${VM_OPTIONS} com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
 					out.println("    ret=$?");
 					out.println("    if [ \"${ret}\" != 9 -o ! -d .updates ]; then");
+					out.println("        rm -fr .updates");
 					out.println("        exit $ret");
 					out.println("    else");
 					out.println("        echo Updating bootstrap ....");

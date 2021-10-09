@@ -1,6 +1,8 @@
 
 package com.sshtools.forker.updater.console;
 
+import java.util.concurrent.Callable;
+
 import org.fusesource.jansi.Ansi;
 import org.fusesource.jansi.Ansi.Erase;
 
@@ -8,7 +10,7 @@ import com.sshtools.forker.updater.Entry;
 import com.sshtools.forker.updater.UpdateHandler;
 import com.sshtools.forker.updater.UpdateSession;
 
-public class ConsoleUpdateHandler extends AbstractConsoleHandler<UpdateSession> implements UpdateHandler {
+public class ConsoleUpdateHandler extends AbstractConsoleHandler<UpdateSession, Void> implements UpdateHandler {
 
 	@Override
 	public void startDownloads() throws Exception {
@@ -41,6 +43,32 @@ public class ConsoleUpdateHandler extends AbstractConsoleHandler<UpdateSession> 
 	public void updateDownloadProgress(float frac) throws Exception {
 		currentFrac = frac;
 		updateRow();
+	}
+
+	@Override
+	public void startUpdateRollback() {
+		Ansi ansi = Ansi.ansi();
+		println(ansi.cursorToColumn(0).bold().a("Starting rollback.").eraseLine(Erase.FORWARD).toString());
+		this.currentIndex = 0;
+		this.currentDest = "Rollback";
+		this.currentFrac = 0;
+		updateRow();
+	}
+
+	@Override
+	public void updateRollbackProgress(float progress) {
+		currentFrac = progress;
+		updateRow();
+	}
+
+	@Override
+	public Void prep(Callable<Void> callback) {
+		return null;
+	}
+
+	@Override
+	public Void value() {
+		return null;
 	}
 
 }

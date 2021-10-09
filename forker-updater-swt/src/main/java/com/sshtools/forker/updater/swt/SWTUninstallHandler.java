@@ -1,38 +1,36 @@
 package com.sshtools.forker.updater.swt;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.text.MessageFormat;
 import java.util.concurrent.Callable;
 
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.MouseListener;
+import org.eclipse.swt.events.MouseAdapter;
+import org.eclipse.swt.events.MouseEvent;
 import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
-import org.eclipse.swt.widgets.DirectoryDialog;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.ProgressBar;
-import org.eclipse.swt.widgets.Text;
 
-import com.sshtools.forker.updater.InstallHandler;
-import com.sshtools.forker.updater.InstallSession;
-import com.sshtools.forker.updater.test.InstallTest;
+import com.sshtools.forker.updater.UninstallHandler;
+import com.sshtools.forker.updater.UninstallSession;
+import com.sshtools.forker.updater.test.UninstallTest;
 
-public class SWTInstallHandler extends AbstractSWTHandler<InstallSession, Path> implements InstallHandler {
+public class SWTUninstallHandler extends AbstractSWTHandler<UninstallSession, Boolean> implements UninstallHandler {
 
 	public static void main(String[] args) throws Exception {
 		System.setProperty("bannerImage", "../forker-updater-example/src/main/installer/left-banner.png");
-		InstallTest.main(args, new SWTInstallHandler());
+		UninstallTest.main(args, new SWTUninstallHandler());
 	}
-	
-	private Path chosenDestination;
+
+	private boolean deleteAll;
 	private ProgressBar progressBar;
 	private Label progressText;
 	private boolean cancelled;
-	private Label installTextLabel;
+	private Label uninstallTextLabel;
 
 	@Override
 	public boolean isCancelled() {
@@ -40,29 +38,12 @@ public class SWTInstallHandler extends AbstractSWTHandler<InstallSession, Path> 
 	}
 
 	@Override
-	public Path value() {
-		return chosenDestination;
+	public Boolean value() {
+		return deleteAll;
 	}
 
 	@Override
-	public void startInstallRollback() throws Exception {
-		display.asyncExec(() -> {
-			progressText.setText("");
-			installTextLabel.setText(MessageFormat.format(
-					session.properties().getProperty("installRollbackText", "Rolling back installation of {0} ..."),
-					title));
-		});
-	}
-
-	@Override
-	public void installRollbackProgress(float progress) {
-		display.asyncExec(() -> {
-			progressBar.setSelection((int) (progress * 100));
-		});
-	}
-
-	@Override
-	public void installDone() {
+	public void uninstallDone() {
 		display.asyncExec(() -> {
 
 			createContainer();
@@ -80,8 +61,8 @@ public class SWTInstallHandler extends AbstractSWTHandler<InstallSession, Path> 
 			labelGridData.grabExcessHorizontalSpace = true;
 			labelGridData.grabExcessVerticalSpace = true;
 			messageLabel.setLayoutData(labelGridData);
-			messageLabel.setText(MessageFormat
-					.format(session.properties().getProperty("closeText", "Installation of {0} is complete."), title));
+			messageLabel.setText(MessageFormat.format(
+					session.properties().getProperty("closeText", "Uninstallation of {0} is complete."), title));
 
 			/* Actions */
 			Composite actions = createActionBar(SWT.FILL, false);
@@ -96,29 +77,29 @@ public class SWTInstallHandler extends AbstractSWTHandler<InstallSession, Path> 
 	}
 
 	@Override
-	public void installFile(Path file, Path d, int index) throws Exception {
+	public void uninstallFile(Path file, Path d, int index) throws Exception {
 		display.asyncExec(() -> {
 			progressText.setText(file.toString());
 		});
 	}
 
 	@Override
-	public void installFileDone(Path file) throws Exception {
+	public void uninstallFileDone(Path file) throws Exception {
 	}
 
 	@Override
-	public void installFileProgress(Path file, float progress) throws Exception {
+	public void uninstallFileProgress(Path file, float progress) throws Exception {
 	}
 
 	@Override
-	public void installProgress(float frac) throws Exception {
+	public void uninstallProgress(float frac) throws Exception {
 		display.asyncExec(() -> {
 			progressBar.setSelection((int) (frac * 100));
 		});
 	}
 
 	@Override
-	public void startInstall() throws Exception {
+	public void startUninstall() throws Exception {
 		inProgress = true;
 		display.asyncExec(() -> {
 			createContainer();
@@ -128,16 +109,17 @@ public class SWTInstallHandler extends AbstractSWTHandler<InstallSession, Path> 
 			container.setLayout(mainGridLayout);
 
 			/* Text */
-			installTextLabel = new Label(container, SWT.WRAP);
-			GridData installTextLabelGridData = new GridData();
-			installTextLabelGridData.horizontalSpan = 3;
-			installTextLabelGridData.horizontalAlignment = SWT.FILL;
-			installTextLabelGridData.verticalAlignment = SWT.BEGINNING;
-			installTextLabelGridData.grabExcessHorizontalSpace = true;
-			installTextLabelGridData.grabExcessVerticalSpace = true;
-			installTextLabel.setLayoutData(installTextLabelGridData);
-			installTextLabel.setText(MessageFormat
-					.format(session.properties().getProperty("installingText", "Installing {0} ..."), title));
+			uninstallTextLabel = new Label(container, SWT.WRAP);
+			GridData uninstallTextLabelGridData = new GridData();
+			uninstallTextLabelGridData.horizontalSpan = 3;
+			uninstallTextLabelGridData.horizontalAlignment = SWT.FILL;
+			uninstallTextLabelGridData.verticalAlignment = SWT.BEGINNING;
+			uninstallTextLabelGridData.grabExcessHorizontalSpace = true;
+			uninstallTextLabelGridData.grabExcessVerticalSpace = true;
+			uninstallTextLabel.setLayoutData(uninstallTextLabelGridData);
+			uninstallTextLabel.setText(MessageFormat.format(
+					session.properties().getProperty("uninstallingText", "Uninstalling {0} from this computer ..."),
+					title));
 
 			/* Decription */
 			progressText = new Label(container, SWT.WRAP);
@@ -170,7 +152,7 @@ public class SWTInstallHandler extends AbstractSWTHandler<InstallSession, Path> 
 		});
 	}
 
-	protected void createMainPage(Callable<Void> installCallback) {
+	protected void createMainPage(Callable<Void> uninstallCallback) {
 		/* Create the main page, showing description and destination */
 
 		GridLayout mainGridLayout = new GridLayout();
@@ -208,48 +190,43 @@ public class SWTInstallHandler extends AbstractSWTHandler<InstallSession, Path> 
 		label.setLayoutData(labelGridData);
 		label.setText(session.properties().getProperty("description", "Forker launched application"));
 
-		/* Install Location */
-		Label installLocationLabel = new Label(container, SWT.NONE);
-		installLocationLabel.setText("Install Location:");
-		GridData installLocationLabelGridData = new GridData();
-		installLocationLabelGridData.grabExcessHorizontalSpace = false;
-		installLocationLabelGridData.grabExcessVerticalSpace = true;
-		installLocationLabel.setLayoutData(installLocationLabelGridData);
+		/* Delete All */
 
-		Text installLocation = new Text(container, SWT.BORDER);
-		GridData installLocationGridData = new GridData();
-		installLocationGridData.grabExcessHorizontalSpace = true;
-		installLocationGridData.grabExcessVerticalSpace = true;
-		installLocationGridData.widthHint = 300;
-		installLocationGridData.horizontalAlignment = SWT.FILL;
-		installLocation.setLayoutData(installLocationGridData);
-
-		Button browse = new Button(container, SWT.PUSH);
-		browse.setText("Browse");
-		browse.addMouseListener(MouseListener.mouseUpAdapter((e) -> {
-			DirectoryDialog dialog = new DirectoryDialog(shell);
-			dialog.setFilterPath(installLocation.getText());
-			String val = dialog.open();
-			if (val != null)
-				installLocation.setText(val);
+		Button deleteAll = new Button(container, SWT.CHECK);
+		GridData deleteAllGridData = new GridData();
+		deleteAllGridData.grabExcessHorizontalSpace = false;
+		deleteAllGridData.grabExcessVerticalSpace = true;
+		deleteAll.setLayoutData(deleteAllGridData);
+		deleteAll.addSelectionListener(SelectionListener.widgetSelectedAdapter((e) -> {
+			SWTUninstallHandler.this.deleteAll = deleteAll.getSelection();
 		}));
-		GridData browseGridData = new GridData();
-		browseGridData.grabExcessHorizontalSpace = false;
-		browseGridData.grabExcessVerticalSpace = true;
-		browse.setLayoutData(browseGridData);
-		installLocation.setText(session.base().toString());
 
+		Label deleteAllLabel = new Label(container, SWT.NONE);
+		deleteAllLabel.addMouseListener(new MouseAdapter() {
+			@Override
+			public void mouseUp(MouseEvent e) {
+				SWTUninstallHandler.this.deleteAll = !deleteAll.getSelection();
+				deleteAll.setSelection(SWTUninstallHandler.this.deleteAll);
+			}
+		});
+		deleteAllLabel.setText("Delete All");
+		GridData deleteAllLabelGridData = new GridData();
+		deleteAllLabelGridData.grabExcessHorizontalSpace = true;
+		deleteAllLabelGridData.grabExcessVerticalSpace = true;
+		deleteAllLabelGridData.widthHint = 300;
+		deleteAllLabelGridData.horizontalAlignment = SWT.FILL;
+		deleteAllLabel.setLayoutData(deleteAllLabelGridData);
+
+		/* Actions */
 		Composite actions = createActionBar(SWT.FILL, false);
-
-		Button install = new Button(actions, SWT.PUSH);
-		install.setText(session.properties().getProperty("installText", "Install"));
-		install.addSelectionListener(SelectionListener.widgetSelectedAdapter((e) -> {
-			chosenDestination = Paths.get(installLocation.getText());
+		Button uninstall = new Button(actions, SWT.PUSH);
+		uninstall.setText(session.properties().getProperty("uninstallText", "Uninstall"));
+		uninstall.addSelectionListener(SelectionListener.widgetSelectedAdapter((e) -> {
 			new Thread() {
 				@Override
 				public void run() {
 					try {
-						installCallback.call();
+						uninstallCallback.call();
 					} catch (Exception e1) {
 					}
 				}
@@ -260,8 +237,8 @@ public class SWTInstallHandler extends AbstractSWTHandler<InstallSession, Path> 
 	}
 
 	@Override
-	protected String getFrameTitle(InstallSession session) {
-		return MessageFormat.format(session.properties().getProperty("frameTitle", "Installing {0}"), title);
+	protected String getFrameTitle(UninstallSession session) {
+		return MessageFormat.format(session.properties().getProperty("frameTitle", "Uninstalling {0}"), title);
 	}
 
 }

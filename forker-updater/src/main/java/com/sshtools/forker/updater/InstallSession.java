@@ -7,11 +7,19 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class InstallSession extends AbstractSession {
+public class InstallSession extends AbstractSession<Updater> {
 
 	private List<Path> files = new ArrayList<>();
 	private Path base;
 	private long sz = -1;
+	
+	public InstallSession() {
+		super();
+	}
+
+	public InstallSession(Path propertiesFile) throws IOException {
+		super(propertiesFile);
+	}
 
 	public Path base() {
 		return base;

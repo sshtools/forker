@@ -23,7 +23,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 
-public class DefaultConsoleInstallHandler extends AbstractHandler<InstallSession> implements InstallHandler {
+public class DefaultConsoleInstallHandler extends AbstractHandler<InstallSession, Path> implements InstallHandler {
 
 	private InstallSession session;
 	private Path dest;
@@ -35,10 +35,12 @@ public class DefaultConsoleInstallHandler extends AbstractHandler<InstallSession
 
 	@Override
 	public void startInstall() throws Exception {
+		System.out.println("Installing ....");
 	}
 
 	@Override
 	public void installFile(Path file, Path dest, int index) throws Exception {
+		System.out.println(file.toString() + " -> " + dest);
 	}
 
 	@Override
@@ -55,15 +57,29 @@ public class DefaultConsoleInstallHandler extends AbstractHandler<InstallSession
 
 	@Override
 	public void installDone() {
+		System.out.println("Install complete!");
 	}
 
 	@Override
-	public Path chosenDestination() {
+	public void startInstallRollback() throws Exception {
+	}
+
+	@Override
+	public void installRollbackProgress(float progress) {
+	}
+
+	@Override
+	public Path value() {
 		return dest;
 	}
 
 	@Override
-	public Path chooseDestination(Callable<Void> callable) {
+	public void failed(Throwable error) {
+		System.out.println("Install failed. " + error.getMessage());
+	}
+
+	@Override
+	public Path prep(Callable<Void> callable) {
 		Path destination = getDestination();
 		if (Files.exists(destination)) {
 			if (Files.isDirectory(destination)) {

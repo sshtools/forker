@@ -15,4 +15,5 @@ module com.sshtools.forker.updater.swt {
     opens com.sshtools.forker.updater.swt; 
 	provides com.sshtools.forker.updater.UpdateHandler with com.sshtools.forker.updater.swt.SWTUpdateHandler;
 	provides com.sshtools.forker.updater.InstallHandler with com.sshtools.forker.updater.swt.SWTInstallHandler;
+	provides com.sshtools.forker.updater.UninstallHandler with com.sshtools.forker.updater.swt.SWTUninstallHandler;
 }

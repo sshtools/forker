@@ -11,7 +11,7 @@ import org.fusesource.jansi.Ansi.Erase;
 import com.sshtools.forker.updater.AbstractHandler;
 import com.sshtools.forker.updater.AbstractSession;
 
-public class AbstractConsoleHandler<S extends AbstractSession> extends AbstractHandler<S> {
+public abstract class AbstractConsoleHandler<S extends AbstractSession<?>, V> extends AbstractHandler<S, V> {
 	protected int currentIndex;
 	protected String currentDest;
 	protected float currentFrac;

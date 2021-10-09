@@ -11,12 +11,12 @@ import org.fusesource.jansi.Ansi.Erase;
 import com.sshtools.forker.updater.InstallHandler;
 import com.sshtools.forker.updater.InstallSession;
 
-public class ConsoleInstallHandler extends AbstractConsoleHandler<InstallSession> implements InstallHandler {
+public class ConsoleInstallHandler extends AbstractConsoleHandler<InstallSession, Path> implements InstallHandler {
 
 	private Path chosenDestination;
 
 	@Override
-	public Path chooseDestination(Callable<Void> callable) {
+	public Path prep(Callable<Void> callable) {
 		chosenDestination = processPath(prompt(Ansi.ansi().a("Enter destination (").fg(Ansi.Color.RED).a("Enter")
 				.fgDefault().a(" for %s):").toString(), session.base()));
 		if (Files.exists(chosenDestination)) {
@@ -41,7 +41,7 @@ public class ConsoleInstallHandler extends AbstractConsoleHandler<InstallSession
 	}
 
 	@Override
-	public Path chosenDestination() {
+	public Path value() {
 		return chosenDestination;
 	}
 
@@ -85,5 +85,21 @@ public class ConsoleInstallHandler extends AbstractConsoleHandler<InstallSession
 		if (path.equals(""))
 			return session.base();
 		return Paths.get(path);
+	}
+
+	@Override
+	public void startInstallRollback() throws Exception {
+		Ansi ansi = Ansi.ansi();
+		println(ansi.cursorToColumn(0).bold().a("Starting rollback.").eraseLine(Erase.FORWARD).toString());
+		this.currentIndex = 0;
+		this.currentDest = "Rollback";
+		this.currentFrac = 0;
+		updateRow();
+	}
+
+	@Override
+	public void installRollbackProgress(float progress) {
+		currentFrac = progress;
+		updateRow();
 	}
 }

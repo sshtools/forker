@@ -72,7 +72,6 @@
 		<module>forker-updater</module>
 		<module>forker-updater-console</module>
 		<module>forker-updater-swt</module>
-		<!--<module>forker-updater-example</module> -->
 		<module>forker-client</module>
 		<module>forker-examples</module>
 		<module>forker-wrapper</module>
@@ -82,6 +81,7 @@
 		<module>forker-services</module>
 		<module>forker-assembly</module>
         <module>forker-pipes</module>
+        <module>forker-updater-example</module>
 	</modules>
 
 	<dependencies>
