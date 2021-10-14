@@ -23,7 +23,7 @@
 	<parent>
 		<groupId>com.sshtools</groupId>
 		<artifactId>forker</artifactId>
-		<version>1.6.3</version>
+		<version>1.6.4</version>
 		<relativePath>..</relativePath>
 	</parent>
 
@@ -90,7 +90,7 @@
 		<repository>
 			<id>ext-snapshots-local</id>
 			<name>ext-snapshots-local</name>
-			<url>http://artifactory.javassh.com/ext-snapshots-local</url>
+			<url>https://artifactory.javassh.com/ext-snapshots-local</url>
 			<releases>
 				<enabled>false</enabled>
 			</releases>

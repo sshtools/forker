@@ -15,6 +15,14 @@
     limitations under the License.
 
 -->
+<!-- Copyright © 2015 - 2021 SSHTOOLS Limited (support@sshtools.com) Licensed 
+	under the Apache License, Version 2.0 (the "License"); you may not use this 
+	file except in compliance with the License. You may obtain a copy of the 
+	License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by 
+	applicable law or agreed to in writing, software distributed under the License 
+	is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY 
+	KIND, either express or implied. See the License for the specific language 
+	governing permissions and limitations under the License. -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
@@ -25,25 +33,25 @@
 	<parent>
 		<groupId>com.sshtools</groupId>
 		<artifactId>forker</artifactId>
-		<version>1.6.3</version>
+		<version>1.6.4</version>
 		<relativePath>..</relativePath>
 	</parent>
-	
-	<!-- Uses an external repository, until Pty4J (out version) is in central this
-	will have to remain -->
+
+	<!-- Uses an external repository, until Pty4J (out version) is in central 
+		this will have to remain -->
 	<distributionManagement>
 		<snapshotRepository>
 			<uniqueVersion>true</uniqueVersion>
 			<id>opensource-snapshots</id>
 			<name>SSHTOOLS Opensource Snapshots</name>
-			<url>http://artifactory.javassh.com/opensource-snapshots</url>
+			<url>https://artifactory.javassh.com/opensource-snapshots</url>
 			<layout>default</layout>
 		</snapshotRepository>
 		<repository>
 			<uniqueVersion>true</uniqueVersion>
 			<id>opensource-releases</id>
 			<name>SSHTOOLS Opensource Releases</name>
-			<url>http://artifactory.javassh.com/opensource-releases</url>
+			<url>https://artifactory.javassh.com/opensource-releases</url>
 			<layout>default</layout>
 		</repository>
 	</distributionManagement>
@@ -61,27 +69,51 @@
 	</build>
 
 	<dependencies>
+        <!-- TEMPORARY - Until https://github.com/JetBrains/pty4j/issues/105 fixed -->
 		<dependency>
 			<groupId>${project.groupId}</groupId>
 			<artifactId>forker-daemon</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>
+			<groupId>com.google.guava</groupId>
+			<artifactId>guava</artifactId>
+			<version>25.1-jre</version>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.jetbrains.pty4j</groupId>
+			<artifactId>purejavacomm</artifactId>
+			<version>0.0.11.1</version>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
 			<groupId>org.jetbrains.pty4j</groupId>
 			<artifactId>pty4j</artifactId>
-			<version>0.9.5</version>
+			<version>0.11.4</version>
+			<exclusions>
+				<exclusion>
+					<groupId>net.java.dev.jna</groupId>
+					<artifactId>jna</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>net.java.dev.jna</groupId>
+					<artifactId>jna-platform</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 
 	</dependencies>
 
 	<repositories>
+		<!-- TEMPORARY - Until https://github.com/JetBrains/pty4j/issues/105 fixed -->
 		<repository>
-			<id>bintray-jetbrains</id>
-			<releases/>
-			<snapshots>
-				<enabled>false</enabled>
-			</snapshots>
-			<url>https://dl.bintray.com/jetbrains/pty4j//</url>
+			<id>jetbrains-intellij-dependencies</id>
+			<url>https://packages.jetbrains.team/maven/p/ij/intellij-dependencies</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+			<snapshots />
 		</repository>
 	</repositories>
 </project>
