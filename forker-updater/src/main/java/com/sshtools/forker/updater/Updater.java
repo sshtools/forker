@@ -354,7 +354,7 @@ public class Updater extends ForkerWrapper {
 			getConfiguration().setProperty("main", manifest.getProperties().get("main"));
 		}
 
-		if (session.requiresUpdate()) {
+		if (!isOffline() && session.requiresUpdate()) {
 			boolean updateOnExit = getConfiguration().getOptionValue("update-on-exit", null) != null;
 			if (updateOnExit) {
 				this.session = session;
@@ -467,7 +467,7 @@ public class Updater extends ForkerWrapper {
 			handler.startingManifestLoad(url);
 			boolean haveRemote = false;
 			if ((url.getProtocol().equals("file") && url.toURI().equals(localManifestPath.toUri()))
-					|| getConfiguration().getSwitch("offline", false)) {
+					|| isOffline()) {
 				url = localManifestPath.toUri().toURL();
 				try (Reader in = Files.newBufferedReader(localManifestPath)) {
 					continueProcessing = manifest(task, localManifest, handler, session, url, in);
@@ -538,6 +538,10 @@ public class Updater extends ForkerWrapper {
 		logger.info("Comntinue process is " + continueProcessing);
 
 		return continueProcessing;
+	}
+
+	protected boolean isOffline() {
+		return getConfiguration().getSwitch("offline", false);
 	}
 
 	protected boolean install(Callable<Void> task) throws Exception {
