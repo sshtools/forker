@@ -1372,8 +1372,12 @@ public class ForkerWrapper extends AbstractWrapper implements ForkerWrapperMXBea
 				if (altJava.toLowerCase().endsWith(".exe")) {
 					altJava = altJava.substring(0, altJava.length() - 4);
 				}
-				if (!altJava.toLowerCase().endsWith("w")) {
+				DisplayMode mode = DisplayMode.valueOf(configuration.getOptionValue("display", DisplayMode.GUI.name()));
+				if (mode == DisplayMode.GUI && !altJava.toLowerCase().endsWith("w")) {
 					altJava += "w";
+				}
+				else if (mode == DisplayMode.CONSOLE && altJava.toLowerCase().endsWith("w")) {
+					altJava = altJava.substring(0, altJava.length() - 1);
 				}
 				altJava += ".exe";
 			}
@@ -1555,6 +1559,8 @@ public class ForkerWrapper extends AbstractWrapper implements ForkerWrapperMXBea
 						+ "communicate things such as the last exited code (forker.info.lastExitCode), number "
 						+ "of times start via (forker.info.attempts) and more. This option prevents those being set.")
 				.build());
+		options.addOption(OptionSpec.builder("-dt", "--display").paramLabel("type").type(DisplayMode.class)
+				.description("Type type of display, one of " + Arrays.asList(DisplayMode.values()) + ". Only affects Windows runtimes.").build());
 		options.addOption(OptionSpec.builder("-nf", "--native-fork")
 				.description("Use an alternative method for forking as a daemon.").build());
 		options.addOption(OptionSpec.builder("-o", "--log-overwrite")
