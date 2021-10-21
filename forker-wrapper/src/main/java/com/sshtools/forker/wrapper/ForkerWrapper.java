@@ -1368,20 +1368,20 @@ public class ForkerWrapper extends AbstractWrapper implements ForkerWrapperMXBea
 		String javaExe = OS.getJavaPath();
 		String altJava = configuration.getOptionValue("java", null);
 		if (Util.isNotBlank(altJava)) {
-			if (Platform.isWindows()) {
-				if (altJava.toLowerCase().endsWith(".exe")) {
-					altJava = altJava.substring(0, altJava.length() - 4);
-				}
-				DisplayMode mode = DisplayMode.valueOf(configuration.getOptionValue("display", DisplayMode.GUI.name()));
-				if (mode == DisplayMode.GUI && !altJava.toLowerCase().endsWith("w")) {
-					altJava += "w";
-				}
-				else if (mode == DisplayMode.CONSOLE && altJava.toLowerCase().endsWith("w")) {
-					altJava = altJava.substring(0, altJava.length() - 1);
-				}
-				altJava += ".exe";
-			}
 			javaExe = altJava;
+		}
+		if (Platform.isWindows()) {
+			if (javaExe.toLowerCase().endsWith(".exe")) {
+				javaExe = javaExe.substring(0, javaExe.length() - 4);
+			}
+			DisplayMode mode = DisplayMode.valueOf(configuration.getOptionValue("display", DisplayMode.GUI.name()));
+			if (mode == DisplayMode.GUI && !javaExe.toLowerCase().endsWith("w")) {
+				javaExe += "w";
+			}
+			else if (mode == DisplayMode.CONSOLE && javaExe.toLowerCase().endsWith("w")) {
+				javaExe = javaExe.substring(0, javaExe.length() - 1);
+			}
+			javaExe += ".exe";
 		}
 		String minjava = configuration.getOptionValue("min-java", null);
 		String maxjava = configuration.getOptionValue("max-java", null);
