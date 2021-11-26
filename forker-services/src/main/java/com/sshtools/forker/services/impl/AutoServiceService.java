@@ -19,25 +19,21 @@ public class AutoServiceService implements ServiceService {
 	}
 
 	private void detect() throws IOException {
-		List<ServiceService> l = new ArrayList<ServiceService>();
-		if(Platform.isWindows()) {
-			l.add(new Win32ServiceService());
-		}
-		else {
+		if (Platform.isWindows()) {
+			services = new Win32ServiceService();
+		} else {
 			if (OSCommand.hasCommand("systemctl")) {
-				l.add(new SystemDServiceService());
+				services = new SystemDServiceService();
 			}
-			if (l.isEmpty() && OSCommand.hasCommand("initctl")) {
-				l.add(new InitctlServiceService());
+			if (services == null && OSCommand.hasCommand("initctl")) {
+				services = new InitctlServiceService();
 			}
-			if (l.isEmpty() && OSCommand.hasCommand("service")) {
-				l.add(new SysVServiceService());
+			if (services == null && OSCommand.hasCommand("service")) {
+				services = new SysVServiceService();
 			}
-			// Fallback to SysV
-			if (l.isEmpty())
+			if (services == null)
 				throw new IOException("Could not detect any service systems.");
 		}
-		services = new CompoundServicesService(l.toArray(new ServiceService[0]));
 	}
 
 	@Override
@@ -92,11 +88,11 @@ public class AutoServiceService implements ServiceService {
 
 	@Override
 	public void pauseService(Service service) throws Exception {
-		services.pauseService(service);		
+		services.pauseService(service);
 	}
 
 	@Override
 	public void unpauseService(Service service) throws Exception {
-		services.unpauseService(service);		
+		services.unpauseService(service);
 	}
 }
