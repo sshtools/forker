@@ -44,7 +44,6 @@ public class PTYProcess extends ForkerProcess {
 			Class.forName(PTYOutputStream.class.getName(), true, PTYProcess.class.getClassLoader());
 			Class.forName(WinSize.class.getName(), true, PTYProcess.class.getClassLoader());
 			Class.forName(PtyUtil.class.getName(), true, PTYProcess.class.getClassLoader());
-			Class.forName(PtyUtil.class.getName() + "$1", true, PTYProcess.class.getClassLoader());
 			Class.forName(Pty.class.getName(), true, PTYProcess.class.getClassLoader());
 
 			if (OS.isUnix()) {
