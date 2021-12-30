@@ -5,9 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
-import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.Callable;
@@ -77,12 +75,7 @@ public class Uninstaller extends AbstractWrapper implements Callable<Integer> {
 	protected UninstallHandler getUninstallHandler() {
 
 		if (uninstallHandler == null) {
-			ServiceLoader<UninstallHandler> handlers = ServiceLoader.load(UninstallHandler.class);
-			Iterator<UninstallHandler> it = handlers.iterator();
-			if (it.hasNext()) {
-				uninstallHandler = it.next();
-			} else
-				uninstallHandler = new DefaultConsoleUninstallHandler();
+			uninstallHandler = InstallerToolkit.Util.getBestHandler(UninstallHandler.class);
 		}
 		return uninstallHandler;
 	}

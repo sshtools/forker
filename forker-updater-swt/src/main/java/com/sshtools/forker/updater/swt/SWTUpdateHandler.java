@@ -53,7 +53,7 @@ public class SWTUpdateHandler extends AbstractSWTHandler<UpdateSession, Void> im
 		updatingLabelGridData.grabExcessVerticalSpace = true;
 		updatingTextLabel.setLayoutData(updatingLabelGridData);
 		updatingTextLabel.setText(
-				MessageFormat.format(session.properties().getProperty("updatingText", "Updatiing {0} ..."), title));
+				MessageFormat.format(session.properties().getProperty("updatingText", "Updating {0} ..."), title));
 
 		/* Decription */
 		progressText = new Label(container, SWT.WRAP);
@@ -117,7 +117,7 @@ public class SWTUpdateHandler extends AbstractSWTHandler<UpdateSession, Void> im
 			labelGridData.grabExcessVerticalSpace = true;
 			messageLabel.setLayoutData(labelGridData);
 			messageLabel.setText(MessageFormat.format(
-					session.properties().getProperty("closeText", "Uninstallation of {0} is complete."), title));
+					session.properties().getProperty("closeText", "Update of {0} is complete."), title));
 
 			/* Actions */
 			Composite actions = createActionBar(SWT.FILL, false);

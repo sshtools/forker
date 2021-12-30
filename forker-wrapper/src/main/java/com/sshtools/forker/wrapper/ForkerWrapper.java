@@ -491,9 +491,11 @@ public class ForkerWrapper extends AbstractWrapper implements ForkerWrapperMXBea
 			init(null);
 		}
 
+		logger.log(Level.INFO, "Starting plugins");
 		for (WrapperPlugin plugin : plugins) {
 			plugin.start();
 		}
+		logger.log(Level.INFO, "Started plugins");
 
 		/*
 		 * Calculate CWD. All file paths from this point are calculated relative to the
@@ -2277,8 +2279,9 @@ public class ForkerWrapper extends AbstractWrapper implements ForkerWrapperMXBea
 	 *
 	 * @param task the task
 	 * @return true, if successful
+	 * @throws IOException 
 	 */
-	protected boolean onBeforeProcess(Callable<Void> task) {
+	protected boolean onBeforeProcess(Callable<Void> task) throws IOException {
 		return true;
 	}
 

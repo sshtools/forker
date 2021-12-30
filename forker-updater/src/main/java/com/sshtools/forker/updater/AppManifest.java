@@ -40,11 +40,12 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
+import com.sshtools.forker.updater.Launcher.Scope;
 import com.sshtools.forker.wrapper.Replace;
 import com.sshtools.forker.wrapper.Replace.Replacer;
 
 public class AppManifest {
-	
+
 	protected Logger logger = Logger.getGlobal();
 
 	public enum ManifestVersion {
@@ -57,7 +58,11 @@ public class AppManifest {
 	public static String BOOTSTRAP_FILE_TAG = "bootstrapFile";
 	public static String PROPERTIES_TAG = "properties";
 	public static String PROPERTY_TAG = "property";
+	public static String ARGUMENT_TAG = "argument";
 	public static String CONFIGURATION_TAG = "configuration";
+	public static String LAUNCHERS_TAG = "launchers";
+	public static String SERVICE_TAG = "service";
+	public static String SHORTCUT_TAG = "shortcut";
 	public static String BASE_TAG = "base";
 
 	public enum Type {
@@ -79,6 +84,7 @@ public class AppManifest {
 	private Path basePath = Paths.get("/");
 	private Path modulePath = Paths.get("modulepath");
 	private Path classPath = Paths.get("classpath");
+	private List<Launcher> launchers = new ArrayList<>();
 
 	public AppManifest() {
 	}
@@ -159,31 +165,75 @@ public class AppManifest {
 			} else if (properties.getLength() > 1)
 				throw new IOException("Should only be a single properties element if it exists.");
 
+			/* Launchers */
+			NodeList launchers = document.getElementsByTagName(LAUNCHERS_TAG);
+			if (launchers.getLength() == 1) {
+				launchers = launchers.item(0).getChildNodes();
+				for (int i = 0; i < launchers.getLength(); i++) {
+					Node property = launchers.item(i);
+					if (property instanceof Element) {
+						Launcher launcher = null;
+
+						if (((Element) property).getTagName().equals(SERVICE_TAG)) {
+							Service srv = new Service(getRequiredAttribute(replace, property, "id"));
+							launcher = srv;
+						} else if (((Element) property).getTagName().equals(SHORTCUT_TAG)) {
+							Shortcut shortcut = new Shortcut(getRequiredAttribute(replace, property, "id"));
+							launcher = shortcut;
+						} else
+							throw new IOException("The launchers tag can only contain service tags, not "
+									+ ((Element) property).getTagName() + ".");
+
+						launcher.scope(Scope.valueOf(getAttribute(replace, property, "scope", Scope.USER.name())));
+						launcher.description(getAttribute(replace, property, "description"));
+						launcher.executable(getAttribute(replace, property, "executable"));
+						
+						NodeList arguments = property.getChildNodes();
+						List<String> args = new ArrayList<>();
+						for (int j = 0; j < arguments.getLength(); j++) {
+							Node argument = arguments.item(j);
+							if (argument instanceof Element) {
+								Element argumentElement = (Element) argument;
+								if (argumentElement.getTagName().equals(ARGUMENT_TAG))
+									args.add(getTextContent(replace, argumentElement));
+								else
+									throw new IOException("A launcher tag can only contain argument tags, not "
+											+ ((Element) property).getTagName() + ".");
+							}
+						}
+						launcher.arguments(args);
+
+						this.launchers.add(launcher);
+					}
+				}
+			} else if (launchers.getLength() > 1)
+				throw new IOException("Should only be a single properties element if it exists.");
+
 			/* Base */
 			NodeList base = document.getElementsByTagName(BASE_TAG);
 			if (base.getLength() == 1) {
 				baseUri = new URI(getRequiredAttribute(replace, base.item(0), "uri"));
-				
-				/* An attempt to be backward and forward compatible. For releases AFTER
-				 * 1.0-SNAPSHOT-24, the manifest was made a bit more consistent, but
-				 * this breaks backward compatibility so an update would not be possible.
+
+				/*
+				 * An attempt to be backward and forward compatible. For releases AFTER
+				 * 1.0-SNAPSHOT-24, the manifest was made a bit more consistent, but this breaks
+				 * backward compatibility so an update would not be possible.
 				 * 
-				 * The manifest will now contain the new attributes and the old attributes.
-				 * The old attributes will be removed at some point in the future.
+				 * The manifest will now contain the new attributes and the old attributes. The
+				 * old attributes will be removed at some point in the future.
 				 */
 				String pathStr = getAttribute(replace, base.item(0), "path", null);
 				String basePathStr = getAttribute(replace, base.item(0), "basepath", null);
-				if(basePathStr == null) {
+				if (basePathStr == null) {
 					basePath = Paths.get("/");
-					if(pathStr != null) {
+					if (pathStr != null) {
 						sectionPath(Section.APP, Paths.get(pathStr));
 						sectionPath(Section.BOOTSTRAP, basePath);
 					}
-				}
-				else {
+				} else {
 					basePath = Paths.get(basePathStr);
 				}
-				
+
 				modulePath = Paths.get(getAttribute(replace, base.item(0), "modulepath", "modulepath"));
 				classPath = Paths.get(getAttribute(replace, base.item(0), "classpath", "classpath"));
 			} else
@@ -194,7 +244,7 @@ public class AppManifest {
 			if (files.getLength() == 1) {
 				Node app = files.item(0);
 				String path = getAttribute(replace, app, "path");
-				if(path != null)
+				if (path != null)
 					sectionPath.put(Section.APP, Paths.get(path));
 				files = app.getChildNodes();
 				for (int i = 0; i < files.getLength(); i++) {
@@ -214,7 +264,7 @@ public class AppManifest {
 			if (bootstrapFiles.getLength() == 1) {
 				Node bootstrap = bootstrapFiles.item(0);
 				String path = getAttribute(replace, bootstrap, "path");
-				if(path != null)
+				if (path != null)
 					sectionPath.put(Section.BOOTSTRAP, Paths.get(path));
 				bootstrapFiles = bootstrap.getChildNodes();
 				for (int i = 0; i < bootstrapFiles.getLength(); i++) {
@@ -247,6 +297,13 @@ public class AppManifest {
 	static String getAttribute(Replace replace, Node item, String name, String defaultValue) {
 		Node attr = item.getAttributes().getNamedItem(name);
 		return attr == null ? defaultValue : replace.replace(attr.getNodeValue());
+	}
+
+	static String getTextContent(Replace replace, Element item) {
+		return getTextContent(replace, item, "");
+	}
+	static String getTextContent(Replace replace, Element item, String defaultValue) {
+		return replace.replace(( item.getTextContent() == null ? defaultValue : item.getTextContent() ) );
 	}
 
 	public Path modulePath() {
@@ -362,12 +419,13 @@ public class AppManifest {
 			if (baseUri != null)
 				baseElement.setAttribute("uri", baseUri.toString());
 
-			baseElement.setAttribute("path", sectionPath.getOrDefault(Section.APP, Paths.get("app/business")).toString());
+			baseElement.setAttribute("path",
+					sectionPath.getOrDefault(Section.APP, Paths.get("app/business")).toString());
 			if (basePath != null)
 				baseElement.setAttribute("basepath", basePath.toString());
-			if(modulePath != null)
+			if (modulePath != null)
 				baseElement.setAttribute("modulepath", modulePath.toString());
-			if(classPath != null)
+			if (classPath != null)
 				baseElement.setAttribute("classpath", classPath.toString());
 			rootElement.appendChild(baseElement);
 
@@ -382,9 +440,37 @@ public class AppManifest {
 				rootElement.appendChild(propertiesElement);
 			}
 
+			if (launchers != null && launchers.size() > 0) {
+				Element launchersElement = doc.createElement(LAUNCHERS_TAG);
+				for (Launcher launcher : launchers) {
+					Element launcherElement;
+					if (launcher instanceof Service) {
+						launcherElement = doc.createElement(SERVICE_TAG);
+					} else if (launcher instanceof Shortcut) {
+						launcherElement = doc.createElement(SHORTCUT_TAG);
+					} else {
+						throw new UnsupportedOperationException(
+								"Unsupported launcher type " + launcher.getClass().getName());
+					}
+					launcherElement.setAttribute("id", launcher.id());
+					launcherElement.setAttribute("executable", launcher.executable());
+					if (launcher.description() != null)
+						launcherElement.setAttribute("description", launcher.description());
+					if (launcher.getArguments() != null) {
+						for (String arg : launcher.getArguments()) {
+							Element launcherArgElement = doc.createElement(ARGUMENT_TAG);
+							launcherElement.setAttribute("value", arg);
+							launcherElement.appendChild(launcherArgElement);
+						}
+					}
+					launchersElement.appendChild(launcherElement);
+				}
+				rootElement.appendChild(launchersElement);
+			}
+
 			Element filesElement = doc.createElement(APP_TAG);
 			Path path = sectionPath(Section.APP);
-			if(path != null)
+			if (path != null)
 				filesElement.setAttribute("path", path.toString());
 			for (Entry e : entries(Section.APP)) {
 				addFileElements(doc, filesElement, e, APP_FILE_TAG);
@@ -393,7 +479,7 @@ public class AppManifest {
 
 			Element bootstrapsElement = doc.createElement(BOOTSTRAP_TAG);
 			path = sectionPath(Section.BOOTSTRAP);
-			if(path != null)
+			if (path != null)
 				bootstrapsElement.setAttribute("path", path.toString());
 			for (Entry e : entries(Section.BOOTSTRAP)) {
 				addFileElements(doc, bootstrapsElement, e, BOOTSTRAP_FILE_TAG);
@@ -411,27 +497,27 @@ public class AppManifest {
 
 	private void addFileElements(Document doc, Element filesElement, Entry e, String name) {
 		Element fileElement = doc.createElement(name);
-		if(e.section() == Section.BOOTSTRAP && (e.type() == Type.CLASSPATH ||  e.type() == Type.MODULEPATH)) {
-			switch(e.type()) {
+		if (e.section() == Section.BOOTSTRAP && (e.type() == Type.CLASSPATH || e.type() == Type.MODULEPATH)) {
+			switch (e.type()) {
 			case CLASSPATH:
-				fileElement.setAttribute("path",  sectionPath(Section.BOOTSTRAP).resolve(classPath).resolve(e.path()).toString());
+				fileElement.setAttribute("path",
+						sectionPath(Section.BOOTSTRAP).resolve(classPath).resolve(e.path()).toString());
 				break;
 			default:
-				fileElement.setAttribute("path",  sectionPath(Section.BOOTSTRAP).resolve(modulePath).resolve(e.path()).toString());
+				fileElement.setAttribute("path",
+						sectionPath(Section.BOOTSTRAP).resolve(modulePath).resolve(e.path()).toString());
 				break;
 			}
-		}
-		else if(e.section() == Section.APP && (e.type() == Type.CLASSPATH ||  e.type() == Type.MODULEPATH)) {
-			switch(e.type()) {
+		} else if (e.section() == Section.APP && (e.type() == Type.CLASSPATH || e.type() == Type.MODULEPATH)) {
+			switch (e.type()) {
 			case CLASSPATH:
-				fileElement.setAttribute("path", classPath.resolve(e.path()).toString()); 
+				fileElement.setAttribute("path", classPath.resolve(e.path()).toString());
 				break;
 			default:
 				fileElement.setAttribute("path", modulePath.resolve(e.path()).toString());
 				break;
 			}
-		}
-		else
+		} else
 			fileElement.setAttribute("path", e.path().toString());
 		fileElement.setAttribute("filepath", e.path().toString());
 		switch (e.type()) {
@@ -496,10 +582,11 @@ public class AppManifest {
 				else
 					b.append("-");
 				fileElement.setAttribute("rwx", b.toString());
-			} 
+			}
 
-			/* DEPRECATED: Remove/Move when the new manifest handling makes it
-			 * out into the wild
+			/*
+			 * DEPRECATED: Remove/Move when the new manifest handling makes it out into the
+			 * wild
 			 */
 			fileElement.setAttribute("execute", String.valueOf(e.execute()));
 			fileElement.setAttribute("write", String.valueOf(e.write()));
@@ -551,11 +638,11 @@ public class AppManifest {
 				return true;
 		return false;
 	}
-	
+
 	public Path sectionPath(Section section) {
 		return sectionPath.get(section);
 	}
-	
+
 	public AppManifest sectionPath(Section section, Path path) {
 		sectionPath.put(section, path);
 		return this;
@@ -564,27 +651,27 @@ public class AppManifest {
 	public Path basePath() {
 		return basePath;
 	}
-	
+
 	public Path resolveBasePath(Path localDir) {
 		return basePath == null || basePath.toString().equals("/") ? localDir : localDir.resolve(basePath);
 	}
 
 	public Path resolve(Section section, Path localDir) {
-		if(basePath != null) {
+		if (basePath != null) {
 			localDir = resolveBasePath(localDir);
 		}
-		if(sectionPath.containsKey(section)) {
+		if (sectionPath.containsKey(section)) {
 			localDir = localDir.resolve(sectionPath.get(section));
 		}
 		return localDir;
 	}
-	
+
 	public static void main(String[] args) {
 		AppManifest mf = new AppManifest();
 		Path p1 = Paths.get("/home/tanktarta");
 		Path p2 = Paths.get("/another/path");
 		mf.basePath = p1;
-		System.out.println("p1: " + p1 + " p2: " + p2 + " = " +  mf.resolveBasePath(p1));
+		System.out.println("p1: " + p1 + " p2: " + p2 + " = " + mf.resolveBasePath(p1));
 	}
 
 	public Map<Section, Path> sectionPaths() {

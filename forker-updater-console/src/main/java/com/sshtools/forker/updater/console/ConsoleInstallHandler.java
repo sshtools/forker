@@ -1,5 +1,6 @@
 package com.sshtools.forker.updater.console;
 
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -32,8 +33,11 @@ public class ConsoleInstallHandler extends AbstractConsoleHandler<InstallSession
 						return chosenDestination;
 					} else
 						throw new IllegalStateException("Aborted.");
-				} else
-					throw new IllegalStateException("Destination exists.");
+				} else {
+					File[] files = chosenDestination.toFile().listFiles();
+					if(files == null || files.length > 0)
+						throw new IllegalStateException("Destination exists.");
+				}
 			} else
 				throw new IllegalStateException("Destination exists and is not a directory.");
 		}

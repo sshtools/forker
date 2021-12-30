@@ -16,6 +16,7 @@
 package com.sshtools.forker.updater;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
@@ -91,8 +92,11 @@ public class DefaultConsoleInstallHandler extends AbstractHandler<InstallSession
 						return destination;
 					} else
 						throw new IllegalStateException("Aborted.");
-				} else
-					throw new IllegalStateException("Destination exists.");
+				} else {
+					File[] files = destination.toFile().listFiles();
+					if(files == null || files.length > 0)
+						throw new IllegalStateException("Destination exists.");	
+				}
 			} else
 				throw new IllegalStateException("Destination exists and is not a directory.");
 		}

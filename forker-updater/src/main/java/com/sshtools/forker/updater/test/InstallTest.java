@@ -1,6 +1,5 @@
 package com.sshtools.forker.updater.test;
 
-import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -8,7 +7,6 @@ import java.util.concurrent.Callable;
 
 import com.sshtools.forker.updater.InstallHandler;
 import com.sshtools.forker.updater.InstallSession;
-
 
 public class InstallTest {
 	public static void main(String[] args, InstallHandler installHandler) throws Exception {
@@ -22,13 +20,13 @@ public class InstallTest {
 				installTo(installHandler, s, installHandler.value());
 				return null;
 			}
-	
+
 		});
 		if (destination == null)
 			return;
 		installTo(installHandler, s, destination);
 	}
-	
+
 	protected static void installTo(InstallHandler handler, InstallSession session, Path dest) throws Exception {
 		handler.startInstall();
 		float iprg = 0;
@@ -46,7 +44,7 @@ public class InstallTest {
 				}
 				checkCancel(handler);
 				handler.installFileDone(f);
-				if(i > 50 && Boolean.getBoolean("installTest.testRollback")) {
+				if (i > 50 && Boolean.getBoolean("installTest.testRollback")) {
 					throw new InterruptedIOException("Failed to install a thing!");
 				}
 			}
@@ -65,7 +63,7 @@ public class InstallTest {
 			throw e;
 		}
 	}
-	
+
 	protected static void checkCancel(InstallHandler handler) throws InterruptedIOException {
 		if (handler.isCancelled())
 			throw new InterruptedIOException("Cancelled.");

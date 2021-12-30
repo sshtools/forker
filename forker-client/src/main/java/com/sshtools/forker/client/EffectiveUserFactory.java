@@ -323,14 +323,20 @@ public abstract class EffectiveUserFactory {
 						if (OSCommand.hasCommand("sudo")
 								&& (OSCommand.hasCommand("gksudo") || OSCommand.hasCommand("gksu"))) {
 							return new SudoGksudoUser();
-						} else if (OSCommand.hasCommand("sudo")) {
+						} else if (OSCommand.hasCommand("sudo") && hasSwing()) {
 							return new SudoAskPassGuiUser();
 						} else if (OSCommand.hasCommand("gksudo") || OSCommand.hasCommand("gksu")) {
 							/*
-							 * Last resort, used Gksud/Gksu. These are a last resort because they do not
+							 * Last resort, Gksudo/Gksu. These are a last resort because they do not
 							 * support stdin
 							 */
 							return new GKSuUser();
+						} else if (OSCommand.hasCommand("pkexec") && OSCommand.hasCommand("sudo")) {
+							/*
+							 * Last resort, pkexec. Thiss is a last resort because it do not
+							 * support stdin
+							 */
+							return new PkExecUser();
 						}
 					} else if (dt == Desktop.CONSOLE) {
 						Console console = System.console();
@@ -343,13 +349,14 @@ public abstract class EffectiveUserFactory {
 						}
 					} else {
 						// Unknown desktop
-						return new SudoAskPassGuiUser();
+						if(hasSwing())
+							return new SudoAskPassGuiUser();
 					}
 				}
 			} else if (Platform.isMac()) {
 				if (fixedPassword != null) {
 					return new SudoFixedPasswordUser(fixedPassword.toCharArray());
-				} else if (OSCommand.hasCommand("sudo")) {
+				} else if (OSCommand.hasCommand("sudo") && hasSwing()) {
 					return new SudoAskPassGuiUser();
 				}
 			} else if (Platform.isWindows()) {
@@ -382,6 +389,25 @@ public abstract class EffectiveUserFactory {
 			return p == null ? System.getProperty("vm.sudo") : p;
 		}
 	}
+	
+	/**
+	 * Get if swing is available (it may not be on modular JVM)
+	 * 
+	 * @return swing available
+	 */
+	public static boolean hasSwing() {
+		if(Boolean.getBoolean("forker.noSwing")) {
+			return false;
+		}
+		try {
+			Class.forName("javax.swing.JLabel");
+			return true;
+		}
+		catch(Exception e) {
+			return false;
+		}
+	}
+	
 
 	/**
 	 * An {@link EffectiveUser} implementation that uses a combination GkSu/Gksudo.
@@ -499,25 +525,13 @@ public abstract class EffectiveUserFactory {
 		public void elevate(ForkerBuilder builder, Process process, Command command) {
 			original = new ArrayList<String>(builder.command());
 			List<String> cmd = builder.command();
-			// Take existing command and turn it into one escaped command
-			StringBuilder bui = new StringBuilder();
-			for (int i = 0; i < cmd.size(); i++) {
-				if (bui.length() > 0) {
-					bui.append(' ');
-				}
-				if (i > 0)
-					bui.append("'");
-				bui.append(Util.escapeSingleQuotes(cmd.get(i)));
-				if (i > 0)
-					bui.append("'");
-			}
 			cmd.clear();
 			cmd.add("pkexec");
 			if (username != null) {
 				cmd.add("--user");
 				cmd.add(username);
 			}
-			cmd.add(bui.toString());
+			cmd.addAll(original);
 		}
 	}
 

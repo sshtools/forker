@@ -18,10 +18,8 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.logging.Level;
@@ -177,7 +175,7 @@ public class Updater extends ForkerWrapper {
 
 		@Override
 		public void cleanUp() {
-			if(tmp != null) {
+			if (tmp != null) {
 				Util.deleteRecursiveIfExists(tmp.toFile());
 			}
 		}
@@ -273,25 +271,14 @@ public class Updater extends ForkerWrapper {
 	protected UpdateHandler getUpdateHandler() {
 
 		if (updateHandler == null) {
-			ServiceLoader<UpdateHandler> handlers = ServiceLoader.load(UpdateHandler.class);
-			Iterator<UpdateHandler> it = handlers.iterator();
-			if (it.hasNext()) {
-				updateHandler = it.next();
-			} else
-				updateHandler = new DefaultConsoleUpdateHandler();
+			updateHandler = InstallerToolkit.Util.getBestHandler(UpdateHandler.class);
 		}
 		return updateHandler;
 	}
 
 	protected InstallHandler getInstallHandler() {
-
 		if (installHandler == null) {
-			ServiceLoader<InstallHandler> handlers = ServiceLoader.load(InstallHandler.class);
-			Iterator<InstallHandler> it = handlers.iterator();
-			if (it.hasNext()) {
-				installHandler = it.next();
-			} else
-				installHandler = new DefaultConsoleInstallHandler();
+			installHandler = InstallerToolkit.Util.getBestHandler(InstallHandler.class);
 		}
 		return installHandler;
 	}
@@ -373,7 +360,7 @@ public class Updater extends ForkerWrapper {
 	}
 
 	@Override
-	protected boolean onBeforeProcess(Callable<Void> task) {
+	protected boolean onBeforeProcess(Callable<Void> task) throws IOException {
 		try {
 			if (isInstaller()) {
 				logger.info("This is an installer, installing.");
@@ -389,7 +376,7 @@ public class Updater extends ForkerWrapper {
 		return update(task);
 	}
 
-	protected boolean update(Callable<Void> task) {
+	protected boolean update(Callable<Void> task) throws IOException {
 		Path userCwd = null;
 		if (!Files.isWritable(cwd())) {
 			userCwd = new File(System.getProperty("user.home") + File.separator + ".cache" + File.separator + "snake"
@@ -428,16 +415,39 @@ public class Updater extends ForkerWrapper {
 
 		/* Try get the remote manifest first */
 		boolean continueProcessing = true;
-		UpdateSession session = null;
+		AppManifest manifest = new AppManifest();
+		UpdateHandler handler = getUpdateHandler();
+		UpdateSession session = new UpdateSession(cwd().resolve("updater.properties"), this);
+		if (userCwd != null)
+			session.systemWideBootstrapInstall(true);
+		session.localDir(cwd());
+		session.appArgs(getConfiguration().getRemaining());
+		logger.info("Initialising handler.");
+		handler.init(session);
+		String fLocation = remoteManifestLocation;
+		Object result = handler.prep(() -> {
+			doUpdate(task, fLocation, localManifestPath, session, manifest, handler);
+			if (getConfiguration().getSwitch("run-on-install", false)) {
+				logger.info("Run on install, so calling task.");
+				task.call();
+			}
+			return null;
+		});
+
+		if (result == null) {
+			logger.info("No result yet.");
+			return false;
+		}
+		else {
+			logger.info("Continue process is " + continueProcessing);
+			return continueProcessing;
+		}
+	}
+
+	protected boolean doUpdate(Callable<Void> task, String remoteManifestLocation, Path localManifestPath,
+			UpdateSession session, AppManifest manifest, UpdateHandler handler) {
+		boolean continueProcessing;
 		try {
-			AppManifest manifest = new AppManifest();
-			UpdateHandler handler = getUpdateHandler();
-			session = new UpdateSession(cwd().resolve("updater.properties"), this);
-			if (userCwd != null)
-				session.systemWideBootstrapInstall(true);
-			session.localDir(cwd());
-			session.appArgs(getConfiguration().getRemaining());
-			handler.init(session);
 
 			/*
 			 * Load the local manifest well to get the current version first.
@@ -459,15 +469,14 @@ public class Updater extends ForkerWrapper {
 			}
 			handler.completedManifestLoad(url);
 
-			if (remoteManifestLocation.startsWith("file://")) {
-				remoteManifestLocation = "file:/" + remoteManifestLocation.substring(7);
-			}
+//			if (remoteManifestLocation.startsWith("file://")) {
+//				remoteManifestLocation = "file:/" + remoteManifestLocation.substring(7);
+//			}
 			url = new URL(remoteManifestLocation);
 			logger.log(Level.FINE, String.format("Get remote manifest from %s.", remoteManifestLocation));
 			handler.startingManifestLoad(url);
 			boolean haveRemote = false;
-			if ((url.getProtocol().equals("file") && url.toURI().equals(localManifestPath.toUri()))
-					|| isOffline()) {
+			if ((url.getProtocol().equals("file") && url.toURI().equals(localManifestPath.toUri())) || isOffline()) {
 				url = localManifestPath.toUri().toURL();
 				try (Reader in = Files.newBufferedReader(localManifestPath)) {
 					continueProcessing = manifest(task, localManifest, handler, session, url, in);
@@ -534,9 +543,6 @@ public class Updater extends ForkerWrapper {
 				}
 			}
 		}
-
-		logger.info("Comntinue process is " + continueProcessing);
-
 		return continueProcessing;
 	}
 

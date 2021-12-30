@@ -290,4 +290,8 @@ public class Entry {
 			return new LinkedHashSet<>(Arrays.asList(attribute.split(",")));
 	}
 
+	public String displayName() {
+		return target == null ? uri.getPath() : target.toString();
+	}
+
 }

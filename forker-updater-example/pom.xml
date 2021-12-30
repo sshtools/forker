@@ -13,16 +13,6 @@
 	</parent>
 
 	<dependencies>
-		<dependency>
-			<groupId>${project.groupId}</groupId>
-			<version>${project.version}</version>
-			<artifactId>forker-updater-swt</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>${project.groupId}</groupId>
-			<version>${project.version}</version>
-			<artifactId>forker-updater-console</artifactId>
-		</dependency>
 	</dependencies>
 
 	<build>
@@ -45,84 +35,6 @@
 
 		<plugins>
 			<plugin>
-				<groupId>com.sshtools</groupId>
-				<artifactId>forker-updater-maven-plugin</artifactId>
-				<version>1.7-SNAPSHOT</version>
-				<executions>
-					<execution>
-						<id>updater</id>
-						<phase>package</phase>
-						<goals>
-							<goal>updates</goal>
-						</goals>
-						<configuration>
-
-							<!-- Only use file:// URL for testing, usually you'd want a http:// 
-								or https:// URL. -->
-							<remoteBase>file://${build.directory}/image</remoteBase>
-							<packageMode>NONE</packageMode>
-							<mainClass>hello.world/hello.world.HelloWorld</mainClass>
-							<installerProperties>
-								<bannerImage>left-banner.png</bannerImage>
-								<bannerPosition>left</bannerPosition>
-							</installerProperties>
-                            <uninstallerProperties>
-                                <bannerImage>left-banner.png</bannerImage>
-                                <bannerPosition>left</bannerPosition>
-                            </uninstallerProperties>
-							<bootstrapFiles>
-								<bootstrapFile>
-									<source>left-banner.png</source>
-								</bootstrapFile>
-							</bootstrapFiles>
-							<systemModules>
-								<systemModule>java.management</systemModule>
-								<systemModule>java.logging</systemModule>
-								<systemModule>java.xml</systemModule>
-								<systemModule>jdk.attach</systemModule>
-								<systemModule>java.management.rmi</systemModule>
-								<systemModule>java.desktop</systemModule>
-							</systemModules>
-							<artifactArch>
-								<linux>org.eclipse.swt.gtk.linux.x86_64</linux>
-							</artifactArch>
-							<artifactOS>
-								<amd64>org.eclipse.swt.gtk.linux.x86_64</amd64>
-							</artifactOS>
-							<bootstrapArtifacts>
-								<bootstrapArtifact>forker-updater-console</bootstrapArtifact>
-								<bootstrapArtifact>jansi</bootstrapArtifact>
-								<bootstrapArtifact>forker-updater-swt</bootstrapArtifact>
-								<bootstrapArtifact>org.eclipse.swt</bootstrapArtifact>
-								<bootstrapArtifact>org.eclipse.swt.gtk.linux.x86_64</bootstrapArtifact>
-							</bootstrapArtifacts>
-						</configuration>
-					</execution>
-
-				</executions>
-			</plugin>
-
-			<plugin>
-				<groupId>com.github.hazendaz.maven</groupId>
-				<artifactId>makeself-maven-plugin</artifactId>
-				<version>1.3.0-M1</version>
-				<executions>
-					<execution>
-						<id>package</id>
-						<phase>package</phase>
-						<goals>
-							<goal>makeself</goal>
-						</goals>
-						<configuration>
-							<label>${project.name}</label>
-							<archiveDir>image</archiveDir>
-							<fileName>${project.artifactId}.sh</fileName>
-							<startupScript>bin/${project.artifactId}</startupScript>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-deploy-plugin</artifactId>
 				<configuration>
@@ -132,5 +44,65 @@
 		</plugins>
 	</build>
 
+	<profiles>
+		<profile>
+			<id>build-installers</id>
+			<activation>
+				<activeByDefault>true</activeByDefault>
+			</activation>
+			<build>
+				<plugins>
+
+					<plugin>
+						<groupId>com.sshtools</groupId>
+						<artifactId>forker-updater-maven-plugin</artifactId>
+						<version>1.7-SNAPSHOT</version>
+						<executions>
+							<execution>
+								<id>updater</id>
+								<phase>package</phase>
+								<goals>
+									<goal>updates</goal>
+								</goals>
+								<configuration>
+									<packageMode>SELF_EXTRACTING</packageMode>
+									<installerProperties>
+										<bannerImage>app/business/left-banner.png</bannerImage>
+										<bannerPosition>left</bannerPosition>
+									</installerProperties>
+									<uninstallerProperties>
+										<bannerImage>app/business/left-banner.png</bannerImage>
+										<bannerPosition>left</bannerPosition>
+									</uninstallerProperties>
+									<bootstrap>
+										<toolkits>
+											<toolkit>console</toolkit>
+										</toolkits>
+									</bootstrap>
+									<linkOptions>
+									   <linkOption>--no-fallback</linkOption>
+									   <linkOption>--report-unsupported-elements-at-runtime</linkOption>
+									</linkOptions>
+									<launchers>
+									    <launcher>
+									       <id>uninstaller</id>
+									       <mode>UNINSTALLER</mode>
+									       <link>true</link>
+									    </launcher>
+										<launcher>
+											<id>hello-world-2</id>
+											<mainClass>hello.world.HelloWorld2</mainClass>
+											<mode>DIRECT</mode>
+										</launcher>
+									</launchers>
+								</configuration>
+							</execution>
+
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 
 </project>

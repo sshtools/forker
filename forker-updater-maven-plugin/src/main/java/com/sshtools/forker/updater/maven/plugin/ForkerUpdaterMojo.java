@@ -1,10 +1,12 @@
 package com.sshtools.forker.updater.maven.plugin;
 
+import static com.sshtools.forker.updater.maven.plugin.UpdaterUtil.checkDir;
+import static com.sshtools.forker.updater.maven.plugin.UpdaterUtil.normalizeForUri;
+import static com.sshtools.forker.updater.maven.plugin.UpdaterUtil.resolveUrl;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.PrintWriter;
 import java.io.Writer;
 import java.lang.reflect.Method;
 import java.net.URI;
@@ -12,37 +14,31 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.attribute.FileTime;
 import java.text.SimpleDateFormat;
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
-import java.util.jar.Manifest;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
-import org.apache.maven.artifact.Artifact;
+import org.apache.maven.artifact.repository.ArtifactRepository;
+import org.apache.maven.artifact.repository.layout.ArtifactRepositoryLayout;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
+import org.apache.maven.shared.transfer.dependencies.resolve.DependencyResolver;
+import org.apache.maven.shared.transfer.dependencies.resolve.DependencyResolverException;
 import org.apache.maven.toolchain.Toolchain;
 import org.apache.maven.toolchain.ToolchainManager;
 import org.codehaus.plexus.languages.java.jpms.LocationManager;
@@ -50,28 +46,96 @@ import org.codehaus.plexus.util.IOUtil;
 import org.codehaus.plexus.util.cli.CommandLineUtils;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
-import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.repository.RemoteRepository;
-import org.eclipse.aether.resolution.ArtifactRequest;
-import org.eclipse.aether.resolution.ArtifactResolutionException;
-import org.eclipse.aether.resolution.ArtifactResult;
 
-import com.sshtools.forker.common.OS;
 import com.sshtools.forker.common.Util;
 import com.sshtools.forker.updater.AppManifest;
 import com.sshtools.forker.updater.AppManifest.Section;
 import com.sshtools.forker.updater.AppManifest.Type;
 import com.sshtools.forker.updater.Entry;
+import com.sshtools.forker.updater.Updater;
 import com.sun.jna.Platform;
 
 @Mojo(threadSafe = true, name = "updates", defaultPhase = LifecyclePhase.PACKAGE, requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME, requiresProject = true)
-public class ForkerUpdaterMojo extends AbstractMojo {
-	private static final String MAVEN_BASE = "https://repo1.maven.org/maven2";
-	
+public class ForkerUpdaterMojo extends AbstractMojo implements Context {
 	public enum PackageMode {
-		NONE, JPACKAGE, SELF_EXTRACTING
+		JPACKAGE, NONE, SELF_EXTRACTING
 	}
+
+	@Parameter
+	protected Map<String, String> jdkToolchain;
 	
+	@Parameter
+	protected Map<String, String> systemProperties;
+
+	@Component
+	protected LocationManager locationManager;
+
+	/**
+	 * The maven project.
+	 */
+	@Parameter(required = true, readonly = true, property = "project")
+	protected MavenProject project;
+
+	@Parameter(defaultValue = "${session}", readonly = true, required = true)
+	protected MavenSession session;
+
+	@Component
+	protected ToolchainManager toolchainManager;
+
+	@Component(role = ArtifactRepositoryLayout.class)
+	protected Map<String, ArtifactRepositoryLayout> repositoryLayouts;
+
+	@Component
+	protected org.apache.maven.repository.RepositorySystem repositorySystem;
+
+	@Component
+	private RepositorySystem repoSystem;
+
+	@Component
+	protected DependencyResolver dependencyResolver;
+
+	@Component
+	private List<RemoteRepository> repos;
+
+	/**
+	 * List of automatic modules
+	 */
+	@Parameter
+	private List<String> automaticArtifacts;
+
+	/**
+	 * Bootstrap config
+	 */
+	@Parameter
+	private Bootstrap bootstrap = new Bootstrap();
+
+	/**
+	 * Business config
+	 */
+	@Parameter
+	private Business business = new Business();
+
+	/**
+	 * List of classpath jars (overrides automatic detection of type)
+	 */
+	@Parameter
+	private List<String> classpathArtifacts;
+
+	@Parameter(defaultValue = "2", property = "compress")
+	private int compress;
+
+	@Parameter
+	private List<String> forkerArgs;
+
+	@Parameter
+	private File forkerArgFile;
+
+	@Parameter(defaultValue = "${project.artifactId}", property = "id", required = true)
+	private String id;
+
+	@Parameter(defaultValue = "true", property = "image")
+	private boolean image;
 
 	/**
 	 * Location of the file.
@@ -79,29 +143,29 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 	@Parameter(defaultValue = "${project.build.directory}/image", property = "imageDirectory", required = true)
 	private File imageDirectory;
 
-	/**
-	 * Location of the file.
-	 */
-	@Parameter(defaultValue = "${project.build.directory}/repository", property = "repositoryDirectory", required = true)
-	private File repositoryDirectory;
+	@Parameter(defaultValue = "true", property = "includeForkerUpdaterRuntimeModules")
+	private boolean includeForkerUpdaterRuntimeModules = true;
 
-	/**
-	 * Location of the classpath jars.
-	 */
-	@Parameter(defaultValue = "app/business", property = "businessPath", required = true)
-	private String businessPath;
+	@Parameter
+	private Properties installerProperties = new Properties();
 
-	/**
-	 * Location of the classpath jars.
-	 */
-	@Parameter(defaultValue = "app/bootstrap", property = "bootstrapPath", required = true)
-	private String bootstrapPath;
+	@Parameter(property = "installLocation", defaultValue = "${installer.home}/${project.artifactId}", required = true)
+	private String installLocation;
 
-	/**
-	 * Location of the classpath jars under business or bootstrap.
-	 */
-	@Parameter(defaultValue = "classpath", property = "classpath", required = true)
-	private String classPath;
+	@Parameter(property = "launcherScriptName", defaultValue = "${project.artifactId}", required = true)
+	private String launcherScriptName;
+
+	@Parameter(defaultValue = "true")
+	private boolean linkJVM;
+
+	@Parameter(defaultValue = "false")
+	private boolean link;
+
+	@Parameter
+	private List<String> linkOptions;
+
+	@Parameter(property = "mainClass")
+	private String mainClass;
 
 	/**
 	 * Location of the modulepath jars.
@@ -110,76 +174,19 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 	private String modulePath;
 
 	/**
-	 * Location of the remote base.
+	 * Location of the classpath jars under business or bootstrap.
 	 */
-	@Parameter(required = true)
-	private String remoteBase;
+	@Parameter(defaultValue = "classpath", property = "classpath", required = true)
+	private String classPath;
+
+	@Parameter(defaultValue = "true", property = "modules")
+	private boolean modules = true;
 
 	/**
-	 * Location of the remote jars.
+	 * Package name.
 	 */
-	@Parameter
-	private String remoteJars;
-	/**
-	 * Location of the remote config file.
-	 */
-	@Parameter
-	private String remoteConfig;
-	/**
-	 * List of system modules (overrides automatic detection of type)
-	 */
-	@Parameter
-	private List<String> systemModules;
-	/**
-	 * List of classpath jars (overrides automatic detection of type)
-	 */
-	@Parameter
-	private List<String> classpathArtifacts;
-	/**
-	 * List of automatic modules
-	 */
-	@Parameter
-	private List<String> automaticArtifacts;
-
-	/**
-	 * List of bootstrap class path
-	 */
-	@Parameter
-	private List<String> bootstrapArtifacts;
-	/**
-	 * List of bootstrap only class path
-	 */
-	@Parameter
-	private List<String> businessArtifacts;
-	/**
-	 * List of bootstrap only modules
-	 */
-	@Parameter
-	private List<String> sharedArtifacts;
-
-	@Parameter
-	private Map<String, String> artifactArch = new HashMap<>();
-
-	@Parameter
-	private Map<String, String> artifactOS = new HashMap<>();
-
-	@Parameter
-	private List<String> updaterArgs;
-
-	@Parameter
-	private List<String> vmArgs;
-
-	@Parameter
-	private List<String> forkerArgs;
-
-	@Parameter
-	private List<BootstrapFile> bootstrapFiles;
-
-	@Parameter
-	private List<AppFile> appFiles;
-
-	@Parameter
-	private Map<String, String> properties;
+	@Parameter(defaultValue = "${project.name}", property = "name", required = true)
+	private String name;
 
 	@Parameter(defaultValue = "true", property = "noHeaderFiles")
 	private boolean noHeaderFiles;
@@ -187,120 +194,102 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 	@Parameter(defaultValue = "true", property = "noManPages")
 	private boolean noManPages;
 
-	@Parameter(defaultValue = "true", property = "updateableBootstrap")
-	private boolean updateableBootstrap;
-
-	@Parameter(defaultValue = "true", property = "updateable")
-	private boolean updateable;
-
-	@Parameter(defaultValue = "true", property = "include")
-	private boolean includeProject;
-
-	@Parameter(defaultValue = "2", property = "compress")
-	private int compress;
-
-	@Parameter(defaultValue = "false")
-	private boolean includeVersion;
-
-	@Parameter(property = "mainClass", required = true)
-	private String mainClass;
-
-	@Parameter(property = "launcherScriptName", defaultValue = "${project.artifactId}", required = true)
-	private String launcherScriptName;
-
-	@Parameter(property = "installLocation", defaultValue = "${installer.home}/${project.artifactId}", required = true)
-	private String installLocation;
-
-	@Parameter(defaultValue = "true", property = "repository")
-	private boolean repository;
-
-	@Parameter(defaultValue = "true", property = "image")
-	private boolean image;
-
-	@Parameter(defaultValue = "", property = "splash")
-	private String splash;
-
-	@Parameter(defaultValue = "true", property = "link")
-	private boolean link;
-
-	@Parameter(defaultValue = "${project.artifactId}", property = "id", required = true)
-	private String id;
-
-	@Parameter(defaultValue = "false", property = "remotesFromOriginalSource")
-	private boolean remotesFromOriginalSource;
-
-	@Parameter(defaultValue = "true", property = "includeForkerUpdaterRuntimeModules")
-	private boolean includeForkerUpdaterRuntimeModules = true;
-
-	@Parameter(defaultValue = "${project.version}-${timestamp}", property = "appVersion")
-	private String version;
-
-	@Parameter(defaultValue = "true", property = "removeImageBeforeLink")
-	private boolean removeImageBeforeLink = true;
-
-	@Parameter(defaultValue = "true", property = "useArgfile")
-	private boolean useArgfile = true;
-
-	@Parameter(defaultValue = "true", property = "uninstaller")
-	private boolean uninstaller = true;
-
-	@Parameter(property = "uninstaller", defaultValue = "uninstaller", required = true)
-	private String uninstallerName = "uninstaller";
-
-	@Parameter(defaultValue = "true", property = "modules")
-	private boolean modules = true;
-
 	@Parameter(defaultValue = "NONE", property = "packageMode")
 	private PackageMode packageMode = PackageMode.NONE;
+
+	/**
+	 * Package name.
+	 */
+	@Parameter(defaultValue = "${project.artifactId}", property = "packageName", required = true)
+	private String packageName;
 
 	@Parameter(defaultValue = "${project.build.directory}/packages", property = "packagePath")
 	private String packagePath;
 
+	@Parameter
+	private Map<String, String> properties;
+
 	/**
-	 * The maven project.
+	 * Location of the remote base.
 	 */
-	@Parameter(required = true, readonly = true, property = "project")
-	protected MavenProject project;
+	@Parameter(required = true, defaultValue = "file://${project.build.directory}/image")
+	private String remoteBase;
 
-	@Component
-	protected ToolchainManager toolchainManager;
+	/**
+	 * Location of the remote config file.
+	 */
+	@Parameter
+	private String remoteConfig;
 
-	@Component
-	private RepositorySystem repoSystem;
+	/**
+	 * Location of the remote jars.
+	 */
+	@Parameter
+	private String remoteJars;
+
+	@Parameter(defaultValue = "false", property = "remotesFromOriginalSource")
+	private boolean remotesFromOriginalSource;
+
+	@Parameter(defaultValue = "true", property = "removeImageBeforeLink")
+	private boolean removeImageBeforeLink = true;
 
 	@Parameter(defaultValue = "${repositorySystemSession}", readonly = true, required = true)
 	private RepositorySystemSession repoSession;
 
-	@Parameter(defaultValue = "${project.remoteProjectRepositories}", readonly = true, required = true)
-	private List<RemoteRepository> repositories;
+	@Parameter(defaultValue = "${project.remoteArtifactRepositories}", readonly = true, required = true)
+	protected List<ArtifactRepository> repositories;
+
+	@Parameter(defaultValue = "true", property = "repository")
+	private boolean repository;
 
 	/**
-	 * <p>
-	 * Specify the requirements for this jdk toolchain. This overrules the toolchain
-	 * selected by the maven-toolchain-plugin.
-	 * </p>
-	 * <strong>note:</strong> requires at least Maven 3.3.1
+	 * Location of the file.
+	 */
+	@Parameter(defaultValue = "${project.build.directory}/repository", property = "repositoryDirectory", required = true)
+	private File repositoryDirectory;
+
+	/**
+	 * List of bootstrap only modules
 	 */
 	@Parameter
-	protected Map<String, String> jdkToolchain;
+	private List<String> sharedArtifacts;
 
-	@Parameter
-	private Properties installerProperties = new Properties();
-
-	@Parameter
-	private Properties uninstallerProperties = new Properties();
-
-	@Parameter(defaultValue = "${session}", readonly = true, required = true)
-	protected MavenSession session;
+	@Parameter(defaultValue = "", property = "splash")
+	private String splash;
 
 	@Parameter(defaultValue = "true", property = "stripDebug")
 	private boolean stripDebug;
 
-	@Component
-	protected LocationManager locationManager;
+	@Parameter
+	private Properties uninstallerProperties = new Properties();
+
+	@Parameter
+	private List<String> updaterArgs;
+
+	@Parameter(defaultValue = "true", property = "useArgfile")
+	private boolean useArgfile = true;
+
+	@Parameter(defaultValue = "${project.version}-${timestamp}", property = "appVersion")
+	private String version;
+
+	@Parameter
+	private List<String> vmArgs;
+
+	@Parameter
+	protected List<Launcher> launchers;
+
+	@Parameter(property = "include")
+	protected Boolean includeProject;
+
+	private AppManifest manifest;
+	private Launcher defaultLauncher;
+	private Launcher defaultInstallerUpdater;
+	private Launcher defaultUninstaller;
+
+	private Set<Launcher> allLaunchers;
 
 	public void execute() throws MojoExecutionException {
-		AppManifest manifest = new AppManifest();
+		manifest = new AppManifest();
 		manifest.id(id);
 		try {
 			manifest.baseUri(new URI(normalizeForUri(remoteBase)));
@@ -310,218 +299,33 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		if (!version.equals(""))
 			manifest.version(version.replace("${timestamp}", String.valueOf(
 					new SimpleDateFormat("yyyyMMddHHmmss").format(new Date(manifest.timestamp().toEpochMilli())))));
-		Path businessPathObj = Paths.get(businessPath);
-		Path bootstrapPathObj = Paths.get(bootstrapPath);
-		manifest.sectionPath(Section.APP, businessPathObj);
-		manifest.sectionPath(Section.BOOTSTRAP, bootstrapPathObj);
 
-		Path imagePath = imageDirectory.toPath();
-		Path repositoryPath = repositoryDirectory.toPath();
+		Path imagePath = getImagePath();
+		Path repositoryPath = getRepositoryPath();
 
 		try {
+			init();
+			analyse();
 
-			if (link) {
-				if (removeImageBeforeLink) {
-					getLog().info("Clearing jlink directory '" + imageDirectory + "'");
-					Util.deleteRecursiveIfExists(imageDirectory);
-				}
-				ProcessBuilder pb = new ProcessBuilder(getJLinkExecutable());
-				if (systemModules != null) {
-					pb.command().add("--add-modules");
-					pb.command().add(String.join(",", systemModules));
-				}
-				pb.command().add("--output");
-				pb.command().add(imageDirectory.getPath());
-				pb.redirectErrorStream(true);
-				if (noHeaderFiles)
-					pb.command().add("--no-header-files");
-				if (noManPages)
-					pb.command().add("--no-man-pages");
-				pb.command().add("--compress=" + compress);
-				if(stripDebug) {
-					pb.command().add("--strip-debug");
-				}
-				getLog().info("Running jlink '" + String.join(" ", pb.command()) + "'");
-				Process p = pb.start();
-				try (InputStream in = p.getInputStream()) {
-					IOUtil.copy(in, System.out);
-				}
-				try {
-					if (p.waitFor() != 0)
-						throw new MojoExecutionException(String.format("The command '%s' failed with exit value %d",
-								String.join(" ", pb.command()), p.exitValue()));
-				} catch (InterruptedException e) {
-					throw new RuntimeException("Interrupted.", e);
-				}
+			if (linkJVM) {
+				createJRE();
 			}
 			checkDir(imagePath);
 
-			Set<Artifact> artifacts = project.getArtifacts();
-			for (Artifact a : artifacts) {
-				doArtifact(manifest, bootstrapPathObj, businessPathObj, a);
-			}
-			if (includeProject)
-				doArtifact(manifest, bootstrapPathObj, businessPathObj, project.getArtifact());
-
-			if (bootstrapFiles != null) {
-				Path installFileSrc = Paths.get(project.getFile().getParentFile().getAbsolutePath()).resolve("src/main/installer");
-				for (BootstrapFile file : bootstrapFiles) {
-					Path path = installFileSrc.resolve(file.source);
-					Path target = imagePath
-							.resolve(file.target.equals(".") ? imagePath : imagePath.resolve(file.target))
-							.resolve(path.getFileName());
-					copy("Bootstrap File", path, target, manifest.timestamp());
-					if (updateableBootstrap) {
-						manifest.entries()
-								.add(new Entry(target, manifest).section(Section.BOOTSTRAP).path(imagePath.relativize(target))
-										.uri(new URI(resolveUrl(remoteBase, imagePath.relativize(target).toString())))
-										.type(Type.OTHER));
-						target = repositoryPath
-								.resolve(file.target.equals(".") ? repositoryPath : repositoryPath.resolve(file.target))
-								.resolve(path.getFileName());
-						copy("Updateable Bootstrap File", path, target, manifest.timestamp());
-					}
-				}
-			}
-
-			if (appFiles != null) {
-				for (AppFile file : appFiles) {
-					Path path = Paths.get(file.source);
-					Path target = imagePath
-							.resolve(file.target.equals(".") ? businessPathObj : businessPathObj.resolve(file.target))
-							.resolve(path.getFileName());
-					Path relTarget = imagePath.relativize(target);
-					copy("App file", path, target, manifest.timestamp());
-					manifest.entries()
-							.add(new Entry(target, manifest).section(Section.APP).path(relTarget)
-									.uri(new URI(resolveUrl(normalizeForUri(remoteBase), relTarget.toString())))
-									.type(Type.OTHER));
-				}
-			}
-
-			/* Anything thats not in the app base is a boostrap entry */
-			Path mf = imagePath.resolve("manifest.xml");
-			if (updateableBootstrap) {
-				Files.walk(imagePath).forEach(s -> {
-					if (Files.isRegularFile(s) && !mf.equals(s)) {
-						Path relPath = imagePath.relativize(s);
-						if (!relPath.startsWith(businessPath) && !relPath.startsWith(bootstrapPath)
-								&& !manifest.hasPath(relPath)) {
-							try {
-								manifest.entries()
-										.add(new Entry(s, manifest).section(Section.BOOTSTRAP).type(Type.OTHER).path(Paths.get("/").resolve(relPath))
-												.uri(new URI(resolveUrl(normalizeForUri(remoteBase),
-														normalizeForUri(relPath.toString())))));
-							} catch (IOException | URISyntaxException e) {
-								throw new IllegalStateException("Failed to construct bootstrap manifest entry.", e);
-							}
-							if (repository) {
-								if (!Files.isSymbolicLink(s)) {
-									Path t = checkFilesDir(repositoryPath.resolve(relPath));
-									try {
-										copy("Non-app bootstrap file", s, t, manifest.timestamp());
-									} catch (IOException e) {
-										throw new IllegalStateException(
-												String.format("Failed to copy bootstrap file %s to %s.", s, t));
-									}
-								}
-							}
-						}
-					}
-				});
-			}
-
-			manifest.getProperties().put("maven.central", MAVEN_BASE);
-			manifest.getProperties().put("main", mainClass);
-			if (properties != null) {
-				for (Map.Entry<String, String> en : properties.entrySet()) {
-					manifest.getProperties().put(en.getKey(), en.getValue());
-				}
-			}
+			process();
+			postProcess();
 
 			if (launcherScriptName == null || launcherScriptName.equals("")) {
-				launcherScriptName = project.getArtifactId();
+				launcherScriptName = id;
 			}
 
-			if(StringUtils.isNotBlank(splash)) {
-				Path splashPath = imagePath.resolve("splash." + getExtension(splash));
-				Files.copy(Paths.get(splash), splashPath, StandardCopyOption.REPLACE_EXISTING);
-				manifest.entries().add(new Entry(splashPath, manifest).section(Section.BOOTSTRAP)
-						.path(imagePath.relativize(splashPath))
-						.uri(new URI(resolveUrl(normalizeForUri(remoteBase), imagePath.relativize(splashPath).toString())))
-						.type(Type.OTHER));
-				if (repository) {
-					Path repositorySplashPath = repositoryPath.resolve("splash." + getExtension(splash));
-					Files.copy(Paths.get(splash), repositorySplashPath, StandardCopyOption.REPLACE_EXISTING);
-				}
+			if (hasAnyLauncherWithMode(LauncherMode.UPDATER)) {
+				writeProperties("installer.properties", "Installer Properties", installerProperties, manifest,
+						imagePath);
 			}
-
-			Path appCfgPath = imagePath.resolve("app.cfg");
-			checkDir(imagePath.resolve("app.cfg.d"));
-			writeAppCfg(manifest, appCfgPath, imagePath);
-			manifest.entries().add(new Entry(appCfgPath, manifest).section(Section.BOOTSTRAP)
-					.path(imagePath.relativize(appCfgPath))
-					.uri(new URI(resolveUrl(normalizeForUri(remoteBase), imagePath.relativize(appCfgPath).toString())))
-					.type(Type.OTHER));
-			if (repository) {
-				Path repositoryAppCfgPath = repositoryPath.resolve("app.cfg");
-				writeAppCfg(manifest, repositoryAppCfgPath, imagePath);
-			}
-			
-			String fullScriptName = launcherScriptName; 
-			if(Platform.isWindows() && !fullScriptName.toLowerCase().endsWith(".bat")) {
-				fullScriptName += ".bat";
-			}
-			String fullUninstallerName = uninstallerName; 
-			if(Platform.isWindows() && !fullUninstallerName.toLowerCase().endsWith(".bat")) {
-				fullUninstallerName += ".bat";
-			}
-
-			Path scriptPath = checkDir(imagePath.resolve("bin")).resolve(fullScriptName);
-			Path argsPath = useArgfile ? checkDir(imagePath).resolve(launcherScriptName + ".args") : null;
-			Path uninstallerPath = null;
-			writeLauncherScript(imagePath, scriptPath, argsPath, bootstrapPathObj, businessPathObj);
-			if(uninstaller) {
-				argsPath = useArgfile ? checkDir(imagePath).resolve(uninstallerName + ".args") : null;
-				uninstallerPath = checkDir(imagePath.resolve("bin")).resolve(fullUninstallerName);
-				writeUninstallerScript(imagePath, uninstallerPath, argsPath, bootstrapPathObj, businessPathObj);
-			}
-			if (updateableBootstrap) {
-				argsPath = useArgfile ? checkDir(repositoryPath).resolve(launcherScriptName + ".args") : null;
-				scriptPath = checkDir(repositoryPath.resolve("bin")).resolve(fullScriptName);
-				writeLauncherScript(imagePath, scriptPath, argsPath, bootstrapPathObj, businessPathObj);
-				if(uninstaller) {
-					argsPath = useArgfile ? checkDir(repositoryPath).resolve(uninstallerName + ".args") : null;
-					uninstallerPath = checkDir(repositoryPath.resolve("bin")).resolve(fullUninstallerName);
-					writeUninstallerScript(imagePath, uninstallerPath, argsPath, bootstrapPathObj, businessPathObj);
-					manifest.entries()
-							.add(new Entry(uninstallerPath, manifest).section(Section.BOOTSTRAP)
-									.path(repositoryPath.relativize(uninstallerPath))
-									.uri(new URI(resolveUrl(normalizeForUri(remoteBase),
-											normalizeForUri(repositoryPath.relativize(uninstallerPath).toString()))))
-									.type(Type.OTHER));
-				}
-				
-				manifest.entries()
-						.add(new Entry(scriptPath, manifest).section(Section.BOOTSTRAP)
-								.path(repositoryPath.relativize(scriptPath))
-								.uri(new URI(resolveUrl(normalizeForUri(remoteBase),
-										normalizeForUri(repositoryPath.relativize(scriptPath).toString()))))
-								.type(Type.OTHER));
-				
-				if (useArgfile) {
-					manifest.entries()
-							.add(new Entry(argsPath, manifest).section(Section.BOOTSTRAP)
-									.path(repositoryPath.relativize(argsPath))
-									.uri(new URI(resolveUrl(normalizeForUri(remoteBase),
-											repositoryPath.relativize(argsPath).toString())))
-									.type(Type.OTHER));
-				}
-			}
-			
-			writeProperties("installer.properties", "Installer Properties", installerProperties, manifest, imagePath);
-			if(uninstaller) {
-				writeProperties("uninstaller.properties", "Uninstaller Properties", uninstallerProperties, manifest, imagePath);
+			if (hasAnyLauncherWithMode(LauncherMode.UNINSTALLER)) {
+				writeProperties("uninstaller.properties", "Uninstaller Properties", uninstallerProperties, manifest,
+						imagePath);
 			}
 
 			try (Writer out = Files.newBufferedWriter(checkDir(imagePath).resolve("manifest.xml"))) {
@@ -532,13 +336,20 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 					manifest.save(out);
 				}
 			}
-			
-			switch(packageMode) {
+
+			switch (packageMode) {
 			case SELF_EXTRACTING:
 				SelfExtractingExecutableBuilder builder = new SelfExtractingExecutableBuilder();
 				builder.image(imagePath);
-				builder.output(Paths.get(packagePath).resolve(project.getBuild().getFinalName()));
-				builder.log(getLog());
+				builder.context(this);
+				builder.name(name);
+				Launcher l = getLauncherWithMode(LauncherMode.UPDATER);
+				if (l == null) {
+					l = getLauncherWithMode(LauncherMode.UPDATER);
+				}
+				if (l != null)
+					builder.script(Paths.get("bin").resolve(l.calcFullScriptName()));
+				builder.output(Paths.get(packagePath).resolve(packageName));
 				builder.make();
 				break;
 			case NONE:
@@ -546,682 +357,265 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 			default:
 				throw new UnsupportedOperationException("Not yet implemented.");
 			}
-		} catch (IOException | URISyntaxException e) {
+		} catch (IOException | URISyntaxException | DependencyResolverException | MojoFailureException e) {
 			throw new MojoExecutionException("Failed to write configuration.", e);
 		}
 	}
 
-	protected void writeProperties(String name, String description, Properties properties, AppManifest manifest, Path imagePath) throws IOException, URISyntaxException {
-		Properties allProperties = new Properties();
-		addDefaultProperties(allProperties);
-		if(properties != null) {
-			allProperties.putAll(properties);
-		}
-		Path propertiesPath = checkDir(imagePath).resolve(name);
-		try (Writer out = Files.newBufferedWriter(propertiesPath)) {
-			allProperties.store(out, description);
-		}
-		manifest.entries().add(new Entry(propertiesPath, manifest).section(Section.BOOTSTRAP)
-				.path(imagePath.relativize(propertiesPath))
-				.uri(new URI(resolveUrl(normalizeForUri(remoteBase), imagePath.relativize(propertiesPath).toString())))
-				.type(Type.OTHER));
+	public boolean hasAnyLauncherWithMode(LauncherMode mode) {
+		return getLauncherWithMode(mode) != null;
 	}
 
-	protected void addDefaultProperties(Properties allProperties) {
+	@Override
+	public Bootstrap getBootstrap() {
+		return bootstrap;
+	}
+
+	@Override
+	public Business getBusiness() {
+		return business;
+	}
+
+	@Override
+	public Path getImagePath() {
+		return imageDirectory.toPath();
+	}
+
+	@Override
+	public AppManifest getManifest() {
+		return manifest;
+	}
+
+	@Override
+	public String getRemoteBase() {
+		return remoteBase;
+	}
+
+	@Override
+	public Path getRepositoryPath() {
+		return repositoryDirectory.toPath();
+	}
+
+	@Override
+	public boolean isImage() {
+		return image;
+	}
+
+	@Override
+	public boolean isRemotesFromOriginalSource() {
+		return remotesFromOriginalSource;
+	}
+
+	@Override
+	public boolean isRepository() {
+		return repository;
+	}
+
+	public void init() {
+
+		getLog().info("Initialising");
+
+		defaultLauncher = new Launcher();
+		defaultLauncher.setId(getLauncherScriptName());
+		defaultLauncher.setMode(LauncherMode.UPDATER);
+		defaultInstallerUpdater = new Launcher();
+		defaultInstallerUpdater.setId("updater");
+		defaultInstallerUpdater.setMainClass(Updater.class.getName());
+		defaultInstallerUpdater.setMode(LauncherMode.UPDATER);
+		defaultUninstaller = new Launcher();
+		defaultUninstaller.setId("uninstaller");
+		defaultUninstaller.setMode(LauncherMode.UNINSTALLER);
+
+		bootstrap.init(this);
+		business.init(this);
+
+		for (Launcher launcher : getAllLaunchers()) {
+			launcher.init(this);
+		}
+	}
+
+	public void analyse() throws IOException {
+		getLog().info("Analyse");
+		bootstrap.analyse();
+		business.analyse();
+		for (Launcher launcher : getAllLaunchers()) {
+			launcher.analyse();
+		}
+	}
+
+	public void process() throws MojoExecutionException, MojoFailureException, IOException, DependencyResolverException,
+			URISyntaxException {
+		getLog().info("Process");
+		bootstrap.process();
+		business.process();
+		for (Launcher launcher : getAllLaunchers()) {
+			launcher.process();
+		}
+	}
+
+	public void postProcess() throws IOException, URISyntaxException {
+		getLog().info("Post Process");
+		bootstrap.postProcess();
+		business.postProcess();
+		for (Launcher launcher : getAllLaunchers()) {
+			launcher.postProcess();
+		}
+	}
+
+	public Launcher getLauncherWithMode(LauncherMode mode) {
+		return findLauncherWithMode(mode, getAllLaunchers());
+	}
+
+	protected Launcher findLauncherWithMode(LauncherMode mode, Collection<Launcher> launchers) {
+		for (Launcher l : launchers) {
+			if (l.getMode() == mode) {
+				return l;
+			}
+		}
+		return null;
+	}
+
+	public boolean isIncludeProject() {
+		return includeProject;
+	}
+
+	@Override
+	public boolean calcIncludeProject() {
+		return (includeProject == null && !"pom".equals(project.getPackaging())) || Boolean.TRUE.equals(includeProject);
+	}
+
+	@Override
+	public final Set<Launcher> getAllLaunchers() {
+		if(allLaunchers == null) {
+			allLaunchers = calcLaunchers();
+		}
+		return allLaunchers;
+	}
+	
+	protected final Set<Launcher> calcLaunchers() {
+		Set<Launcher> ll = new LinkedHashSet<>();
+		for (Launcher l : calcUnfilteredLaunchers()) {
+			if (!l.isSkip())
+				ll.add(l);
+		}
+		return ll;
+	}
+
+	protected Set<Launcher> calcUnfilteredLaunchers() {
+		Set<Launcher> l = new LinkedHashSet<>();
+
+		/* Now overrides and extras */
+		if (launchers != null)
+			l.addAll(launchers);
+
+		/* Default installer,updater and defaultLauncher */
+		if (calcIncludeProject())
+			l.add(defaultLauncher);
+
+		/* Default defaultUninstaller */
+		l.add(defaultUninstaller);
+
+		/*
+		 * If there are no UPDATER type launchers, and this build is supposed to be
+		 * updateable, then create an 'updater'
+		 */
+		if ( findLauncherWithMode(LauncherMode.UPDATER, l) == null
+			    && findLauncherWithMode(LauncherMode.WRAPPED, l) == null
+				&& (bootstrap.isUpdateable() || business.isUpdateable())) {
+			l.add(defaultInstallerUpdater);
+		}
+
+		return l;
+	}
+
+	private void addDefaultProperties(Properties allProperties) {
 		allProperties.put("title", project.getName());
 		allProperties.put("description", project.getDescription() == null ? "" : project.getDescription());
 		allProperties.put("version", project.getVersion());
 	}
 
-	protected boolean isForkerUpdaterBootstrap(org.eclipse.aether.artifact.Artifact a) {
-		return a.getArtifactId().equals("forker-updater")
-				|| (a.getArtifactId().startsWith("forker-updater-")
-						&& !a.getArtifactId().equals("forker-updater-example"))
-				|| a.getArtifactId().equals("forker-client") || a.getArtifactId().equals("forker-common")
-				|| a.getArtifactId().equals("forker-wrapper")
-				|| a.getArtifactId().equals("jna-platform") || a.getArtifactId().equals("jna")
-				|| a.getArtifactId().equals("picocli");
+	private Set<String> getAllSystemModules() {
+		Set<String> allSystemModules = UpdaterUtil.concat(bootstrap.calcSystemModules(), business.calcSystemModules());
+		for (Launcher l : getAllLaunchers()) {
+			allSystemModules.addAll(l.calcSystemModules());
+		}
+		return allSystemModules;
 	}
 
-	protected boolean isForkerUpdaterRuntime(org.eclipse.aether.artifact.Artifact a) {
-		if (includeForkerUpdaterRuntimeModules) {
-			return a.getArtifactId().equals("forker-updater") || a.getArtifactId().equals("forker-common")
-					|| a.getArtifactId().equals("forker-client") || a.getArtifactId().equals("forker-wrapped")
-					|| a.getArtifactId().equals("jna-platform") || a.getArtifactId().equals("jna")
-					|| a.getArtifactId().equals("picocli");
-		} else {
-			return false;
+	private void createJRE() throws IOException, MojoExecutionException {
+		if (removeImageBeforeLink) {
+			getLog().info("Clearing jlink directory '" + imageDirectory + "'");
+			Util.deleteRecursiveIfExists(imageDirectory);
 		}
-	}
-
-	protected boolean isBootstrap(org.eclipse.aether.artifact.Artifact a) {
-		return isShared(a) || isForkerUpdaterBootstrap(a) || (!isShared(a) && containsArtifact(bootstrapArtifacts, a));
-	}
-
-	protected boolean isShared(org.eclipse.aether.artifact.Artifact a) {
-		return containsArtifact(sharedArtifacts, a);
-	}
-
-	protected boolean isBusiness(org.eclipse.aether.artifact.Artifact a) {
-		return (!isBootstrap(a) && !isShared(a)) || artifactEquals(a, project.getArtifact()) || isShared(a) || (isForkerUpdaterRuntime(a))
-				|| (!isShared(a) && (containsArtifact(businessArtifacts, a)));
-	}
-
-	protected boolean artifactEquals(org.eclipse.aether.artifact.Artifact a, Artifact artifact) {
-		return a.getArtifactId().equals(artifact.getArtifactId()) && a.getGroupId().equals(artifact.getGroupId());
-	}
-
-	protected void doArtifact(AppManifest manifest, Path bootstrapPathObj, Path businessPathObj,
-
-			Artifact a) throws MojoExecutionException, IOException, URISyntaxException {
-		String artifactId = a.getArtifactId();
-		org.eclipse.aether.artifact.Artifact aetherArtifact = new DefaultArtifact(a.getGroupId(), a.getArtifactId(),
-				a.getClassifier(), a.getType(), a.getVersion());
-
-		ArtifactResult resolutionResult = resolveRemoteArtifact(new HashSet<MavenProject>(), project, aetherArtifact,
-				this.repositories);
-		if (resolutionResult == null)
-			throw new MojoExecutionException("Artifact " + aetherArtifact.getGroupId() + ":"
-					+ aetherArtifact.getArtifactId() + " could not be resolved.");
-
-		aetherArtifact = resolutionResult.getArtifact();
-
-		File file = aetherArtifact.getFile();
-		if (file == null || !file.exists()) {
-			getLog().warn("Artifact " + artifactId
-					+ " has no attached file. Its content will not be copied in the target model directory.");
-			return;
+		ProcessBuilder pb = new ProcessBuilder(getJLinkExecutable());
+		Set<String> allSystemModules = getAllSystemModules();
+		if (!allSystemModules.isEmpty()) {
+			pb.command().add("--add-modules");
+			pb.command().add(String.join(",", allSystemModules));
 		}
-		
-		if(!"jar".equals(aetherArtifact.getExtension())) {
-			getLog().info(String.format("Skipping %s, it is not a jar", artifactId));
-			return;
+		pb.command().add("--output");
+		pb.command().add(imageDirectory.getPath());
+		pb.redirectErrorStream(true);
+		if (noHeaderFiles)
+			pb.command().add("--no-header-files");
+		if (noManPages)
+			pb.command().add("--no-man-pages");
+		pb.command().add("--compress=" + compress);
+		if (stripDebug) {
+			pb.command().add("--strip-debug");
 		}
-
-		boolean isBootstrap = isBootstrap(aetherArtifact);
-		boolean isBusiness = isBusiness(aetherArtifact);
-		boolean isModule = isModule(aetherArtifact);
-
-		getLog().debug(String.format(
-				"Adding artifact: %s   Module: %s, Bootstrap: %s, Business: %s Bootstrap Path: %s Bus. Path: %s",
-				getFileName(a), isModule, isBootstrap, isBusiness, bootstrapPathObj, businessPathObj));
-
-		if (isBootstrap) {
-			/* Bootstrap */
-			if (isModule) {
-				Path dir = resolvePath(bootstrapPathObj, modulePath);
-				module(manifest, dir, false, a, resolutionResult, file, Section.BOOTSTRAP);
-			} else {
-				Path dir = resolvePath(bootstrapPathObj, classPath);
-				classpath(manifest, dir, false, a, resolutionResult, file, Section.BOOTSTRAP);
-			}
+		getLog().info("Running jlink '" + String.join(" ", pb.command()) + "'");
+		Process p = pb.start();
+		try (InputStream in = p.getInputStream()) {
+			IOUtil.copy(in, System.out);
 		}
-
-		if (isBusiness) {
-			/* App */
-			if (isModule) {
-				Path dir = resolvePath(businessPathObj, modulePath);
-				module(manifest, dir, true, a, resolutionResult, file, Section.APP);
-			} else {
-				Path dir = resolvePath(businessPathObj, classPath);
-				classpath(manifest, dir, true, a, resolutionResult, file, Section.APP);
-			}
-		}
-
-		return;
-	}
-
-	private Path resolvePath(Path pathObj, String path) {
-		return path == null || path.equals("") ? pathObj : pathObj.resolve(path);
-	}
-
-	private boolean containsArtifact(Collection<String> artifactNames, org.eclipse.aether.artifact.Artifact artifact) {
-		if (artifactNames == null)
-			return false;
-		String k = artifact.getGroupId() + ":" + artifact.getArtifactId() + ":" + artifact.getClassifier();
-		if (artifactNames.contains(k))
-			return true;
-		k = artifact.getGroupId() + ":" + artifact.getArtifactId();
-		if (artifactNames.contains(k))
-			return true;
-		k = artifact.getArtifactId();
-		if (artifactNames.contains(k))
-			return true;
-		return false;
-	}
-	
-	private void writeUninstallerScript(Path imagePath, Path uninstallerPath, Path argsPath, Path bootstrapPath, Path businessPath)
-			throws IOException {
-		
-		List<String> modulePaths = new ArrayList<>();
-		List<String> vmopts = new ArrayList<>();
-		List<String> classPaths = new ArrayList<>();
-		StringBuilder updaterArgs = new StringBuilder();
-		
-		boolean useForkerModules = scriptArgs(imagePath, bootstrapPath, modulePaths, vmopts,
-				classPaths, updaterArgs);
-		
-		if(Platform.isWindows()) {
-			try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(uninstallerPath), true)) {
-				out.println("@ECHO OFF");
-				out.println("CD %~dp0\\..");
-				if (argsPath != null) {
-					try (PrintWriter pw = new PrintWriter(Files.newBufferedWriter(argsPath))) {
-						for (String vmopt : vmopts) {
-							pw.println(vmopt);
-						}
-					}
-					out.println(String.format("SET VM_OPTIONS=\"@%s\"", argsPath.getFileName().toString()));
-				} else
-					out.println(String.format("SET VM_OPTIONS=\"%s\"", String.join(" ", vmopts)));
-	
-				if (link) {
-					out.println("SET JAVA_EXE=bin\\java.exe");
-				} else {
-					out.println(String.format("IF \"%JAVA_HOME%\"==\"\" ( "));
-					out.println("    SET JAVA_EXE=${JAVA_HOME}\\bin\\java.exe");
-					out.println(") ELSE (");
-					out.println("    SET JAVA_EXE=java");
-					out.println(")");
-				}
-	
-				if (updateableBootstrap) {
-					//out.println("while : ; do");
-					if (useForkerModules)
-						out.println(
-								"    %JAVA_EXE% %VM_OPTIONS% -m com.sshtools.forker.updater/com.sshtools.forker.updater.Uninstaller %APP_ARGS% %*");
-					else
-						out.println("    %JAVA_EXE% %VM_OPTIONS% com.sshtools.forker.updater.Uninstaller %APP_ARGS% %*");
-//					out.println("    ret=$?");
-//					out.println("    if [ \"${ret}\" != 9 -o ! -d .updates ]; then");
-//					out.println("        exit $ret");
-//					out.println("    else");
-//					out.println("        echo Updating bootstrap ....");
-//					out.println("        cd .updates");
-//					out.println("        if ! find . -type d -exec mkdir -p ../\\{} \\; ; then");
-//					out.println("            echo \"$0: Failed to recreate directory structure.\" >&2");
-//					out.println("            exit 2");
-//					out.println("        fi");
-//					out.println("        if ! find . -type f -exec mv -f \\{} ../\\{} \\; ; then");
-//					out.println("            echo \"$0: Failed to move update files.\" >&2");
-//					out.println("            exit 2");
-//					out.println("        fi");
-//					out.println("        if ! find . -type l -exec mv -f \\{} ../\\{} \\; ; then");
-//					out.println("            echo \"$0: Failed to move link files.\" >&2");
-//					out.println("            exit 2");
-//					out.println("        fi");
-//					out.println("        cd ..");
-//					out.println("        rm -fr .updates");
-//					out.println("    fi");
-//					out.println("done");
-				} else {
-					if (useForkerModules)
-						out.println(
-								"%JAVA_EXE% %VM_OPTIONS% -m com.sshtools.forker.updater/com.sshtools.forker.updater.Uninstaller %APP_ARGS% %*");
-					else
-						out.println("%JAVA_EXE% %VM_OPTIONS% com.sshtools.forker.updater.Uninstaller %APP_ARGS% %*");
-				}
-			}
-		}
-		else if(OS.isUnix()) {
-			try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(uninstallerPath), true)) {
-				out.println("#!/bin/sh");
-				out.println("realpath=$(readlink \"$0\")");
-				out.println("if [ -z \"${realpath}\" ] ; then realpath=\"$0\" ; fi");
-				out.println("cd $(dirname ${realpath})/..");
-	
-				if (argsPath != null) {
-					try (PrintWriter pw = new PrintWriter(Files.newBufferedWriter(argsPath))) {
-						for (String vmopt : vmopts) {
-							pw.println(vmopt);
-						}
-					}
-					out.println(String.format("VM_OPTIONS=\"@%s\"", argsPath.getFileName().toString()));
-				} else
-					out.println(String.format("VM_OPTIONS=\"%s\"", String.join(" ", vmopts)));
-	
-				if (link) {
-					out.println("JAVA_EXE=bin/java");
-				} else {
-					out.println(String.format("if [ -n \"${JAVA_HOME}\" ] ; then "));
-					out.println("    JAVA_EXE=${JAVA_HOME}/bin/java");
-					out.println("else");
-					out.println("    JAVA_EXE=java");
-					out.println("fi");
-				}
-	
-				if (updateableBootstrap) {
-					out.println("while : ; do");
-					if (useForkerModules)
-						out.println(
-								"    ${JAVA_EXE} ${VM_OPTIONS} -m com.sshtools.forker.updater/com.sshtools.forker.updater.Uninstaller ${APP_ARGS} $@");
-					else
-						out.println("    ${JAVA_EXE} ${VM_OPTIONS} com.sshtools.forker.updater.Uninstaller ${APP_ARGS} $@");
-					out.println("    ret=$?");
-					out.println("    exit $ret");
-					out.println("done");
-				} else {
-					if(updateable) {
-						if (useForkerModules)
-							out.println(
-									"${JAVA_EXE} ${VM_OPTIONS} -m com.sshtools.forker.updater/com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
-						else
-							out.println("${JAVA_EXE} ${VM_OPTIONS} com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
-					}
-					else {
-						if (useForkerModules)
-							out.println("${JAVA_EXE} ${VM_OPTIONS} -m com.sshtools.forker.wrapper/com.sshtools.forker.wrapper.ForkerWrapper ${APP_ARGS} $@");
-						else
-							out.println("${JAVA_EXE} ${VM_OPTIONS} com.sshtools.forker.wrapper.ForkerWrapper ${APP_ARGS} $@");
-					}
-				}
-			}
-		}
-		else
-			throw new UnsupportedOperationException("Cannot create launch script for this platform.");
-		uninstallerPath.toFile().setExecutable(true);
-	}
-
-	private void writeLauncherScript(Path imagePath, Path scriptPath, Path argsPath, Path bootstrapPath, Path businessPath)
-			throws IOException {
-		
-		List<String> modulePaths = new ArrayList<>();
-		List<String> vmopts = new ArrayList<>();
-		List<String> classPaths = new ArrayList<>();
-		StringBuilder updaterArgs = new StringBuilder();
-		
-		boolean useForkerModules = scriptArgs(imagePath, bootstrapPath, modulePaths, vmopts,
-				classPaths, updaterArgs);
-		
-		if(Platform.isWindows()) {
-			try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(scriptPath), true)) {
-				out.println("@ECHO OFF");
-				out.println("CD %~dp0\\..");
-				if (argsPath != null) {
-					try (PrintWriter pw = new PrintWriter(Files.newBufferedWriter(argsPath))) {
-						for (String vmopt : vmopts) {
-							pw.println(vmopt);
-						}
-					}
-					out.println(String.format("SET VM_OPTIONS=\"@%s\"", argsPath.getFileName().toString()));
-				} else
-					out.println(String.format("SET VM_OPTIONS=\"%s\"", String.join(" ", vmopts)));
-	
-				if (link) {
-					out.println("SET JAVA_EXE=bin\\java.exe");
-				} else {
-					out.println(String.format("IF \"%JAVA_HOME%\"==\"\" ( "));
-					out.println("    SET JAVA_EXE=${JAVA_HOME}\\bin\\java.exe");
-					out.println(") ELSE (");
-					out.println("    SET JAVA_EXE=java");
-					out.println(")");
-				}
-	
-				out.println(String.format("SET APP_ARGS=\"%s\"", updaterArgs.toString()));
-				if (updateableBootstrap) {
-					//out.println("while : ; do");
-					if (useForkerModules)
-						out.println(
-								"    %JAVA_EXE% %VM_OPTIONS% -m com.sshtools.forker.updater/com.sshtools.forker.updater.Updater %APP_ARGS% %*");
-					else
-						out.println("    %JAVA_EXE% %VM_OPTIONS% com.sshtools.forker.updater.Updater %APP_ARGS% %*");
-//					out.println("    ret=$?");
-//					out.println("    if [ \"${ret}\" != 9 -o ! -d .updates ]; then");
-//					out.println("        exit $ret");
-//					out.println("    else");
-//					out.println("        echo Updating bootstrap ....");
-//					out.println("        cd .updates");
-//					out.println("        if ! find . -type d -exec mkdir -p ../\\{} \\; ; then");
-//					out.println("            echo \"$0: Failed to recreate directory structure.\" >&2");
-//					out.println("            exit 2");
-//					out.println("        fi");
-//					out.println("        if ! find . -type f -exec mv -f \\{} ../\\{} \\; ; then");
-//					out.println("            echo \"$0: Failed to move update files.\" >&2");
-//					out.println("            exit 2");
-//					out.println("        fi");
-//					out.println("        if ! find . -type l -exec mv -f \\{} ../\\{} \\; ; then");
-//					out.println("            echo \"$0: Failed to move link files.\" >&2");
-//					out.println("            exit 2");
-//					out.println("        fi");
-//					out.println("        cd ..");
-//					out.println("        rm -fr .updates");
-//					out.println("    fi");
-//					out.println("done");
-				} else {
-					if(updateable) {
-						if (useForkerModules)
-							out.println(
-									"%JAVA_EXE% %VM_OPTIONS% -m com.sshtools.forker.updater/com.sshtools.forker.updater.Updater %APP_ARGS% %*");
-						else
-							out.println("%JAVA_EXE% %VM_OPTIONS% com.sshtools.forker.updater.Updater %APP_ARGS% %*");
-					}
-					else {
-						if (useForkerModules)
-							out.println("%JAVA_EXE% %VM_OPTIONS% -m com.sshtools.forker.wrapper/com.sshtools.forker.wrapper.ForkerWrapper %APP_ARGS% %*");
-						else
-							out.println("%JAVA_EXE% %VM_OPTIONS% com.sshtools.forker.wrapper.ForkerWrapper %APP_ARGS% %*");
-					}
-				}
-			}
-		}
-		else if(OS.isUnix()) {
-			try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(scriptPath), true)) {
-				out.println("#!/bin/sh");
-				out.println("realpath=$(readlink \"$0\")");
-				out.println("if [ -z \"${realpath}\" ] ; then realpath=\"$0\" ; fi");
-				out.println("cd $(dirname ${realpath})/..");
-	
-				if (argsPath != null) {
-					try (PrintWriter pw = new PrintWriter(Files.newBufferedWriter(argsPath))) {
-						for (String vmopt : vmopts) {
-							pw.println(vmopt);
-						}
-					}
-					out.println(String.format("VM_OPTIONS=\"@%s\"", argsPath.getFileName().toString()));
-				} else
-					out.println(String.format("VM_OPTIONS=\"%s\"", String.join(" ", vmopts)));
-	
-				if (link) {
-					out.println("JAVA_EXE=bin/java");
-				} else {
-					out.println(String.format("if [ -n \"${JAVA_HOME}\" ] ; then "));
-					out.println("    JAVA_EXE=${JAVA_HOME}/bin/java");
-					out.println("else");
-					out.println("    JAVA_EXE=java");
-					out.println("fi");
-				}
-	
-				out.println(String.format("APP_ARGS=\"%s\"", updaterArgs.toString()));
-				if (updateableBootstrap) {
-					out.println("while : ; do");
-					if (useForkerModules)
-						out.println(
-								"    ${JAVA_EXE} ${VM_OPTIONS} -m com.sshtools.forker.updater/com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
-					else
-						out.println("    ${JAVA_EXE} ${VM_OPTIONS} com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
-					out.println("    ret=$?");
-					out.println("    if [ \"${ret}\" != 9 -o ! -d .updates ]; then");
-					out.println("        rm -fr .updates");
-					out.println("        exit $ret");
-					out.println("    else");
-					out.println("        echo Updating bootstrap ....");
-					out.println("        cd .updates");
-					out.println("        if ! find . -type d -exec mkdir -p ../\\{} \\; ; then");
-					out.println("            echo \"$0: Failed to recreate directory structure.\" >&2");
-					out.println("            exit 2");
-					out.println("        fi");
-					out.println("        if ! find . -type f -exec mv -f \\{} ../\\{} \\; ; then");
-					out.println("            echo \"$0: Failed to move update files.\" >&2");
-					out.println("            exit 2");
-					out.println("        fi");
-					out.println("        if ! find . -type l -exec mv -f \\{} ../\\{} \\; ; then");
-					out.println("            echo \"$0: Failed to move link files.\" >&2");
-					out.println("            exit 2");
-					out.println("        fi");
-					out.println("        cd ..");
-					out.println("        rm -fr .updates");
-					out.println("    fi");
-					out.println("done");
-				} else {
-					if(updateable) {
-						if (useForkerModules)
-							out.println(
-									"${JAVA_EXE} ${VM_OPTIONS} -m com.sshtools.forker.updater/com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
-						else
-							out.println("${JAVA_EXE} ${VM_OPTIONS} com.sshtools.forker.updater.Updater ${APP_ARGS} $@");
-					}
-					else {
-						if (useForkerModules)
-							out.println("${JAVA_EXE} ${VM_OPTIONS} -m com.sshtools.forker.wrapper/com.sshtools.forker.wrapper.ForkerWrapper ${APP_ARGS} $@");
-						else
-							out.println("${JAVA_EXE} ${VM_OPTIONS} com.sshtools.forker.wrapper.ForkerWrapper ${APP_ARGS} $@");
-					}
-				}
-			}
-		}
-		else
-			throw new UnsupportedOperationException("Cannot create launch script for this platform.");
-		scriptPath.toFile().setExecutable(true);
-	}
-
-	protected boolean scriptArgs(Path imagePath, Path bootstrapPath, List<String> modulePaths,
-			List<String> vmopts, List<String> classPaths, StringBuilder updaterArgs) {
-
-		boolean useForkerModules = false;
-		Path localDir = resolvePath(imagePath.resolve(bootstrapPath), modulePath);
-		Path dir = resolvePath(bootstrapPath, modulePath);
-		if (Files.exists(localDir)) {
-			for (File f : localDir.toFile().listFiles()) {
-				modulePaths.add(dir + File.separator + f.getName());
-				if (f.getName().startsWith("forker-updater")) {
-					useForkerModules = true;
-				}
-			}
-		}
-
-		localDir = resolvePath(imagePath.resolve(bootstrapPath), classPath);
-		dir = resolvePath(bootstrapPath, classPath);
-		if (Files.exists(localDir)) {
-			for (File f : localDir.toFile().listFiles()) {
-				classPaths.add(dir + File.separator + f.getName());
-			}
-		}
-		if(org.apache.commons.lang3.StringUtils.isNotBlank(splash)) {
-			vmopts.add("-splash:splash." + getExtension(splash));
-		}
-		if (!modulePaths.isEmpty()) {
-			vmopts.add("-p");
-			vmopts.add(String.join(File.pathSeparator, modulePaths));
-		}
-		if (!classPaths.isEmpty()) {
-			vmopts.add("-cp");
-			vmopts.add(String.join(File.pathSeparator, classPaths));
-		}
-
-		if (systemModules != null && systemModules.size() > 0) {
-			vmopts.add("--add-modules");
-			vmopts.add(String.join(",", systemModules));
-		}
-		vmopts.add("-Dforker.remoteManifest=" + normalizeForUri(remoteBase));
-		if (vmArgs != null) {
-			for (String vmArg : vmArgs) {
-				vmopts.add(vmArg);
-			}
-		}
-		
-		updaterArgs.append("--configuration=");
-		updaterArgs.append("app.cfg");
-		if (this.updaterArgs != null) {
-			for (String arg : this.updaterArgs) {
-				updaterArgs.append(" ");
-				updaterArgs.append(escapeSpaces(arg));
-			}
-		}
-		
-		return useForkerModules;
-	}
-
-	private String getExtension(String fileName) {
-		int idx = fileName.indexOf('.');
-		if(idx == -1)
-			throw new IllegalArgumentException(String.format("Filename %s must have extension.", fileName));
-		return fileName.substring(idx + 1);
-	}
-
-	private void writeAppCfg(AppManifest manifest, Path appCfgPath, Path imagePath) throws IOException {
-		try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(appCfgPath), true)) {
-			out.println("configuration-directory app.cfg.d");
-			out.println("local-manifest manifest.xml");
-			out.println("default-remote-manifest " + normalizeForUri(remoteBase) + "/manifest.xml");
-			Set<String> cp = new LinkedHashSet<>();
-			Set<String> mp = new LinkedHashSet<>();
-			Path root = Paths.get("/");
-			for (Entry entry : manifest.entries(Section.APP)) {
-				switch (entry.type()) {
-				case CLASSPATH:
-					cp.add(root.relativize(entry.resolve(root)).toString());
-					break;
-				case MODULEPATH:
-					mp.add(root.relativize(entry.resolve(root)).toString());
-					break;
-				default:
-					break;
-				}
-			}
-			if (cp.size() > 0) {
-				out.println("classpath " + String.join(File.pathSeparator, cp));
-			}
-			if (mp.size() > 0) {
-				out.println("modulepath " + String.join(File.pathSeparator, mp));
-			}
-			if (installLocation != null && !installLocation.equals(""))
-				out.println("install-location " + installLocation);
-			if (forkerArgs != null) {
-				for (String forkerArg : forkerArgs)
-					out.println(forkerArg.trim());
-			}
-		}
-	}
-
-	private Path checkFilesDir(Path resolve) {
-		checkDir(resolve.getParent());
-		return resolve;
-	}
-
-	private Path checkDir(Path resolve) {
-		if (!Files.exists(resolve)) {
-			try {
-				Files.createDirectories(resolve);
-			} catch (IOException e) {
-				throw new IllegalStateException(String.format("Failed to create %s.", resolve));
-			}
-		}
-		return resolve;
-	}
-
-	private String escapeSpaces(String str) {
-		return str.replace(" ", "\\\\ ");
-	}
-
-	private void classpath(AppManifest manifest, Path path, boolean business, Artifact a,
-			ArtifactResult resolutionResult, File file, Section section) throws IOException, URISyntaxException {
-		String finalClassPath = path.resolve(getFileName(a)).toString();
-		getLog().info(String.format("Adding %s classpath jar %s to updater config.", a.getFile(), finalClassPath));
-		if (image)
-			copy("Image classpath jar", a.getFile().toPath(), imageDirectory.toPath().resolve(finalClassPath), manifest.timestamp());
-		String remoteUrl = mavenUrl(resolutionResult);
-		Entry entry;
-		Path entryPath = Paths.get(getFileName(a));
-		if (repository) {
-			if (remotesFromOriginalSource) {
-				if (!isRemote(remoteUrl) && !Files.isSymbolicLink(file.toPath())) {
-					copy("Classpath jar from Maven", a.getFile().toPath(), repositoryDirectory.toPath().resolve(finalClassPath),
-							manifest.timestamp());
-				}
-				if (remoteUrl == null)
-					remoteUrl = repositoryUrl(resolutionResult, path);
-				entry = new Entry(file.toPath(), manifest).section(section).name(entryPath).uri(new URI(remoteUrl))
-						.type(Type.CLASSPATH);
-			} else {
-				entry = new Entry(file.toPath(), manifest).section(section).name(entryPath)
-						.uri(new URI(repositoryUrl(resolutionResult, path))).type(Type.CLASSPATH);
-				if (!Files.isSymbolicLink(file.toPath()))
-					copy("Classpath jar from Local", file.toPath(), repositoryDirectory.toPath().resolve(finalClassPath), manifest.timestamp());
-			}
-		} else {
-			entry = new Entry(file.toPath(), manifest).section(section).name(entryPath).uri(new URI(remoteUrl))
-					.type(Type.CLASSPATH);
-		}
-		setArchitectures(a, entry);
-		setOS(a, entry);
-		manifest.entries().add(entry);
-	}
-
-	private void module(AppManifest manifest, Path path, boolean business, Artifact a, ArtifactResult resolutionResult,
-			File file, Section section) throws IOException, URISyntaxException {
-		String finalModulePath = path.resolve(getFileName(a)).toString();
-		getLog().info(String.format("Adding %s module jar %s to updater config.", a.getFile(), finalModulePath));
-		if (image)
-			copy("Modulepath image jar", file.toPath(), imageDirectory.toPath().resolve(finalModulePath), manifest.timestamp());
-		String remoteUrl = mavenUrl(resolutionResult);
-		Entry entry;
-		Path entryPath =Paths.get(getFileName(a));
-		if (repository) {
-			if (remotesFromOriginalSource) {
-				if (!isRemote(remoteUrl)) {
-					copy("Modulepath jar from Maven", file.toPath(), repositoryDirectory.toPath().resolve(finalModulePath), manifest.timestamp());
-				}
-				if (remoteUrl == null)
-					remoteUrl = repositoryUrl(resolutionResult, path);
-				entry = new Entry(file.toPath(), manifest).section(section).name(entryPath).uri(new URI(remoteUrl))
-						.type(Type.MODULEPATH);
-			} else {
-				entry = new Entry(file.toPath(), manifest).section(section).name(entryPath)
-						.uri(new URI(repositoryUrl(resolutionResult, path))).type(Type.MODULEPATH);
-				copy("Modulepath jar from Local", a.getFile().toPath(), repositoryDirectory.toPath().resolve(finalModulePath), manifest.timestamp());
-			}
-		} else {
-			entry = new Entry(file.toPath(), manifest).section(section).name(entryPath).uri(new URI(remoteUrl))
-					.type(Type.MODULEPATH);
-		}
-
-		setArchitectures(a, entry);
-		setOS(a, entry);
-
-		manifest.entries().add(entry);
-	}
-
-	private void setArchitectures(Artifact a, Entry entry) {
-		for (Map.Entry<String, String> en : artifactArch.entrySet()) {
-			if (Entry.toSet(en.getValue()).contains(a.getArtifactId())) {
-				entry.architecture().add(en.getKey());
-			}
-		}
-	}
-
-	private void setOS(Artifact a, Entry entry) {
-		for (Map.Entry<String, String> en : artifactOS.entrySet()) {
-			if (Entry.toSet(en.getValue()).contains(a.getArtifactId())) {
-				entry.os().add(en.getKey());
-			}
-		}
-	}
-
-	private ArtifactResult resolveRemoteArtifact(Set<MavenProject> visitedProjects, MavenProject project,
-			org.eclipse.aether.artifact.Artifact aetherArtifact, List<RemoteRepository> repos)
-			throws MojoExecutionException {
-		ArtifactRequest req = new ArtifactRequest().setRepositories(repos).setArtifact(aetherArtifact);
-		ArtifactResult resolutionResult = null;
-		visitedProjects.add(project);
 		try {
-			resolutionResult = this.repoSystem.resolveArtifact(this.repoSession, req);
-
-		} catch (ArtifactResolutionException e) {
-			if (project.getParent() == null) {
-				/* Reached the root (reactor), now look in child module repositories too */
-				for (MavenProject p : session.getAllProjects()) {
-					if (!visitedProjects.contains(p)) {
-						try {
-							resolutionResult = resolveRemoteArtifact(visitedProjects, p, aetherArtifact,
-									p.getRemoteProjectRepositories());
-							if (resolutionResult != null)
-								break;
-						} catch (MojoExecutionException mee) {
-						}
-					}
-				}
-			} else if (!visitedProjects.contains(project.getParent()))
-				return resolveRemoteArtifact(visitedProjects, project.getParent(), aetherArtifact,
-						project.getParent().getRemoteProjectRepositories());
+			if (p.waitFor() != 0)
+				throw new MojoExecutionException(String.format("The command '%s' failed with exit value %d",
+						String.join(" ", pb.command()), p.exitValue()));
+		} catch (InterruptedException e) {
+			throw new RuntimeException("Interrupted.", e);
 		}
-		return resolutionResult;
 	}
 
-	protected String getJLinkExecutable() throws IOException {
+	private String getJLinkExecutable() throws IOException {
 		return this.getToolExecutable("jlink");
 	}
 
-	protected String getToolExecutable(final String toolName) throws IOException {
+	private Toolchain getToolchain() {
+		Toolchain tc = null;
+
+		if (this.jdkToolchain != null) {
+			// Maven 3.3.1 has plugin execution scoped Toolchain Support
+			try {
+				final Method getToolchainsMethod = this.toolchainManager.getClass().getMethod("getToolchains",
+						MavenSession.class, String.class, Map.class);
+
+				@SuppressWarnings("unchecked")
+				final List<Toolchain> tcs = (List<Toolchain>) getToolchainsMethod.invoke(this.toolchainManager,
+						this.session, "jdk", this.jdkToolchain);
+
+				if (tcs != null && tcs.size() > 0) {
+					tc = tcs.get(0);
+				}
+			} catch (final ReflectiveOperationException e) {
+				// ignore
+			} catch (final SecurityException e) {
+				// ignore
+			} catch (final IllegalArgumentException e) {
+				// ignore
+			}
+		}
+
+		if (tc == null) {
+			// TODO: Check if we should make the type configurable?
+			tc = this.toolchainManager.getToolchainFromBuildContext("jdk", this.session);
+		}
+
+		return tc;
+	}
+
+	public String getToolExecutable(final String toolName) throws IOException {
 		final Toolchain tc = this.getToolchain();
 
 		String toolExecutable = null;
@@ -1287,187 +681,166 @@ public class ForkerUpdaterMojo extends AbstractMojo {
 		return toolExe.getAbsolutePath();
 	}
 
-	public Toolchain getToolchain() {
-		Toolchain tc = null;
-
-		if (this.jdkToolchain != null) {
-			// Maven 3.3.1 has plugin execution scoped Toolchain Support
-			try {
-				final Method getToolchainsMethod = this.toolchainManager.getClass().getMethod("getToolchains",
-						MavenSession.class, String.class, Map.class);
-
-				@SuppressWarnings("unchecked")
-				final List<Toolchain> tcs = (List<Toolchain>) getToolchainsMethod.invoke(this.toolchainManager,
-						this.session, "jdk", this.jdkToolchain);
-
-				if (tcs != null && tcs.size() > 0) {
-					tc = tcs.get(0);
-				}
-			} catch (final ReflectiveOperationException e) {
-				// ignore
-			} catch (final SecurityException e) {
-				// ignore
-			} catch (final IllegalArgumentException e) {
-				// ignore
-			}
+	private void writeProperties(String name, String description, Properties properties, AppManifest manifest,
+			Path imagePath) throws IOException, URISyntaxException {
+		Properties allProperties = new Properties();
+		addDefaultProperties(allProperties);
+		if (properties != null) {
+			allProperties.putAll(properties);
 		}
-
-		if (tc == null) {
-			// TODO: Check if we should make the type configurable?
-			tc = this.toolchainManager.getToolchainFromBuildContext("jdk", this.session);
+		Path propertiesPath = checkDir(imagePath).resolve(name);
+		try (Writer out = Files.newBufferedWriter(propertiesPath)) {
+			allProperties.store(out, description);
 		}
-
-		return tc;
+		manifest.entries().add(new Entry(propertiesPath, manifest).section(Section.BOOTSTRAP)
+				.path(imagePath.relativize(propertiesPath))
+				.uri(new URI(resolveUrl(normalizeForUri(remoteBase), imagePath.relativize(propertiesPath).toString())))
+				.type(Type.OTHER));
 	}
 
-	private void copy(String reason, Path p1, Path p2, Instant mod) throws IOException {
-		getLog().info(String.format("Copy %s - %s to %s", reason, p1.toAbsolutePath(), p2.toAbsolutePath()));
-		Files.createDirectories(p2.getParent());
-		if (Files.isSymbolicLink(p1)) {
-			Files.createSymbolicLink(p2, Files.readSymbolicLink(p1));
-		} else {
-			try (OutputStream out = Files.newOutputStream(p2)) {
-				Files.copy(p1, out);
-			}
-		}
-		Files.setLastModifiedTime(p2, FileTime.from(mod));
+	@Override
+	public String getMainClass() {
+		return mainClass;
 	}
 
-	private String getFileName(Artifact a) {
-		return getFileName(a.getArtifactId(), a.getVersion(), a.getClassifier(), a.getType());
+	@Override
+	public Map<String, String> getProperties() {
+		return properties;
 	}
 
-	private String getFileName(org.eclipse.aether.artifact.Artifact a) {
-		return getFileName(a.getArtifactId(), a.getVersion(), a.getClassifier(), a.getExtension());
+	@Override
+	public boolean isModules() {
+		return modules;
 	}
 
-	private String getFileName(String artifactId, String version, String classifier, String type) {
-		StringBuilder fn = new StringBuilder();
-		fn.append(artifactId);
-		if (includeVersion) {
-			fn.append("-");
-			fn.append(version);
-		}
-		if (classifier != null && classifier.length() > 0) {
-			fn.append("-");
-			fn.append(classifier);
-		}
-		fn.append(".");
-		fn.append(type);
-		return fn.toString();
+	@Override
+	public String getRemoteJars() {
+		return remoteJars;
 	}
 
-	private boolean isModule(org.eclipse.aether.artifact.Artifact a) throws IOException {
-		if (!modules)
-			return false;
-
-		if (automaticArtifacts != null && containsArtifact(new LinkedHashSet<>(automaticArtifacts), a))
-			return true;
-
-		if (classpathArtifacts != null && containsArtifact(new LinkedHashSet<>(classpathArtifacts), a))
-			return false;
-
-		/* Detect */
-		return isModuleJar(a);
+	@Override
+	public List<ArtifactRepository> getRepositories() {
+		return repositories;
 	}
 
-	private boolean isModuleJar(org.eclipse.aether.artifact.Artifact a) throws IOException {
-		if (a.getFile() == null) {
-			getLog().warn(String.format("%s has a null file?", a));
-		} else {
-			if ("jar".equals(a.getExtension())) {
-				try (JarFile jarFile = new JarFile(a.getFile())) {
-					Enumeration<JarEntry> enumOfJar = jarFile.entries();
-					Manifest mf = jarFile.getManifest();
-					if (mf != null) {
-						if (mf.getMainAttributes().getValue("Automatic-Module-Name") != null)
-							return true;
-					}
-					while (enumOfJar.hasMoreElements()) {
-						JarEntry entry = enumOfJar.nextElement();
-						if (entry.getName().equals("module-info.class")
-								|| entry.getName().matches("META-INF/versions/.*/module-info.class")) {
-							return true;
-						}
-					}
-				}
-			}
-		}
-		return false;
+	@Override
+	public RepositorySystemSession getRepoSession() {
+		return repoSession;
 	}
 
-	private String mavenUrl(String base, String groupId, String artifactId, String version, String classifier) {
-		StringBuilder builder = new StringBuilder();
-		builder.append(base + '/');
-		builder.append(groupId.replace('.', '/') + "/");
-		builder.append(artifactId.replace('.', '-') + "/");
-		builder.append(version + "/");
-		builder.append(artifactId.replace('.', '-') + "-" + version);
-
-		if (classifier != null && classifier.length() > 0) {
-			builder.append('-' + classifier);
-		}
-
-		builder.append(".jar");
-
-		return builder.toString();
+	@Override
+	public RepositorySystem getRepoSystem() {
+		return repoSystem;
 	}
 
-	private String mavenUrl(ArtifactResult result) {
-		org.eclipse.aether.repository.ArtifactRepository repo = result.getRepository();
-		MavenProject project = this.project;
-		while (project != null) {
-			List<MavenProject> collectedProjects = project.getCollectedProjects();
-			if (collectedProjects != null) {
-				for (MavenProject p : collectedProjects) {
-					for (RemoteRepository r : p.getRemoteProjectRepositories()) {
-						if (r.getId().equals(repo.getId())) {
-							String url = repo == null ? resolveUrl(normalizeForUri(remoteBase), remoteJars)
-									: r.getUrl();
-							return mavenUrl(url, result.getArtifact().getGroupId(),
-									result.getArtifact().getArtifactId(), result.getArtifact().getVersion(),
-									result.getArtifact().getClassifier());
-						}
-					}
-				}
-			}
-			project = project.getParent();
-		}
-		return null;
+	@Override
+	public org.apache.maven.repository.RepositorySystem getRepositorySystem() {
+		return repositorySystem;
 	}
 
-	private String normalizeForUri(String localPath) {
-		return localPath.replace(File.separator, "/");
+	@Override
+	public boolean isIncludeForkerUpdaterRuntimeModules() {
+		return includeForkerUpdaterRuntimeModules;
 	}
 
-	private String repositoryUrl(String path, Path sectionPath) {
-		return resolveUrl(resolveUrl(normalizeForUri(remoteBase), normalizeForUri(sectionPath.toString())),
-				normalizeForUri(path));
+	@Override
+	public String getClassPath() {
+		return classPath;
 	}
 
-	private String repositoryUrl(ArtifactResult result, Path sectionPath) {
-		return repositoryUrl(getFileName(result.getArtifact()), sectionPath);
+	@Override
+	public String getModulePath() {
+		return modulePath;
 	}
 
-	private boolean isRemote(String path) {
-		return path != null && (path.startsWith("http:") || path.startsWith("https:"));
+	@Override
+	public MavenProject getProject() {
+		return project;
 	}
 
-	private boolean isUrl(String path) {
-		return isRemote(path) || (path != null && path.startsWith("file:"));
+	@Override
+	public MavenSession getSession() {
+		return session;
 	}
 
-	private String resolveUrl(String base, String path) {
-		if (isUrl(path))
-			return path;
-		else if (path != null && path.startsWith("/")) {
-			int idx = base.indexOf('/');
-			return idx == -1 ? base + path : base.substring(0, idx) + path;
-		} else if (path != null) {
-			return base.endsWith("/") ? base + path : base + "/" + path;
-		} else {
-			return base;
-		}
+	@Override
+	public Map<String, ArtifactRepositoryLayout> getRepositoryLayouts() {
+		return repositoryLayouts;
+	}
+
+	@Override
+	public DependencyResolver getDependencyResolver() {
+		return dependencyResolver;
+	}
+
+	@Override
+	public List<RemoteRepository> getRepos() {
+		return repos;
+	}
+
+	@Override
+	public boolean isLinkJVM() {
+		return linkJVM;
+	}
+
+	@Override
+	public boolean isLink() {
+		return link;
+	}
+
+	@Override
+	public String getSplash() {
+		return splash;
+	}
+
+	@Override
+	public List<String> getVmArgs() {
+		return vmArgs;
+	}
+
+	@Override
+	public List<String> getUpdaterArgs() {
+		return updaterArgs;
+	}
+
+	@Override
+	public boolean isUseArgFile() {
+		return useArgfile;
+	}
+
+	@Override
+	public String getInstallLocation() {
+		return installLocation;
+	}
+
+	@Override
+	public List<String> getForkerArgs() {
+		return forkerArgs;
+	}
+
+	@Override
+	public String getLauncherScriptName() {
+		return launcherScriptName;
+	}
+
+	@Override
+	public File getForkerArgsFile() {
+		return forkerArgFile;
+	}
+
+	@Override
+	public Path resolveLaunchersSrcPath() {
+		return Paths.get("src/main/launchers");
+	}
+
+	@Override
+	public Map<String, String> getSystemProperties() {
+		return systemProperties;
+	}
+
+	@Override
+	public List<String> getLinkOptions() {
+		return linkOptions;
 	}
 
 }

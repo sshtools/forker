@@ -1,16 +1,23 @@
 package com.sshtools.forker.updater.swt;
 
+import java.awt.Toolkit;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.swing.JFrame;
+
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.StackLayout;
 import org.eclipse.swt.events.SelectionListener;
+import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.Image;
+import org.eclipse.swt.graphics.RGB;
 import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
@@ -117,6 +124,15 @@ public abstract class AbstractSWTHandler<S extends Session, V> extends AbstractH
 
 		createMainPage(callable);
 
+		String icon = session.properties().getProperty("icon");
+		if(icon != null) {
+			List<Image> l = new ArrayList<>();
+			for(String i : icon.split(",")) {
+				l.add(new Image(display, i));
+			}
+			shell.setImages(l.toArray(new Image[0]));
+		}
+		
 		shell.pack();
 		shell.open();
 
@@ -125,7 +141,7 @@ public abstract class AbstractSWTHandler<S extends Session, V> extends AbstractH
 				display.sleep();
 		}
 		display.dispose();
-		
+
 		return null;
 	}
 
@@ -140,11 +156,10 @@ public abstract class AbstractSWTHandler<S extends Session, V> extends AbstractH
 
 		title = session.properties().getProperty("title", "Application");
 
-		if(display == null) {
+		if (display == null) {
 			display = new Display();
 			setupShell();
-		}
-		else {
+		} else {
 			display.asyncExec(() -> setupShell());
 		}
 
@@ -177,8 +192,9 @@ public abstract class AbstractSWTHandler<S extends Session, V> extends AbstractH
 
 	protected GridData createBannerImage() {
 		String relpath = session.properties().getProperty("bannerImage");
+		String bannerBackgroundColor = session.properties().getProperty("bannerBackgroundColor");
 		Path abspath = resolveInstallerFile(relpath);
-		Image bannerImage = new Image(display,  abspath.toString());
+		Image bannerImage = new Image(display, abspath.toString());
 		Canvas canvas = new Canvas(root, SWT.NONE);
 		GridData bannerImageGridData = new GridData();
 		bannerImageGridData.horizontalAlignment = GridData.FILL;
@@ -187,13 +203,32 @@ public abstract class AbstractSWTHandler<S extends Session, V> extends AbstractH
 		bannerImageGridData.heightHint = bannerImage.getBounds().height;
 		bannerImageGridData.verticalAlignment = GridData.FILL;
 		canvas.setLayoutData(bannerImageGridData);
-		canvas.addPaintListener(e -> e.gc.drawImage(bannerImage, 0, 0));
+		Color bg = bannerBackgroundColor == null ? null : new Color(display, parseRgb(bannerBackgroundColor));
+		canvas.addPaintListener(e -> {
+			if (bg != null) {
+				e.gc.setBackground(bg);
+				e.gc.fillRectangle(0, 0, bannerImage.getBounds().width, bannerImage.getBounds().height);
+			}
+			e.gc.drawImage(bannerImage, 0, 0);
+		});
 		return bannerImageGridData;
+	}
+
+	private RGB parseRgb(String col) {
+		if (col.startsWith("#"))
+			col = col.substring(1);
+
+		if (col.length() == 3)
+			return new RGB(Integer.parseInt(col.substring(0, 1)) * 16, Integer.parseInt(col.substring(1, 2)) * 16,
+					Integer.parseInt(col.substring(2, 3)) * 16);
+		else
+			return new RGB(Integer.parseInt(col.substring(0, 2)), Integer.parseInt(col.substring(2, 4)),
+					Integer.parseInt(col.substring(4, 6)));
 	}
 
 	protected Path resolveInstallerFile(String relpath) {
 		Path dir = Paths.get(System.getProperty("user.dir"));
-		if(!Files.exists(dir)) {
+		if (!Files.exists(dir)) {
 			dir = Paths.get("src/main/installer");
 		}
 		return dir.resolve(relpath);
