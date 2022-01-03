@@ -44,9 +44,21 @@ be implemented.</description>
 		
 		<dependency>
             <groupId>com.github.hypfvieh</groupId>
-            <artifactId>dbus-java</artifactId>
-            <version>3.3.0</version>
+            <artifactId>dbus-java-core</artifactId>
+            <version>4.0.0</version>
 		</dependency>
+        
+        <dependency>
+            <groupId>com.github.hypfvieh</groupId>
+            <artifactId>dbus-java-transport-tcp</artifactId>
+            <version>4.0.0</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>com.github.hypfvieh</groupId>
+            <artifactId>dbus-java-transport-jnr-unixsocket</artifactId>
+            <version>4.0.0</version>
+        </dependency>
 
 		<dependency>
 			<groupId>com.github.thjomnx</groupId>
@@ -56,6 +68,10 @@ be implemented.</description>
 				<exclusion>
 					<groupId>org.slf4j</groupId>
 					<artifactId>slf4j-simple</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>com.github.hypfvieh</groupId>
+					<artifactId>dbus-java</artifactId>
 				</exclusion>
 			</exclusions>
 		</dependency>
