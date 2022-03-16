@@ -40,16 +40,6 @@ public interface IO {
 	 * A mode indicating non-blocking I/O is required.
 	 */
 	public final static IO NON_BLOCKING = new DefaultIO("NON_BLOCKING", true, true, false, true);
-	/**
-	 * A mode indicating the daemon should be used.
-	 */
-	public final static IO DAEMON = new DefaultIO("DAEMON", true, true);
-
-	/**
-	 * This is here for backwards compatibility, and is a mode indicating a Pty
-	 * is required.
-	 */
-	public final static IO PTY = new DefaultIO("PTY", false, true);
 
 	/**
 	 * Get if the mode may be used from the same runtime as the called
@@ -196,7 +186,6 @@ public interface IO {
 				ios.put(NON_BLOCKING.name(), NON_BLOCKING);
 				ios.put(IO.name(), IO);
 				ios.put(SINK.name(), SINK);
-				ios.put(DAEMON.name(), DAEMON);
 				for (IO io : ServiceLoader.load(IO.class)) {
 					ios.put(io.name(), io);
 				}
