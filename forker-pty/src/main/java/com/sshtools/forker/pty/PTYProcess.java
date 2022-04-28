@@ -15,6 +15,7 @@ import com.pty4j.util.Pair;
 import com.pty4j.util.PtyUtil;
 import com.pty4j.windows.WinPty;
 import com.pty4j.windows.WinPtyProcess;
+import com.sshtools.forker.client.EffectiveUser;
 import com.sshtools.forker.client.ForkerBuilder;
 import com.sshtools.forker.client.ForkerProcess;
 import com.sshtools.forker.client.ForkerProcessListener;
@@ -70,10 +71,10 @@ public class PTYProcess extends ForkerProcess {
 	 */
 	public PTYProcess(ForkerBuilder builder) throws IOException {
 
-//		EffectiveUser effectiveUser = builder.effectiveUser();
-//		if (effectiveUser != null) {
-//			effectiveUser.elevate(builder, null, builder.getCommand());
-//		}
+		EffectiveUser effectiveUser = builder.effectiveUser();
+		if (effectiveUser != null) {
+			effectiveUser.elevate(builder, null, builder.getCommand());
+		}
 		try {
 
 			// If Windows, and we are starting a shell, strip this commands
@@ -87,9 +88,9 @@ public class PTYProcess extends ForkerProcess {
 			nativeProcess = PtyProcess.exec((String[]) arguments.toArray(new String[0]), builder.environment(),
 					builder.directory() == null ? System.getProperty("user.dir") :  builder.directory().getAbsolutePath());
 		} finally {
-//			if (effectiveUser != null) {
-//				effectiveUser.descend(builder, null, builder.getCommand());
-//			}
+			if (effectiveUser != null) {
+				effectiveUser.descend(builder, null, builder.getCommand());
+			}
 		}
 
 	}
