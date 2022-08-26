@@ -10,6 +10,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.freedesktop.dbus.connections.impl.DBusConnection;
+import org.freedesktop.dbus.connections.impl.DBusConnectionBuilder;
 import org.freedesktop.dbus.exceptions.DBusException;
 import org.freedesktop.dbus.interfaces.DBusSigHandler;
 import org.freedesktop.dbus.interfaces.Properties;
@@ -184,7 +185,7 @@ public class SystemDServiceService extends AbstractServiceService implements Ser
 			final Manager manager = systemd.getManager();
 			manager.subscribe();
 			LOG.info("Connecting to System DBus");
-			conn = DBusConnection.getConnection(DBusConnection.DEFAULT_SYSTEM_BUS_ADDRESS);
+			conn = DBusConnectionBuilder.forSystemBus().withShared(false).build();
 			conn.addSigHandler(PropertiesChanged.class, new DBusSigHandler<PropertiesChanged>() {
 				@Override
 				public void handle(PropertiesChanged sig) {
