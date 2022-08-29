@@ -9,7 +9,7 @@ named pipes on Windows.</description>
 	<parent>
 		<groupId>com.sshtools</groupId>
 		<artifactId>forker</artifactId>
-		<version>1.7-SNAPSHOT</version>
+		<version>1.7</version>
 		<relativePath>..</relativePath>
 	</parent>
 
