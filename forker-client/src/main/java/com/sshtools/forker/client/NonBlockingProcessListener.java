@@ -17,8 +17,6 @@ package com.sshtools.forker.client;
 
 import java.nio.ByteBuffer;
 
-import com.sshtools.forker.client.impl.nonblocking.NonBlockingProcess;
-
 /**
  * Listener for events products by {@link NonBlockingProcess}.
  */

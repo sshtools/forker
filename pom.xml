@@ -1,50 +1,35 @@
-<!--
-
-    Copyright © 2015 - 2021 SSHTOOLS Limited (support@sshtools.com)
-
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-        http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
-
--->
-<!-- Copyright © 2015 - 2021 SSHTOOLS Limited (support@sshtools.com) Licensed 
-	under the Apache License, Version 2.0 (the "License"); you may not use this 
-	file except in compliance with the License. You may obtain a copy of the 
-	License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by 
-	applicable law or agreed to in writing, software distributed under the License 
-	is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY 
-	KIND, either express or implied. See the License for the specific language 
-	governing permissions and limitations under the License. -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-
-
 	<properties>
-		<maven.compiler.target>1.7</maven.compiler.target>
-		<maven.compiler.source>1.7</maven.compiler.source>
+		<maven.compiler.source>11</maven.compiler.source>
+		<maven.compiler.target>11</maven.compiler.target>
+		<maven.checkstyle.plugin>2.17</maven.checkstyle.plugin>
+		<maven.cobertura.plugin>2.7</maven.cobertura.plugin>
+		<maven.doxia.module.markdown.version>1.7</maven.doxia.module.markdown.version>
+		<maven.javadoc.plugin>2.10.4</maven.javadoc.plugin>
+		<maven.jxr.plugin>2.5</maven.jxr.plugin>
+		<maven.pmd.plugin>3.7</maven.pmd.plugin>
+		<maven.project.info.reports.plugin>2.9</maven.project.info.reports.plugin>
+		<maven.findbugs.plugin>3.0.5</maven.findbugs.plugin>
+		<maven.site.plugin>3.3</maven.site.plugin>
+		<maven.sonar.plugin>3.2-RC3</maven.sonar.plugin>
+		<maven.surefire.plugin>2.12</maven.surefire.plugin>
+		<maven.taglist.plugin>2.4</maven.taglist.plugin>
+		<maven.versions.plugin>2.3</maven.versions.plugin>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-
 	</properties>
 
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.sshtools</groupId>
 	<artifactId>forker</artifactId>
-	<version>1.6.4</version>
+	<version>1.7-SNAPSHOT</version>
 	<name>Forker</name>
 	<description>Forker is a set of utilities and helpers for executing operating system commands.</description>
 	<url>http://www.sshtools.com</url>
 	<packaging>pom</packaging>
-	<inceptionYear>2015</inceptionYear>
+
 	<licenses>
 		<license>
 			<name>Apache License Version 2.0</name>
@@ -66,24 +51,37 @@
 
 	<distributionManagement>
 		<snapshotRepository>
-			<id>ossrh-sshtools</id>
-			<url>https://oss.sonatype.org/content/repositories/snapshots</url>
+			<uniqueVersion>true</uniqueVersion>
+			<id>opensource-snapshots</id>
+			<name>SSHTOOLS Opensource Snapshots</name>
+			<url>https://artifactory.jadaptive.com/opensource-snapshots</url>
+			<layout>default</layout>
 		</snapshotRepository>
 		<repository>
-			<id>ossrh-sshtools</id>
-			<url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+			<uniqueVersion>true</uniqueVersion>
+			<id>opensource-releases</id>
+			<name>SSHTOOLS Opensource Releases</name>
+			<url>https://artifactory.jadaptive.com/opensource-releases</url>
+			<layout>default</layout>
 		</repository>
 	</distributionManagement>
 
 	<modules>
+		<module>forker-updater-maven-plugin</module>
 		<module>forker-common</module>
-		<module>forker-daemon</module>
+		<module>forker-updater</module>
+		<module>forker-updater-console</module>
+		<module>forker-updater-swt</module>
 		<module>forker-client</module>
 		<module>forker-examples</module>
 		<module>forker-wrapper</module>
+		<module>forker-wrapper-plugin-scripts</module>
+		<module>forker-wrapped</module>
 		<module>forker-pty</module>
 		<module>forker-services</module>
 		<module>forker-assembly</module>
+        <module>forker-pipes</module>
+        <module>forker-updater-example</module>
 	</modules>
 
 	<dependencies>
@@ -91,325 +89,259 @@
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
-			<version>4.7</version>
+			<version>4.13.1</version>
 			<scope>test</scope>
 		</dependency>
 
 	</dependencies>
 
 	<profiles>
-        <profile>
-            <activation>
-                <jdk>[9,)</jdk>
-            </activation>
-            <build>
-                <pluginManagement>
-                    <plugins>
-                        <plugin>
-                            <groupId>org.apache.maven.plugins</groupId>
-                            <artifactId>maven-javadoc-plugin</artifactId>
-                            <configuration>
-                                <!-- TODO: Why is this STILL broken! -->
-                                <javadocExecutable>${java.home}/bin/javadoc</javadocExecutable>
-                            </configuration>
-                        </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-gpg-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>sign-artifacts</id>
-                                <phase>verify</phase>
-                                <goals>
-                                    <goal>sign</goal>
-                                </goals>
-                                <configuration>
-                                    <gpgArguments>
-                                        <arg>--pinentry-mode</arg>
-                                        <arg>loopback</arg>
-                                    </gpgArguments>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    </plugins>
-                </pluginManagement>
-            </build>
-        </profile>
-        <profile>
-            <id>release-sign-artifacts</id>
-            <activation>
-                <property>
-                    <name>performRelease</name>
-                    <value>true</value>
-                </property>
-            </activation>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-gpg-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>sign-artifacts</id>
-                                <phase>verify</phase>
-                                <goals>
-                                    <goal>sign</goal>
-                                </goals>
-                            </execution>
+		<profile>
+			<activation>
+				<jdk>[9,)</jdk>
+			</activation>
+			<build>
+				<pluginManagement>
+					<plugins>
+						<plugin>
+							<groupId>org.apache.maven.plugins</groupId>
+							<artifactId>maven-javadoc-plugin</artifactId>
+							<configuration>
+								<!-- TODO: Why is this STILL broken! -->
+								<javadocExecutable>${java.home}/bin/javadoc</javadocExecutable>
+							</configuration>
+						</plugin>
+					</plugins>
+				</pluginManagement>
+			</build>
+		</profile>
+		<profile>
+			<id>release-sign-artifacts</id>
+			<activation>
+				<property>
+					<name>performRelease</name>
+					<value>true</value>
+				</property>
+			</activation>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-gpg-plugin</artifactId>
+						<version>1.5</version>
+						<executions>
+							<execution>
+								<id>sign-artifacts</id>
+								<phase>verify</phase>
+								<goals>
+									<goal>sign</goal>
+								</goals>
+								<configuration>
+									<gpgArguments>
+										<arg>--pinentry-mode</arg>
+										<arg>loopback</arg>
+									</gpgArguments>
+								</configuration>
+							</execution>
 
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 
-	<build>
-		<pluginManagement>
-			<plugins>
-				<plugin>
-					<groupId>org.apache.maven.plugins</groupId>
-					<artifactId>maven-site-plugin</artifactId>
-					<version>3.7.1</version>
-					<dependencies>
-						<dependency>
-							<groupId>org.apache.maven.doxia</groupId>
-							<artifactId>doxia-module-markdown</artifactId>
-							<version>1.8</version>
-						</dependency>
-					</dependencies>
-				</plugin>
-				<plugin>
-					<groupId>org.codehaus.mojo</groupId>
-					<artifactId>build-helper-maven-plugin</artifactId>
-					<version>1.12</version>
-				</plugin>
-
-				<plugin>
-					<groupId>org.apache.maven.plugins</groupId>
-					<artifactId>maven-jar-plugin</artifactId>
-					<version>3.1.0</version>
-				</plugin>
-
-				<plugin>
-					<groupId>org.apache.maven.plugins</groupId>
-					<artifactId>maven-gpg-plugin</artifactId>
-					<version>1.6</version>
-					<executions>
-						<execution>
-							<id>sign-artifacts</id>
-							<phase>verify</phase>
-							<goals>
-								<goal>sign</goal>
-							</goals>
-						</execution>
-					</executions>
-				</plugin>
-				<plugin>
-					<groupId>com.mycila</groupId>
-					<artifactId>license-maven-plugin</artifactId>
-					<version>2.3</version>
-					<configuration>
-						<header>templates/APACHE-2.txt</header>
-						<properties>
-							<year>${year}</year>
-							<owner>SSHTOOLS Limited</owner>
-							<email>support@sshtools.com</email>
-						</properties>
-						<excludes>
-							<exclude>**/README</exclude>
-							<exclude>src/test/resources/**</exclude>
-							<exclude>src/main/resources/**</exclude>
-						</excludes>
-					</configuration>
-					<executions>
-						<execution>
-							<goals>
-								<goal>format</goal>
-							</goals>
-						</execution>
-					</executions>
-				</plugin>
-				<plugin>
-					<groupId>org.sonatype.plugins</groupId>
-					<artifactId>nexus-staging-maven-plugin</artifactId>
-					<version>1.6.3</version>
-					<extensions>true</extensions>
-					<configuration>
-						<serverId>ossrh-sshtools</serverId>
-						<nexusUrl>https://oss.sonatype.org/</nexusUrl>
-						<autoReleaseAfterClose>true</autoReleaseAfterClose>
-					</configuration>
-				</plugin>
-	            <plugin>
-	                <artifactId>maven-javadoc-plugin</artifactId>
-	                <version>3.2.0</version>
-	                <configuration>
-	                    <encoding>UTF-8</encoding>
-	                    <excludePackageNames>**.impl.*</excludePackageNames>
-	                    <!-- https://bugs.openjdk.java.net/browse/JDK-8212233 -->
-	                    <detectJavaApiLink>false</detectJavaApiLink>
-	                    <source>8</source>
-	                    <additionalparam>-Xdoclint:none</additionalparam>
-	                </configuration>
-	            </plugin>
-			</plugins>
-		</pluginManagement>
-
-
-		<plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>release</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>jar</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-jar-plugin</artifactId>
-				<configuration>
-					<archive>
-						<manifest>
-							<addClasspath>true</addClasspath>
-						</manifest>
-					</archive>
-				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<configuration>
-					<source>1.8</source>
-					<target>1.8</target>
-					<encoding>UTF-8</encoding>
-				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>build-helper-maven-plugin</artifactId>
-				<executions>
-					<execution>
-						<phase>package</phase>
-						<id>timestamp-property</id>
-						<goals>
-							<goal>timestamp-property</goal>
-						</goals>
-						<configuration>
-							<name>year</name>
-							<pattern>yyyy</pattern>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-javadoc-plugin</artifactId>
-				<configuration>
-					<!-- <skip>true</skip> -->
-					<encoding>UTF-8</encoding>
-					<excludePackageNames>**.impl.*</excludePackageNames>
-					<!-- https://stackoverflow.com/questions/49472783/maven-is-unable-to-find-javadoc-command -->
-					<!-- <javadocExecutable>${java.home}/bin/javadoc</javadocExecutable> -->
-
-					<!-- https://bugs.openjdk.java.net/browse/JDK-8212233 -->
-					<source>8</source>
-				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>com.mycila</groupId>
-				<artifactId>license-maven-plugin</artifactId>
-				<executions>
-					<execution>
-						<phase>package</phase>
-						<goals>
-							<goal>format</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-source-plugin</artifactId>
-				<version>2.2.1</version>
-				<executions>
-					<execution>
-						<id>attach-sources</id>
-						<goals>
-							<goal>jar-no-fork</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
-            <plugin>
-                <groupId>org.sonatype.plugins</groupId>
-                <artifactId>nexus-staging-maven-plugin</artifactId>
-            </plugin>
-		</plugins>
-
-	</build>
 	<reporting>
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-surefire-report-plugin</artifactId>
-				<version>2.22.0</version>
-				<configuration>
-					<outputDirectory>${project.reporting.outputDirectory}/testresults</outputDirectory>
-				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-checkstyle-plugin</artifactId>
-				<version>3.0.0</version>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-project-info-reports-plugin</artifactId>
-				<version>3.0.0</version>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-jxr-plugin</artifactId>
-				<version>2.5</version>
-				<configuration>
-					<aggregate>true</aggregate>
-				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>cobertura-maven-plugin</artifactId>
-				<version>2.7</version>
-				<configuration>
-					<aggregate>true</aggregate>
-					<outputDirectory>%{project.reporting.outputDirectory}/cobertura</outputDirectory>
-				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>findbugs-maven-plugin</artifactId>
-				<version>3.0.5</version>
-			</plugin>
-			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>versions-maven-plugin</artifactId>
 				<version>2.6</version>
-			</plugin>
-			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>taglist-maven-plugin</artifactId>
-				<version>2.4</version>
+				<!-- <artifactId>maven-site-plugin</artifactId> <executions> used for 
+					multiproject builds <execution> <id>attach-descriptor</id> <goals> <goal>attach-descriptor</goal> 
+					</goals> </execution> </executions> -->
 				<configuration>
-					<aggregate>true</aggregate>
+					<reportPlugins>
+						<plugin>
+							<groupId>org.apache.maven.plugins</groupId>
+							<artifactId>maven-surefire-report-plugin</artifactId>
+							<version>${maven.surefire.plugin}</version>
+							<configuration>
+								<outputDirectory>${project.reporting.outputDirectory}/testresults</outputDirectory>
+							</configuration>
+						</plugin>
+						<plugin>
+							<groupId>org.apache.maven.doxia</groupId>
+							<artifactId>doxia-module-markdown</artifactId>
+							<version>${maven.doxia.module.markdown.version}</version>
+						</plugin>
+						<plugin>
+							<groupId>org.apache.maven.plugins</groupId>
+							<artifactId>maven-checkstyle-plugin</artifactId>
+							<version>${maven.checkstyle.plugin}</version>
+						</plugin>
+						<plugin>
+							<groupId>org.apache.maven.plugins</groupId>
+							<artifactId>maven-project-info-reports-plugin</artifactId>
+							<version>${maven.project.info.reports.plugin}</version>
+						</plugin>
+						<plugin>
+							<groupId>org.codehaus.mojo</groupId>
+							<artifactId>cobertura-maven-plugin</artifactId>
+							<version>${maven.cobertura.plugin}</version>
+							<configuration>
+								<aggregate>true</aggregate>
+								<outputDirectory>%{project.reporting.outputDirectory}/cobertura</outputDirectory>
+							</configuration>
+						</plugin>
+						<plugin>
+							<groupId>org.codehaus.mojo</groupId>
+							<artifactId>findbugs-maven-plugin</artifactId>
+							<version>${maven.findbugs.plugin}</version>
+						</plugin>
+						<plugin>
+							<groupId>org.codehaus.mojo</groupId>
+							<artifactId>versions-maven-plugin</artifactId>
+							<version>${maven.versions.plugin}</version>
+						</plugin>
+						<plugin>
+							<groupId>org.codehaus.mojo</groupId>
+							<artifactId>taglist-maven-plugin</artifactId>
+							<version>${maven.taglist.plugin}</version>
+							<configuration>
+								<aggregate>true</aggregate>
+							</configuration>
+						</plugin>
+					</reportPlugins>
+					<locales>en</locales>
+
 				</configuration>
 			</plugin>
 		</plugins>
 	</reporting>
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-javadoc-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>release</id>
+						<phase>package</phase>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-deploy-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>default-deploy</id>
+						<phase>deploy</phase>
+						<goals>
+							<goal>deploy</goal>
+						</goals>
+						<configuration>
+							<skip>true</skip>
+						</configuration>
+					</execution>
+					<execution>
+						<id>release</id>
+						<phase>deploy</phase>
+						<goals>
+							<goal>deploy</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+		</plugins>
+
+		<pluginManagement>
+			<plugins>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-compiler-plugin</artifactId>
+					<version>3.8.1</version>
+				</plugin>
+				<plugin>
+					<artifactId>maven-javadoc-plugin</artifactId>
+					<version>3.2.0</version>
+					<configuration>
+						<encoding>UTF-8</encoding>
+						<excludePackageNames>**.impl.*</excludePackageNames>
+						<!-- https://bugs.openjdk.java.net/browse/JDK-8212233 -->
+						<detectJavaApiLink>false</detectJavaApiLink>
+						<source>8</source>
+						<additionalparam>-Xdoclint:none</additionalparam>
+					</configuration>
+				</plugin>
+				<plugin>
+					<artifactId>maven-site-plugin</artifactId>
+					<version>${maven.site.plugin}</version>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-jar-plugin</artifactId>
+					<version>3.2.0</version>
+				</plugin>
+				<plugin>
+					<artifactId>maven-clean-plugin</artifactId>
+					<version>3.1.0</version>
+				</plugin>
+				<plugin>
+					<artifactId>maven-resources-plugin</artifactId>
+					<version>3.2.0</version>
+				</plugin>
+				<plugin>
+					<artifactId>maven-plugin-plugin</artifactId>
+					<version>3.6.0</version>
+				</plugin>
+				<plugin>
+					<artifactId>maven-surefire-plugin</artifactId>
+					<version>3.0.0-M5</version>
+				</plugin>
+				<plugin>
+					<artifactId>maven-install-plugin</artifactId>
+					<version>3.0.0-M1</version>
+				</plugin>
+				<plugin>
+					<artifactId>maven-deploy-plugin</artifactId>
+					<version>3.0.0-M1</version>
+				</plugin>
+				<plugin>
+					<artifactId>maven-invoker-plugin</artifactId>
+					<version>3.2.1</version>
+				</plugin>
+
+				<plugin>
+					<groupId>org.eclipse.m2e</groupId>
+					<artifactId>lifecycle-mapping</artifactId>
+					<version>1.0.0</version>
+					<configuration>
+						<lifecycleMappingMetadata>
+							<pluginExecutions>
+								<pluginExecution>
+									<pluginExecutionFilter>
+										<groupId>org.apache.maven.plugins</groupId>
+										<artifactId>maven-enforcer-plugin</artifactId>
+										<versionRange>[1.0.0,)</versionRange>
+										<goals>
+											<goal>enforce</goal>
+										</goals>
+									</pluginExecutionFilter>
+									<action>
+										<ignore />
+									</action>
+								</pluginExecution>
+							</pluginExecutions>
+						</lifecycleMappingMetadata>
+					</configuration>
+				</plugin>
+			</plugins>
+		</pluginManagement>
+	</build>
 </project>

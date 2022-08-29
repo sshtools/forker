@@ -1,1 +1,1 @@
-com.sshtools.forker.pty.PTYExecutor$PTYIO
+com.sshtools.forker.pty.PTYIO

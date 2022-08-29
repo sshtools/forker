@@ -17,6 +17,7 @@ package com.sshtools.forker.client;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.ProcessBuilder.Redirect;
 import java.security.AccessControlException;
 import java.util.Arrays;
 import java.util.List;
@@ -42,17 +43,11 @@ import com.sshtools.forker.common.Util;
  * provided for launching Java based processes using the same runtime (and
  * optionally classpath).
  * <p>
- * This class can also integrate with <i>Forker Daemon</i> to provide a way of
- * lowering fork costs of launching processes on Linux, pseudo terminals for
- * real interactive shells, persistent administrator access (
- * {@link Forker#loadDaemon(boolean)}) and access to administrator only files.
- * <p>
  * It can also integrate with <i>Forker Wrapper</i> to wrap Java or native
  * processes providing restart, logging, Java version detection and more.
  *
  */
 public class ForkerBuilder {
-	private boolean background;
 	private Command command = new Command();
 	private ForkerConfiguration configuration;
 	private EffectiveUser effectiveUser;
@@ -70,7 +65,6 @@ public class ForkerBuilder {
 			throw new NullPointerException();
 		this.configuration = configuration;
 		this.command.getArguments().addAll(command);
-		initBuilder();
 	}
 
 	/**
@@ -84,7 +78,6 @@ public class ForkerBuilder {
 	public ForkerBuilder(ForkerConfiguration configuration, String... command) {
 		this.configuration = configuration;
 		this.command.getArguments().addAll(Arrays.asList(command));
-		initBuilder();
 	}
 
 	/**
@@ -109,6 +102,60 @@ public class ForkerBuilder {
 		this(ForkerConfiguration.getDefault(), command);
 	}
 
+    public ForkerBuilder redirectInput(Redirect source) {
+        if (source.type() == Redirect.Type.WRITE ||
+            source.type() == Redirect.Type.APPEND)
+            throw new IllegalArgumentException( 
+                    String.format("Invalid redirect for reading: %s", source));
+        command.getRedirects()[0] = source;
+        return this;
+    }
+
+    public ForkerBuilder redirectOutput(Redirect destination) {
+        if (destination.type() == Redirect.Type.READ)
+            throw new IllegalArgumentException(
+                    String.format("Invalid redirect for writing: %s", destination));
+        command.getRedirects()[1] = destination;
+        return this;
+    }
+
+    public ForkerBuilder redirectError(Redirect destination) {
+        if (destination.type() == Redirect.Type.READ)
+            throw new IllegalArgumentException(
+                String.format("Invalid redirect for writing: %s", destination));
+        command.getRedirects()[2] = destination;
+        return this;
+    }
+
+    public ForkerBuilder redirectInput(File file) {
+        return redirectInput(Redirect.from(file));
+    }
+
+    public ForkerBuilder redirectOutput(File file) {
+        return redirectOutput(Redirect.to(file));
+    }
+
+    public ForkerBuilder redirectError(File file) {
+        return redirectError(Redirect.to(file));
+    }
+
+    public Redirect redirectInput() {
+        return command.isDefaultRedirects() ? Redirect.PIPE : command.getRedirects()[0];
+    }
+
+    public Redirect redirectOutput() {
+        return command.isDefaultRedirects() ? Redirect.PIPE : command.getRedirects()[1];
+    }
+
+    public Redirect redirectError() {
+        return command.isDefaultRedirects() ? Redirect.PIPE : command.getRedirects()[2];
+    }
+
+    public ForkerBuilder inheritIO() {
+        Arrays.fill(command.getRedirects(), Redirect.INHERIT);
+        return this;
+    }
+    
 	/**
 	 * Get the process affinity list. To bind to particular CPUs, their numbers
 	 * should be added to this list. If this list is empty, the process will be
@@ -126,7 +173,7 @@ public class ForkerBuilder {
 	 * @return background
 	 */
 	public boolean background() {
-		return background;
+		return command.isBackground();
 	}
 
 	/**
@@ -136,7 +183,7 @@ public class ForkerBuilder {
 	 * @return this for chaining
 	 */
 	public ForkerBuilder background(boolean background) {
-		this.background = background;
+		command.setBackground(background);
 		return this;
 	}
 
@@ -484,7 +531,7 @@ public class ForkerBuilder {
 
 	@Override
 	public String toString() {
-		return "ForkerBuilder [command=" + command + ", background=" + background + ", effectiveUser=" + effectiveUser + "]";
+		return "ForkerBuilder [command=" + command + ", effectiveUser=" + effectiveUser + "]";
 	}
 
 	protected IOException handleIllegalArgumentException(String prog, String dir, IllegalArgumentException e) {
@@ -507,11 +554,6 @@ public class ForkerBuilder {
 		return new IOException(
 				"Cannot run program \"" + prog + "\"" + (dir == null ? "" : " (in directory \"" + dir + "\")") + exceptionInfo,
 				cause);
-	}
-
-	protected void initBuilder() {
-		if (Forker.isDaemonRunning())
-			this.command.setIO(IO.DAEMON);
 	}
 
 	protected Process startLocalProcess() throws IOException {

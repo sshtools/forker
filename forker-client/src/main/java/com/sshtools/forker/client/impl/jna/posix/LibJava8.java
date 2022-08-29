@@ -18,13 +18,12 @@ package com.sshtools.forker.client.impl.jna.posix;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.commons.lang3.SystemUtils;
-
 import com.sshtools.forker.client.impl.nonblocking.NonBlockingBasePosixProcess;
 import com.sun.jna.JNIEnv;
 import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.NativeLibrary;
+import com.sun.jna.Platform;
 
 /**
  */
@@ -32,7 +31,7 @@ public class LibJava8 {
 	static {
 		Map<String, Object> options = new HashMap<>();
 		options.put(Library.OPTION_ALLOW_OBJECTS, Boolean.TRUE);
-		if (SystemUtils.IS_OS_MAC) {
+		if (Platform.isMac()) {
 			Native.register(NativeLibrary.getProcess(options));
 		} else {
 			Native.register(NativeLibrary.getInstance("java", options));

@@ -1,18 +1,3 @@
-/**
- * Copyright © 2015 - 2021 SSHTOOLS Limited (support@sshtools.com)
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package com.sshtools.forker.services.impl;
 
 import java.io.IOException;
@@ -24,15 +9,15 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.io.output.NullOutputStream;
-import org.freedesktop.DBus.Properties;
-import org.freedesktop.DBus.Properties.PropertiesChanged;
-import org.freedesktop.dbus.DBusConnection;
-import org.freedesktop.dbus.DBusSigHandler;
+import org.freedesktop.dbus.connections.impl.DBusConnection;
+import org.freedesktop.dbus.connections.impl.DBusConnectionBuilder;
 import org.freedesktop.dbus.exceptions.DBusException;
+import org.freedesktop.dbus.interfaces.DBusSigHandler;
+import org.freedesktop.dbus.interfaces.Properties;
+import org.freedesktop.dbus.interfaces.Properties.PropertiesChanged;
 
 import com.sshtools.forker.client.OSCommand;
+import com.sshtools.forker.common.Util.NullOutputStream;
 import com.sshtools.forker.services.AbstractService;
 import com.sshtools.forker.services.Service;
 import com.sshtools.forker.services.ServiceService;
@@ -60,7 +45,7 @@ public class SystemDServiceService extends AbstractServiceService implements Ser
 			return uf.getActiveState();
 		}
 
-	}
+	}	
 
 	private abstract class AbststractUnitFileService extends SystemDService {
 
@@ -174,11 +159,22 @@ public class SystemDServiceService extends AbstractServiceService implements Ser
 	}
 
 	private Service unitToService(final UnitType uf) {
-		return new UnitTypeService(FilenameUtils.getBaseName(uf.getUnitName()), uf);
+		return new UnitTypeService(getBaseName(uf.getUnitName()), uf);
+	}
+
+	private String getBaseName(String name) {
+		int idx = name.indexOf('/');
+		if(idx != -1) {
+			name = name.substring(idx + 1);
+		}
+		idx = name.lastIndexOf('.');
+		if(idx != -1)
+			name = name.substring(0, idx);
+		return name;
 	}
 
 	private Service unitToService(final UnitFileType uf) {
-		return new UnitFileTypeService(FilenameUtils.getBaseName(uf.getPath()), uf);
+		return new UnitFileTypeService(getBaseName(uf.getPath()), uf);
 	}
 
 	@Override
@@ -189,7 +185,7 @@ public class SystemDServiceService extends AbstractServiceService implements Ser
 			final Manager manager = systemd.getManager();
 			manager.subscribe();
 			LOG.info("Connecting to System DBus");
-			conn = DBusConnection.getConnection(DBusConnection.DEFAULT_SYSTEM_BUS_ADDRESS);
+			conn = DBusConnectionBuilder.forSystemBus().withShared(false).build();
 			conn.addSigHandler(PropertiesChanged.class, new DBusSigHandler<PropertiesChanged>() {
 				@Override
 				public void handle(PropertiesChanged sig) {
@@ -201,7 +197,7 @@ public class SystemDServiceService extends AbstractServiceService implements Ser
 							for (String n : names) {
 								final de.thjom.java.systemd.Service unit = (de.thjom.java.systemd.Service) systemd
 										.getManager().getUnit(n);
-								fireStateChange(new SystemDService(FilenameUtils.getBaseName(n)) {
+								fireStateChange(new SystemDService(getBaseName(n)) {
 									@Override
 									String getState() {
 										return unit.getActiveState();

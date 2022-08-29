@@ -1,8 +1,8 @@
-# Forker Servers
+# Forker Services
 
 ## Introduction
 
-Forker Servers provides a way of starting, stopping and querying local system services. Multiple
+Forker Services provides a way of starting, stopping and querying local system services. Multiple
 implementations are provided for the 3 main operating systems the Forker suite supportes. On 
 Windows, the *sc* command is currently used (with polling). On Linux and Unix there are multiple
 options, with the most efficient being the SystemD DBus based one.  

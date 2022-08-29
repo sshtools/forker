@@ -2,3 +2,5 @@
 /target/
 *.classpath
 /bin/
+*.cfg
+/tmp/

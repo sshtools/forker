@@ -19,12 +19,14 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.lang.ProcessBuilder.Redirect;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.lang3.SystemUtils;
+import com.sshtools.forker.common.IO.DefaultIO;
+import com.sun.jna.Platform;
 
 /**
  * This class carries all of the detail for the command to launch and may be
@@ -38,19 +40,22 @@ public class Command {
 
 		@Override
 		public boolean add(String e) {
-			if(e == null)
+			if (e == null)
 				throw new NullPointerException();
 			return super.add(e);
 		}
-		
+
 	};
 	private boolean redirectError;
 	private File directory;
 	private Map<String, String> environment;
 	private String runAs = "";
-	private IO io = IO.IO;
+	private IO io = getDefaultIO();
+
 	private Priority priority = null;
 	private List<Integer> affinity = new ArrayList<Integer>();
+	private boolean background;
+	private Redirect[] redirects;
 
 	/**
 	 * Constructor
@@ -60,13 +65,29 @@ public class Command {
 	}
 
 	/**
+	 * Get whether or not this process will be launched in the background.
+	 * 
+	 * @return background
+	 */
+	public boolean isBackground() {
+		return background;
+	}
+
+	/**
+	 * Set whether or not this process will be launched in the background.
+	 * 
+	 * @param background whether to run in background or not
+	 */
+	public void setBackground(boolean background) {
+		this.background = background;
+	}
+
+	/**
 	 * Construct a new command given the serialisation stream. The order of
 	 * attributes must be as per {@link Command#write(DataOutputStream)}.
 	 * 
-	 * @param din
-	 *            input stream
-	 * @throws IOException
-	 *             on any error
+	 * @param din input stream
+	 * @throws IOException on any error
 	 */
 	public Command(DataInputStream din) throws IOException {
 		int argc = din.readInt();
@@ -117,8 +138,7 @@ public class Command {
 	/**
 	 * Set whether stderr should be redirected to stdout.
 	 * 
-	 * @param redirectError
-	 *            redirect error stream
+	 * @param redirectError redirect error stream
 	 */
 	public void setRedirectError(boolean redirectError) {
 		this.redirectError = redirectError;
@@ -136,8 +156,7 @@ public class Command {
 	/**
 	 * Set the working directory this command should run in.
 	 * 
-	 * @param directory
-	 *            directory
+	 * @param directory directory
 	 */
 	public void setDirectory(File directory) {
 		this.directory = directory;
@@ -155,8 +174,7 @@ public class Command {
 	/**
 	 * Set the environment variables that will be passed to the command.
 	 * 
-	 * @param environment
-	 *            environment variables
+	 * @param environment environment variables
 	 */
 	public void setEnvironment(Map<String, String> environment) {
 		this.environment = environment;
@@ -174,8 +192,7 @@ public class Command {
 	/**
 	 * Set the priority the command should run under.
 	 * 
-	 * @param priority
-	 *            priority
+	 * @param priority priority
 	 */
 	public void setPriority(Priority priority) {
 		this.priority = priority;
@@ -193,8 +210,7 @@ public class Command {
 	/**
 	 * Set the I/O mode that should be used.
 	 * 
-	 * @param io
-	 *            I/O mode
+	 * @param io I/O mode
 	 */
 	public void setIO(IO io) {
 		this.io = io;
@@ -202,8 +218,8 @@ public class Command {
 
 	/**
 	 * Get the user the command should run as. If this is <code>null</code>, the
-	 * user will be run under the same user as the either the current runtime or
-	 * the daemon.
+	 * user will be run under the same user as the either the current runtime or the
+	 * daemon.
 	 * 
 	 * @return user to run as
 	 */
@@ -213,11 +229,10 @@ public class Command {
 
 	/**
 	 * Set the user the command should run as. If this is <code>null</code>, the
-	 * user will be run under the same user as the either the current runtime or
-	 * the daemon.
+	 * user will be run under the same user as the either the current runtime or the
+	 * daemon.
 	 * 
-	 * @param runAs
-	 *            user to run as
+	 * @param runAs user to run as
 	 */
 	public void setRunAs(String runAs) {
 		this.runAs = runAs;
@@ -232,9 +247,24 @@ public class Command {
 		return arguments;
 	}
 
+	public boolean isDefaultRedirects() {
+		return redirects == null;
+	}
+
+	public Redirect[] getRedirects() {
+		if (redirects == null) {
+			redirects = new Redirect[] { Redirect.PIPE, Redirect.PIPE, Redirect.PIPE };
+		}
+		return redirects;
+	}
+
+	public void setRedirects(Redirect[] redirects) {
+		this.redirects = redirects;
+	}
+
 	/**
-	 * Serialise this command to a stream. This data may be used to construct another
-	 * {@link Command} (see the constructors).
+	 * Serialise this command to a stream. This data may be used to construct
+	 * another {@link Command} (see the constructors).
 	 * 
 	 * @param dout output stream to write command data to
 	 * @throws IOException on any error
@@ -266,15 +296,16 @@ public class Command {
 	}
 
 	/**
-	 * Get all of the arguments that will actually be run. This will be the contents of {@link #getArguments()},
-	 * but adjusted to include wrapper commands that may do things such as change the priority.
+	 * Get all of the arguments that will actually be run. This will be the contents
+	 * of {@link #getArguments()}, but adjusted to include wrapper commands that may
+	 * do things such as change the priority.
 	 * 
 	 * @return all arguments
 	 */
 	public List<String> getAllArguments() {
 		List<String> a = new ArrayList<String>(arguments);
 		if (priority != null) {
-			if (SystemUtils.IS_OS_UNIX) {
+			if (OS.isUnix()) {
 				a.add(0, "nice");
 				a.add(1, "-n");
 				switch (priority) {
@@ -293,7 +324,7 @@ public class Command {
 				default:
 					break;
 				}
-			} else if (SystemUtils.IS_OS_WINDOWS) {
+			} else if (Platform.isWindows()) {
 				if (a.size() < 3 || !a.get(0).equals("CMD.EXE") || !a.get(1).equals("/C")
 						|| !a.get(2).equals("START")) {
 					a.add(0, "CMD.EXE");
@@ -324,18 +355,21 @@ public class Command {
 				throw new UnsupportedOperationException();
 		}
 
+		if (OS.isUnix() && background) {
+			a.add(0, "nohup");
+		}
+
 		if (!affinity.isEmpty()) {
 			long mask = 0;
 			for (Integer cpu : affinity) {
 				mask = mask | 1 << (cpu - 1);
 			}
-			if (SystemUtils.IS_OS_UNIX) {
+			if (OS.isUnix()) {
 				a.add(0, "taskset");
 				a.add(1, String.format("0x%x", mask));
-			} else if (SystemUtils.IS_OS_WINDOWS && !(SystemUtils.IS_OS_WINDOWS_XP) && !SystemUtils.IS_OS_WINDOWS_95
-					&& !SystemUtils.IS_OS_WINDOWS_98 && !SystemUtils.IS_OS_WINDOWS_ME && !SystemUtils.IS_OS_WINDOWS_NT
-					&& !SystemUtils.IS_OS_WINDOWS_VISTA) {
-				// Windows 7 and above
+			} else if (Platform.isWindows()) {
+				// Windows 7 and above only, but by now that should not be a problem (is JDK
+				// even possible on those?)
 				if (a.size() < 3 || !a.get(0).equals("CMD.EXE") || !a.get(1).equals("/C")
 						|| !a.get(2).equals("START")) {
 					a.add(0, "CMD.EXE");
@@ -348,5 +382,9 @@ public class Command {
 				throw new UnsupportedOperationException();
 		}
 		return a;
+	}
+
+	protected static IO getDefaultIO() {
+		return DefaultIO.valueOf(System.getProperty("forker.defaultIo", IO.DEFAULT.name()));
 	}
 }

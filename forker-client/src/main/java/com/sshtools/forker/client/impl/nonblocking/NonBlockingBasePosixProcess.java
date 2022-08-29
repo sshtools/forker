@@ -27,6 +27,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.sshtools.forker.client.ForkerBuilder;
+import com.sshtools.forker.client.NonBlockingProcess;
+import com.sshtools.forker.client.NonBlockingProcessFactory;
 import com.sshtools.forker.client.NonBlockingProcessListener;
 import com.sshtools.forker.client.impl.jna.posix.LibC;
 import com.sun.jna.Memory;

@@ -18,9 +18,8 @@ package com.sshtools.forker.client;
 import java.io.IOException;
 import java.util.List;
 
-import org.apache.commons.lang3.SystemUtils;
-
 import com.sshtools.forker.common.IO;
+import com.sun.jna.Platform;
 
 /**
  * Specialised version of {@link ShellBuilder} that builds a process appropriate
@@ -28,7 +27,7 @@ import com.sshtools.forker.common.IO;
  */
 public class PowerShellBuilder extends ShellBuilder {
 	{
-		if (SystemUtils.IS_OS_WINDOWS)
+		if (Platform.isWindows())
 			shell("powershell.exe");
 		else
 			shell("pwsh");

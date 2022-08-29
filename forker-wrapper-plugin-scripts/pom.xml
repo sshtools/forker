@@ -1,0 +1,105 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<artifactId>forker-wrapper-plugin-scripts</artifactId>
+	<name>Forker Wrapper Plugin - Scripts</name>
+	<description>Extend forker-wrapper allow scripts to be run at significant efents.</description>
+	<parent>
+		<groupId>com.sshtools</groupId>
+		<artifactId>forker</artifactId>
+		<version>1.7-SNAPSHOT</version>
+		<relativePath>..</relativePath>
+	</parent>
+
+	<build>
+		<sourceDirectory>src/main/java</sourceDirectory>
+		<testSourceDirectory>src/test/java</testSourceDirectory>
+		<outputDirectory>target/classes</outputDirectory>
+		<testOutputDirectory>target/test-classes</testOutputDirectory>
+		<resources>
+			<resource>
+				<targetPath>.</targetPath>
+				<directory>src/main/resources</directory>
+			</resource>
+		</resources>
+		<testResources>
+			<testResource>
+				<targetPath>.</targetPath>
+				<directory>src/test/resources</directory>
+			</testResource>
+		</testResources>
+	</build>
+
+	<dependencies>
+		
+        <dependency>
+            <groupId>com.sshtools</groupId>
+            <artifactId>forker-wrapper</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+	</dependencies>
+
+	<repositories>
+
+
+		<!-- Other third party libraries we hold in our Artifactory -->
+		<repository>
+			<id>ext-releases</id>
+			<url>https://artifactory.jadaptive.com/ext-releases-local/</url>
+			<releases />
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</repository>
+		<repository>
+			<id>ext-snapshots</id>
+			<url>https://artifactory.jadaptive.com/ext-snapshots-local/</url>
+			<releases>
+				<enabled>false</enabled>
+			</releases>
+			<snapshots />
+		</repository>
+
+		<!-- Open source hosted at sshtools repository -->
+
+		<repository>
+			<id>public-releases</id>
+			<url>https://artifactory.jadaptive.com/public-releases</url>
+			<releases />
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</repository>
+		<repository>
+			<id>public-snapshots</id>
+			<url>https://artifactory.jadaptive.com/public-snapshots</url>
+			<releases>
+				<enabled>false</enabled>
+			</releases>
+			<snapshots />
+		</repository>
+
+		<!-- Opensource releases hosted at sshtools -->
+
+		<repository>
+			<id>opensource-releases</id>
+			<url>https://artifactory.jadaptive.com/opensource-releases</url>
+			<releases />
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</repository>
+		<repository>
+			<id>opensource-snapshots</id>
+			<url>https://artifactory.jadaptive.com/opensource-snapshots</url>
+			<releases>
+				<enabled>false</enabled>
+			</releases>
+			<snapshots>
+				<enabled>true</enabled>
+			</snapshots>
+		</repository>
+
+	</repositories>
+</project>
