@@ -41,23 +41,22 @@ be implemented.</description>
 			<artifactId>forker-client</artifactId>
 			<version>${project.version}</version>
 		</dependency>
-		
-		<dependency>
+				<dependency>
             <groupId>com.github.hypfvieh</groupId>
             <artifactId>dbus-java-core</artifactId>
-            <version>4.1.0</version>
+            <version>4.2.1</version>
 		</dependency>
         
         <dependency>
             <groupId>com.github.hypfvieh</groupId>
             <artifactId>dbus-java-transport-tcp</artifactId>
-            <version>4.1.0</version>
+            <version>4.2.1</version>
         </dependency>
         
         <dependency>
             <groupId>com.github.hypfvieh</groupId>
             <artifactId>dbus-java-transport-jnr-unixsocket</artifactId>
-            <version>4.1.0</version>
+            <version>4.2.1</version>
         </dependency>
 
 		<dependency>
