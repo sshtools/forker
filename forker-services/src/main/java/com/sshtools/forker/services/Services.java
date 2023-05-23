@@ -95,7 +95,7 @@ public class Services {
 					}
 					
 					@Override
-					public List<Service> getServices() throws IOException {
+					public List<? extends Service> getServices() throws IOException {
 						return underlyingServiceService.getServices();
 					}
 					

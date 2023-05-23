@@ -1,15 +1,14 @@
 package com.sshtools.forker.services.impl;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
 import com.sshtools.forker.client.OSCommand;
 import com.sshtools.forker.services.Service;
 import com.sshtools.forker.services.ServiceService;
 import com.sshtools.forker.services.ServicesContext;
 import com.sshtools.forker.services.ServicesListener;
 import com.sun.jna.Platform;
+
+import java.io.IOException;
+import java.util.List;
 
 public class AutoServiceService implements ServiceService {
 	private ServiceService services;
@@ -47,7 +46,7 @@ public class AutoServiceService implements ServiceService {
 	}
 
 	@Override
-	public List<Service> getServices() throws IOException {
+	public List<? extends Service> getServices() throws IOException {
 		return services.getServices();
 	}
 

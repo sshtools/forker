@@ -51,7 +51,7 @@ public class CompoundServicesService implements ServiceService {
 	@Override
 	public void restartService(Service service) throws Exception {
 		for (ServiceService s : serviceServices) {
-			List<Service> l = s.getServices();
+			var l = s.getServices();
 			if (l.contains(service)) {
 				s.restartService(service);
 				return;
@@ -63,7 +63,7 @@ public class CompoundServicesService implements ServiceService {
 	@Override
 	public void startService(Service service) throws Exception {
 		for (ServiceService s : serviceServices) {
-			List<Service> l = s.getServices();
+			var l = s.getServices();
 			if (l.contains(service)) {
 				s.startService(service);
 				return;
@@ -75,7 +75,7 @@ public class CompoundServicesService implements ServiceService {
 	@Override
 	public void stopService(Service service) throws Exception {
 		for (ServiceService s : serviceServices) {
-			List<Service> l = s.getServices();
+			var l = s.getServices();
 			if (l.contains(service)) {
 				s.stopService(service);
 				return;
@@ -98,7 +98,7 @@ public class CompoundServicesService implements ServiceService {
 	@Override
 	public void setStartOnBoot(Service service, boolean startOnBoot) throws Exception {
 		for (ServiceService s : serviceServices) {
-			List<Service> l = s.getServices();
+			var l = s.getServices();
 			if (l.contains(service)) {
 				s.setStartOnBoot(service, startOnBoot);
 				return;
@@ -110,7 +110,7 @@ public class CompoundServicesService implements ServiceService {
 	@Override
 	public boolean isStartOnBoot(Service service) throws Exception {
 		for (ServiceService s : serviceServices) {
-			List<Service> l = s.getServices();
+			var l = s.getServices();
 			if (l.contains(service)) {
 				return s.isStartOnBoot(service);
 			}
@@ -127,7 +127,7 @@ public class CompoundServicesService implements ServiceService {
 	@Override
 	public void pauseService(Service service) throws Exception {
 		for (ServiceService s : serviceServices) {
-			List<Service> l = s.getServices();
+			var l = s.getServices();
 			if (l.contains(service)) {
 				s.pauseService(service);
 				return;
@@ -139,7 +139,7 @@ public class CompoundServicesService implements ServiceService {
 	@Override
 	public void unpauseService(Service service) throws Exception {
 		for (ServiceService s : serviceServices) {
-			List<Service> l = s.getServices();
+			var l = s.getServices();
 			if (l.contains(service)) {
 				s.unpauseService(service);
 				return;

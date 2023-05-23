@@ -1,13 +1,5 @@
 package com.sshtools.forker.services.impl;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-
 import com.sshtools.forker.client.OSCommand;
 import com.sshtools.forker.common.Util;
 import com.sshtools.forker.common.Util.NullOutputStream;
@@ -16,6 +8,14 @@ import com.sshtools.forker.services.Service;
 import com.sshtools.forker.services.Service.Status;
 import com.sshtools.forker.services.ServiceService;
 import com.sshtools.forker.services.ServicesContext;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class InitctlServiceService extends AbstractServiceService implements ServiceService {
 	private static final long POLL_DELAY = 1000;
@@ -100,11 +100,11 @@ public class InitctlServiceService extends AbstractServiceService implements Ser
 					String goal = statusArr[0];
 					String state = statusArr.length > 1 ? statusArr[1] : "unknown";
 					// Process ID (if a running daemon)
-					int processId = Integer.MIN_VALUE;
+//					int processId = Integer.MIN_VALUE;
 					if (serviceProcess.length > 1) {
 						String[] process = serviceProcess[1].trim().split("\\s+");
 						if (process[0].equals("process")) {
-							processId = Integer.parseInt(process[1]);
+//							processId = Integer.parseInt(process[1]);
 						}
 					}
 					// Translate to the status

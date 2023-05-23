@@ -6,8 +6,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class DefaultContext implements ServicesContext {
+    final static Logger LOG = Logger.getLogger(DefaultContext.class.getName());
+    
 	private ScheduledExecutorService executor;
 	{
 		executor = Executors.newScheduledThreadPool(1);
@@ -15,12 +19,18 @@ public class DefaultContext implements ServicesContext {
 
 	@Override
 	public ScheduledFuture<?> schedule(Runnable runnable, long initialDelay, long delay, TimeUnit units) {
-		return executor.scheduleAtFixedRate(runnable, initialDelay, delay, units);
+		return executor.scheduleWithFixedDelay(runnable, initialDelay, delay, units);
 	}
 
 	@Override
 	public void call(Callable<?> callable) {
-		executor.schedule(callable, 0, TimeUnit.MILLISECONDS);
+		executor.execute(() -> {
+            try {
+                callable.call();
+            } catch (Exception e) {
+                LOG.log(Level.SEVERE, "Scheduled task failed.", e);
+            }
+        });
 	}
 
 	@Override

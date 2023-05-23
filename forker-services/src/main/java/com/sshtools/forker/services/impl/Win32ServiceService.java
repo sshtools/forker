@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
@@ -28,8 +29,8 @@ import com.sun.jna.platform.win32.Winsvc.SC_HANDLE;
 import com.sun.jna.platform.win32.Winsvc.SERVICE_STATUS_PROCESS;
 
 public class Win32ServiceService extends AbstractServiceService implements ServiceService {
-	private static final long POLL_DELAY = 1000;
-	private List<Service> services = new ArrayList<>();
+	private static final long POLL_DELAY = 60000;
+	private List<Win32Service> services = new ArrayList<>();
 	private W32ServiceManager smgr;
 	private ScheduledFuture<?> task;
 	final static Logger LOG = Logger.getLogger(Win32ServiceService.class.getName());
@@ -39,7 +40,7 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 	private static final long STOP_WAIT_TIME = Integer.parseInt(System.getProperty("forker.win32.stopWaitTime", "30000"));
 
 	@Override
-	public List<Service> getServices() throws IOException {
+	public List<? extends Service> getServices() throws IOException {
 		return services;
 	}
 
@@ -84,6 +85,7 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 					srv.pauseService();
 				} finally {
 					srv.close();
+                    stateChange(service);
 				}
 			} finally {
 				smgr.close();
@@ -102,6 +104,7 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 					srv.continueService();
 				} finally {
 					srv.close();
+                    stateChange(service);
 				}
 			} finally {
 				smgr.close();
@@ -128,6 +131,7 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 			            throw new RuntimeException("Unable to start the service");
 			        }
 				} finally {
+				    stateChange(service);
 					srv.close();
 				}
 			} finally {
@@ -135,6 +139,19 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 			}
 		}
 	}
+
+    protected void stateChange(Service service) {
+        var idx = services.indexOf(service);
+        Win32Service winSrv = new Win32Service(service.getNativeName());
+        if(idx == -1) {
+            services.add(winSrv);
+            fireServiceAdded(winSrv);
+        }
+        else {
+            services.set(idx, winSrv);
+            fireStateChange(winSrv);
+        }
+    }
 	
     void timedWaitForNonPendingState(W32Service srv, long timeout) {
 
@@ -210,6 +227,7 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 					srv.stopService(STOP_WAIT_TIME);
 				} finally {
 					srv.close();
+                    stateChange(service);
 				}
 			} finally {
 				smgr.close();
@@ -221,8 +239,8 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 		synchronized (smgr) {
 			try {
 				smgr.open(Winsvc.SC_MANAGER_ALL_ACCESS);
-				List<Service> oldServices = new ArrayList<>(services);
-				List<Service> newServices = new ArrayList<>();
+				List<Win32Service> oldServices = new ArrayList<>(services);
+				List<Win32Service> newServices = new ArrayList<>();
 				List<Service> addServices = new ArrayList<>();
 				List<Service> updateServices = new ArrayList<>();
 				newServices.clear();
@@ -311,7 +329,7 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 		}
 	}
 
-	private void addService(List<Service> oldServices, List<Service> newServices, List<Service> addServices,
+	private void addService(List<Win32Service> oldServices, List<Win32Service> newServices, List<Service> addServices,
 			List<Service> updateServices, Win32Service service) {
 		newServices.add(service);
 		// If the service didn't previously exist, or state
@@ -321,8 +339,8 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 		if (idx == -1) {
 			addServices.add(service);
 		} else {
-			Service s = oldServices.get(idx);
-			if (s.getStatus() != service.getStatus()) {
+			Win32Service s = oldServices.get(idx);
+			if (!Objects.equals(s.cachedStatus(), service.getStatus())) {
 				updateServices.add(service);
 			}
 			oldServices.remove(s);
@@ -333,44 +351,54 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 		public Win32Service(String name) {
 			super(name);
 		}
+		
+		Status cachedStatus() {
+		    return super.getStatus();
+		}
 
 		@Override
 		public Status getStatus() {
 			synchronized (smgr) {
-				smgr.open(WinNT.GENERIC_READ);
-				try {
-					W32Service srv = smgr.openService(getNativeName(), WinNT.GENERIC_READ);
-					try {
-						SERVICE_STATUS_PROCESS q = srv.queryStatus();
-	
-						if (q.dwCurrentState == Winsvc.SERVICE_RUNNING)
-							return Status.STARTED;
-						else if (q.dwCurrentState == Winsvc.SERVICE_START_PENDING)
-							return Status.STARTING;
-						else if (q.dwCurrentState == Winsvc.SERVICE_PAUSE_PENDING)
-							return Status.PAUSING;
-						else if (q.dwCurrentState == Winsvc.SERVICE_PAUSED)
-							return Status.PAUSED;
-						else if (q.dwCurrentState == Winsvc.SERVICE_CONTINUE_PENDING)
-							return Status.UNPAUSING;
-						else if (q.dwCurrentState == Winsvc.SERVICE_STOP_PENDING)
-							return Status.STOPPING;
-						else if (q.dwCurrentState == Winsvc.SERVICE_STOPPED)
-							return Status.STOPPED;
-						else
-							return Status.UNKNOWN;
-					} finally {
-						srv.close();
-					}
-				}
-				catch(Win32Exception ew) {
-					return Status.UNKNOWN;
-				}
-				finally {
-					smgr.close();
-				}
+			    var status = calcStatus();
+			    super.setStatus(status);
+				return status;
 			}
 		}
+
+        protected Status calcStatus() {
+            smgr.open(WinNT.GENERIC_READ);
+            try {
+            	W32Service srv = smgr.openService(getNativeName(), WinNT.GENERIC_READ);
+            	try {
+            		SERVICE_STATUS_PROCESS q = srv.queryStatus();
+
+            		if (q.dwCurrentState == Winsvc.SERVICE_RUNNING)
+            			return Status.STARTED;
+            		else if (q.dwCurrentState == Winsvc.SERVICE_START_PENDING)
+            			return Status.STARTING;
+            		else if (q.dwCurrentState == Winsvc.SERVICE_PAUSE_PENDING)
+            			return Status.PAUSING;
+            		else if (q.dwCurrentState == Winsvc.SERVICE_PAUSED)
+            			return Status.PAUSED;
+            		else if (q.dwCurrentState == Winsvc.SERVICE_CONTINUE_PENDING)
+            			return Status.UNPAUSING;
+            		else if (q.dwCurrentState == Winsvc.SERVICE_STOP_PENDING)
+            			return Status.STOPPING;
+            		else if (q.dwCurrentState == Winsvc.SERVICE_STOPPED)
+            			return Status.STOPPED;
+            		else
+            			return Status.UNKNOWN;
+            	} finally {
+            		srv.close();
+            	}
+            }
+            catch(Win32Exception ew) {
+            	return Status.UNKNOWN;
+            }
+            finally {
+            	smgr.close();
+            }
+        }
 	}
 
 	@Override

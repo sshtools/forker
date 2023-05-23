@@ -1,7 +1,5 @@
 package com.sshtools.forker.services;
 
-import javax.swing.JComponent;
-
 public interface ExtendedServiceStatus {
 	int getMessageType();
 
@@ -11,5 +9,5 @@ public interface ExtendedServiceStatus {
 
 	Throwable getError();
 
-	JComponent getAccessory();
+	Object getAccessory();
 }

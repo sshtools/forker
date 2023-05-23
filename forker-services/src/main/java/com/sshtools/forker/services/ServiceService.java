@@ -13,7 +13,7 @@ public interface ServiceService extends Closeable {
 
 	void removeListener(ServicesListener listener);
 
-	List<Service> getServices() throws IOException;
+	List<? extends Service> getServices() throws IOException;
 
 	void restartService(Service service) throws Exception;
 
