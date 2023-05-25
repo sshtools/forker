@@ -403,6 +403,7 @@ public class Win32ServiceService extends AbstractServiceService implements Servi
 
 	@Override
 	public Service getService(String name) throws IOException {
+	    load();
 		for (Service s : getServices()) {
 			if (s.getNativeName().equals(name)) {
 				return s;
