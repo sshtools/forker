@@ -377,7 +377,7 @@ public abstract class EffectiveUserFactory {
 		}
 
 		private String getFixedPassword() {
-			String p = System.getProperty("forker.administrator.password");
+			String p = System.getProperty("forker.administrator.password", System.getenv("FORKER_ADMINISTRATOR_PASSWORD"));
 			// For backwards compatibility
 			return p == null ? System.getProperty("vm.sudo") : p;
 		}
