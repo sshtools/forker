@@ -22,20 +22,17 @@ import com.sshtools.forker.services.AbstractService;
 import com.sshtools.forker.services.Service;
 import com.sshtools.forker.services.ServiceService;
 import com.sshtools.forker.services.ServicesContext;
-
-import de.thjom.java.systemd.Manager;
-import de.thjom.java.systemd.Systemd;
-import de.thjom.java.systemd.Unit;
-import de.thjom.java.systemd.Unit.Mode;
-import de.thjom.java.systemd.types.UnitFileType;
-import de.thjom.java.systemd.types.UnitType;
+import com.sshtools.forker.services.impl.systemd.ListUnitFilesStruct;
+import com.sshtools.forker.services.impl.systemd.ListUnitsStruct;
+import com.sshtools.forker.services.impl.systemd.Manager;
+import com.sshtools.forker.services.impl.systemd.Unit;
 
 public class SystemDServiceService extends AbstractServiceService implements ServiceService {
 
 	private final class UnitTypeService extends AbststractUnitFileService {
-		private final UnitType uf;
+		private final Unit uf;
 
-		private UnitTypeService(String name, UnitType uf) {
+		private UnitTypeService(String name, Unit uf) {
 			super(name);
 			this.uf = uf;
 		}
@@ -57,7 +54,7 @@ public class SystemDServiceService extends AbstractServiceService implements Ser
 		Unit getUnit() throws IOException {
 			if (unit == null) {
 				try {
-					unit = (de.thjom.java.systemd.Service) systemd.getManager().getUnit(toServiceName(this));
+					unit = manager.GetUnit(toServiceName(this));
 				} catch (Exception e) {
 					throw new IOException(String.format("Could not get service %s.", getNativeName()), e);
 				}
@@ -65,20 +62,20 @@ public class SystemDServiceService extends AbstractServiceService implements Ser
 			return unit;
 		}
 
-		de.thjom.java.systemd.Service unit;
+		Unit unit;
 	}
 
 	private final class UnitFileTypeService extends AbststractUnitFileService {
-		private final UnitFileType uf;
+		private final ListUnitFilesStruct uf;
 
-		private UnitFileTypeService(String name, UnitFileType uf) {
+		private UnitFileTypeService(String name, ListUnitFilesStruct uf) {
 			super(name);
 			this.uf = uf;
 		}
 
 		@Override
 		String getState() {
-			return uf.getStatus();
+			return uf.getState();
 		}
 
 	}
@@ -113,53 +110,45 @@ public class SystemDServiceService extends AbstractServiceService implements Ser
 		abstract Unit getUnit() throws IOException;
 
 		public void stop() throws IOException {
-			getUnit().stop(Mode.REPLACE);
+			getUnit().Stop("replace");
 		}
 
 		public void start() throws IOException {
-			getUnit().start(Mode.REPLACE);
+			getUnit().Start("replace");
 
 		}
 
 		public void restart() throws IOException {
-			getUnit().restart(Mode.REPLACE);
+			getUnit().Restart("replace");
 		}
 	}
 
 	final static Logger LOG = Logger.getLogger(SystemDServiceService.class.getName());
 
-	private Systemd systemd;
 	private DBusConnection conn;
+	private Manager manager;
 
 	@Override
 	public List<Service> getServices() throws IOException {
-		try {
-			List<UnitType> units = systemd.getManager().listUnits();
-			List<Service> l = new ArrayList<>(units.size());
-			Set<String> s = new HashSet<>();
-			for (UnitType uf : units) {
-				if (uf.isService()) {
-					Service usrv = unitToService(uf);
-					s.add(usrv.getNativeName());
-					l.add(usrv);
-				}
-			}
-			List<UnitFileType> unitFileTypes = systemd.getManager().listUnitFiles();
-			for (UnitFileType uf : unitFileTypes) {
-				if (uf.isService()) {
-					Service usrv = unitToService(uf);
-					if (!s.contains(usrv.getNativeName()))
-						l.add(usrv);
-				}
-			}
-			return l;
-		} catch (DBusException dbe) {
-			throw new IOException("Failed to get systemd services.", dbe);
+		List<ListUnitsStruct> units = manager.ListUnits();
+		List<Service> l = new ArrayList<>(units.size());
+		Set<String> s = new HashSet<>();
+		for (ListUnitsStruct uf : units) {
+			Service usrv = unitToService(uf);
+			s.add(usrv.getNativeName());
+			l.add(usrv);
 		}
+		List<ListUnitFilesStruct> unitFileTypes = manager.ListUnitFiles();
+		for (ListUnitFilesStruct uf : unitFileTypes) {
+			Service usrv = unitToService(uf);
+			if (!s.contains(usrv.getNativeName()))
+				l.add(usrv);
+		}
+		return l;
 	}
 
-	private Service unitToService(final UnitType uf) {
-		return new UnitTypeService(getBaseName(uf.getUnitName()), uf);
+	private Service unitToService(final ListUnitsStruct uf) {
+		return new UnitTypeService(getBaseName(uf.getName()), uf.getUnit());
 	}
 
 	private String getBaseName(String name) {
@@ -173,17 +162,14 @@ public class SystemDServiceService extends AbstractServiceService implements Ser
 		return name;
 	}
 
-	private Service unitToService(final UnitFileType uf) {
-		return new UnitFileTypeService(getBaseName(uf.getPath()), uf);
+	private Service unitToService(final ListUnitFilesStruct uf) {
+		return new UnitFileTypeService(getBaseName(uf.getName()), uf);
 	}
 
 	@Override
 	public void configure(ServicesContext app) {
 
 		try {
-			systemd = Systemd.get();
-			final Manager manager = systemd.getManager();
-			manager.subscribe();
 			LOG.info("Connecting to System DBus");
 			conn = DBusConnectionBuilder.forSystemBus().withShared(false).build();
 			conn.addSigHandler(PropertiesChanged.class, new DBusSigHandler<PropertiesChanged>() {
@@ -191,12 +177,11 @@ public class SystemDServiceService extends AbstractServiceService implements Ser
 				public void handle(PropertiesChanged sig) {
 					if (sig.getInterface().equals("org.freedesktop.systemd1.Service")) {
 						try {
-							Properties props = conn.getRemoteObject(Systemd.SERVICE_NAME, sig.getPath(),
+							Properties props = conn.getRemoteObject("org.freedesktop.systemd1", sig.getPath(),
 									Properties.class);
 							List<String> names = props.Get("org.freedesktop.systemd1.Unit", "Names");
 							for (String n : names) {
-								final de.thjom.java.systemd.Service unit = (de.thjom.java.systemd.Service) systemd
-										.getManager().getUnit(n);
+								var unit = manager.GetUnit(n);
 								fireStateChange(new SystemDService(getBaseName(n)) {
 									@Override
 									String getState() {
@@ -216,6 +201,8 @@ public class SystemDServiceService extends AbstractServiceService implements Ser
 					}
 				}
 			});
+			
+			manager = conn.getRemoteObject("org.freedesktop.systemd1", "/org/freedesktop/systemd1", Manager.class);
 
 		} catch (DBusException e) {
 			throw new IllegalStateException("Could not connect to SystemD");
@@ -240,24 +227,19 @@ public class SystemDServiceService extends AbstractServiceService implements Ser
 
 	@Override
 	public Service getService(String name) throws IOException {
-		try {
-			final de.thjom.java.systemd.Service unit = (de.thjom.java.systemd.Service) systemd.getManager()
-					.getUnit(name + ".service");
-			return new SystemDService(name) {
-				@Override
-				String getState() {
-					return unit.getActiveState();
-				}
+		var unit = manager.GetUnit(name + ".service");
+		return new SystemDService(name) {
+			@Override
+			String getState() {
+				return unit.getActiveState();
+			}
 
-				@Override
-				Unit getUnit() {
-					return unit;
-				}
+			@Override
+			Unit getUnit() {
+				return unit;
+			}
 
-			};
-		} catch (DBusException dbe) {
-			throw new IOException("Failed to get systemd service.", dbe);
-		}
+		};
 	}
 
 	@Override

@@ -19,6 +19,8 @@
 		<maven.versions.plugin>2.3</maven.versions.plugin>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <build.projectProperties>${basedir}/jadaptive.build.properties</build.projectProperties>
+        <build.userProperties>${user.home}/.jadaptive.build.properties</build.userProperties>
 	</properties>
 
 	<modelVersion>4.0.0</modelVersion>
@@ -219,9 +221,13 @@
 			</plugin>
 		</plugins>
 	</reporting>
-	<build>
-		<plugins>
-			<plugin>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>properties-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-javadoc-plugin</artifactId>
 				<executions>
@@ -262,6 +268,26 @@
 
 		<pluginManagement>
 			<plugins>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>properties-maven-plugin</artifactId>
+                    <version>1.0.0</version>
+                    <executions>
+                        <execution>
+                            <phase>initialize</phase>
+                            <goals>
+                                <goal>read-project-properties</goal>
+                            </goals>
+                            <configuration>
+                                <quiet>true</quiet>
+                                <files>
+                                    <file>${build.projectProperties}</file>
+                                    <file>${build.userProperties}</file>
+                                </files>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-compiler-plugin</artifactId>

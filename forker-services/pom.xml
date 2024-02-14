@@ -41,39 +41,23 @@ be implemented.</description>
 			<artifactId>forker-client</artifactId>
 			<version>${project.version}</version>
 		</dependency>
-				<dependency>
+		<dependency>
             <groupId>com.github.hypfvieh</groupId>
             <artifactId>dbus-java-core</artifactId>
-            <version>4.2.1</version>
+            <version>5.0.0</version>
 		</dependency>
         
         <dependency>
             <groupId>com.github.hypfvieh</groupId>
             <artifactId>dbus-java-transport-tcp</artifactId>
-            <version>4.2.1</version>
+            <version>5.0.0</version>
         </dependency>
         
         <dependency>
             <groupId>com.github.hypfvieh</groupId>
             <artifactId>dbus-java-transport-jnr-unixsocket</artifactId>
-            <version>4.2.1</version>
+            <version>5.0.0</version>
         </dependency>
-
-		<dependency>
-			<groupId>com.github.thjomnx</groupId>
-			<artifactId>java-systemd</artifactId>
-			<version>2.1.0</version>
-			<exclusions>
-				<exclusion>
-					<groupId>org.slf4j</groupId>
-					<artifactId>slf4j-simple</artifactId>
-				</exclusion>
-				<exclusion>
-					<groupId>com.github.hypfvieh</groupId>
-					<artifactId>dbus-java</artifactId>
-				</exclusion>
-			</exclusions>
-		</dependency>
 	</dependencies>
 
 	<repositories>
