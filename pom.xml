@@ -24,7 +24,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.sshtools</groupId>
 	<artifactId>forker</artifactId>
-	<version>1.7</version>
+	<version>1.8-SNAPSHOT</version>
 	<name>Forker</name>
 	<description>Forker is a set of utilities and helpers for executing operating system commands.</description>
 	<url>http://www.sshtools.com</url>
@@ -67,11 +67,12 @@
 	</distributionManagement>
 
 	<modules>
-		<module>forker-updater-maven-plugin</module>
 		<module>forker-common</module>
+		<!--<module>forker-updater-maven-plugin</module>
 		<module>forker-updater</module>
 		<module>forker-updater-console</module>
 		<module>forker-updater-swt</module>
+        <module>forker-updater-example</module>-->
 		<module>forker-client</module>
 		<module>forker-examples</module>
 		<module>forker-wrapper</module>
@@ -81,7 +82,6 @@
 		<module>forker-services</module>
 		<module>forker-assembly</module>
         <module>forker-pipes</module>
-        <module>forker-updater-example</module>
 	</modules>
 
 	<dependencies>
