@@ -2,8 +2,8 @@
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<properties>
-		<maven.compiler.source>11</maven.compiler.source>
-		<maven.compiler.target>11</maven.compiler.target>
+		<maven.compiler.source>17</maven.compiler.source>
+		<maven.compiler.target>17</maven.compiler.target>
 		<maven.checkstyle.plugin>2.17</maven.checkstyle.plugin>
 		<maven.cobertura.plugin>2.7</maven.cobertura.plugin>
 		<maven.doxia.module.markdown.version>1.7</maven.doxia.module.markdown.version>
@@ -26,7 +26,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.sshtools</groupId>
 	<artifactId>forker</artifactId>
-	<version>1.8-SNAPSHOT</version>
+	<version>1.9-SNAPSHOT</version>
 	<name>Forker</name>
 	<description>Forker is a set of utilities and helpers for executing operating system commands.</description>
 	<url>http://www.sshtools.com</url>
@@ -70,11 +70,6 @@
 
 	<modules>
 		<module>forker-common</module>
-		<!--<module>forker-updater-maven-plugin</module>
-		<module>forker-updater</module>
-		<module>forker-updater-console</module>
-		<module>forker-updater-swt</module>
-        <module>forker-updater-example</module>-->
 		<module>forker-client</module>
 		<module>forker-examples</module>
 		<module>forker-wrapper</module>
