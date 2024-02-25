@@ -15,7 +15,7 @@ Parts of the non-blocking API are based on NuProcess (https://github.com/brettwo
 	<parent>
 		<groupId>com.sshtools</groupId>
 		<artifactId>forker</artifactId>
-		<version>1.8-SNAPSHOT</version>
+		<version>1.8</version>
 		<relativePath>..</relativePath>
 	</parent>
 
