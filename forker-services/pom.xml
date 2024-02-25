@@ -74,7 +74,7 @@ be implemented.</description>
 					<artifactId>dbus-java</artifactId>
 				</exclusion>
 			</exclusions>
-		</dependency>
+        </dependency>
 	</dependencies>
 
 	<repositories>
